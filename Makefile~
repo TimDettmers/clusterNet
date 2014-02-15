@@ -1,9 +1,0 @@
-nvcc -lmpi $1.cu -o $1.out -I /usr/mpi/openmpi-1.7.4/include -L /usr/mpi/openmpi-1.7.4/lib/ -I/home/tim/development/ -gencode arch=compute_35,code=sm_35
-
-if [ "$2" == "1" ]; then
-  cp $1.out /home/tim/
-  scp /home/tim/$1.out tim@10.0.0.2:/home/tim/
-  /usr/mpi/openmpi-1.7.4/bin/mpirun -np 2 -hostfile /home/tim/cluster /home/tim/$1.out 
-else 
-  /home/tim/development/$1.out
-fi
