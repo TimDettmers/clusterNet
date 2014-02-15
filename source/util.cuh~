@@ -1,0 +1,12 @@
+#ifndef util
+struct Matrix
+{
+  const int shape[2];
+  const int bytes;
+  const int size;
+  const float *data;
+};
+
+Matrix read_csv(char *filename);
+#endif
+

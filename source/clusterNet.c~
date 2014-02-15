@@ -1,0 +1,25 @@
+#include <stdio.h>
+#include <clusterNet.h>
+#include <stdlib.h>
+#include <util.cuh>
+
+int main(int argc, char *argv[])
+{
+  printf("I am alive/n");
+
+  Matrix X = read_csv("/home/tim/Downloads/mnist_full_X.csv");
+
+
+
+
+
+  for(int i = 0; i < 4; i++)
+  {
+    printf("%f\n",X.data[i]);
+  }
+
+
+
+
+
+}

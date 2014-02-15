@@ -1,0 +1,49 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <iostream>
+#include <sstream>
+#include <fstream>
+#include <string>
+#include <list>
+#include <vector>
+#include <util.cuh>
+
+using namespace std;
+
+Matrix read_csv (char* filename)
+{
+
+  ifstream  dStream(filename);
+  int dimX = 0;
+  int dimY = 0;
+  vector<float> X;
+
+    string line;
+    while(std::getline(dStream,line))
+    {
+        stringstream  lineStream(line);
+        string        cell;
+        while(std::getline(lineStream,cell,','))
+        {
+	    X.push_back(::atof(cell.c_str()));
+	    
+	if(dimY == 0)
+	    dimX++;
+        }
+	dimY++;
+    }
+
+  
+  //memcpy(data.data,&X[0], dimX*dimY*sizeof(float));
+
+  Matrix m = {{dimX,dimY},dimX*dimY*sizeof(float),dimX*dimY,&X[0]};  
+
+  for(int i = 0; i< 10; i++)
+  {
+    printf("%f\n",m.data[i]);
+  }
+
+  return data;
+}
+
