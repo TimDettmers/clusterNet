@@ -39,59 +39,57 @@ Matrix fill_matrix(int rows, int cols, float fill_value)
 
 Matrix add(Matrix A, Matrix B)
 {
-  Matrix out = zeros(A.shape[0],B.shape[0]);
-  return add(A, B, out);
+  Matrix out = zeros(A.shape[0],A.shape[1]);
+  add(A, B, out);
+  return out;
 }
 
-Matrix add(Matrix A, Matrix B, Matrix out)
+void add(Matrix A, Matrix B, Matrix out)
 {
   int block_size = (A.size/1024) + 1;
   kAdd<<<block_size,1024>>>(A.data, B.data, out.data, A.size);
-  
-  return out;
 }
 
 Matrix sub(Matrix A, Matrix B)
 {
-  Matrix out = zeros(A.shape[0],B.shape[0]);
-  return sub(A, B, out);
+  Matrix out = zeros(A.shape[0],A.shape[1]);
+  sub(A, B, out);
+  return out;
 }
 
-Matrix sub(Matrix A, Matrix B, Matrix out)
+void sub(Matrix A, Matrix B, Matrix out)
 {
   int block_size = (A.size/1024) + 1;
   kSub<<<block_size,1024>>>(A.data, B.data, out.data, A.size);
-  
-  return out;
 }
 
 Matrix mul(Matrix A, Matrix B)
 {
-  Matrix out = zeros(A.shape[0],B.shape[0]);
-  return mul(A, B, out);
+  Matrix out = zeros(A.shape[0],A.shape[1]);
+  mul(A, B, out);
+  return out;
 }
 
-Matrix mul(Matrix A, Matrix B, Matrix out)
+void mul(Matrix A, Matrix B, Matrix out)
 {
   int block_size = (A.size/1024) + 1;
   kMul<<<block_size,1024>>>(A.data, B.data, out.data, A.size);
-  
-  return out;
 }
 
 Matrix div(Matrix A, Matrix B)
 {
-  Matrix out = zeros(A.shape[0],B.shape[0]);
-  return div(A, B, out);
+  Matrix out = zeros(A.shape[0],A.shape[1]);
+  div(A, B, out);
+  return out;
 }
 
-Matrix div(Matrix A, Matrix B, Matrix out)
+void div(Matrix A, Matrix B, Matrix out)
 {
   int block_size = (A.size/1024) + 1;
   kDiv<<<block_size,1024>>>(A.data, B.data, out.data, A.size);
-  
-  return out;
 }
+
+
 
 Matrix to_host(Matrix m)
 {
@@ -101,3 +99,74 @@ Matrix to_host(Matrix m)
   Matrix host_matrix = {{m.shape[0],m.shape[1]},m.bytes,m.size,cpu_data};
   return host_matrix;
 }
+
+Matrix scalarMul(Matrix A, float a)
+{
+  Matrix out = zeros(A.shape[0],A.shape[1]);
+  scalarMul(A, a, out);
+
+  return out;
+}
+
+void scalarMul(Matrix A, float a, Matrix out)
+{
+  int block_size = (A.size/1024) + 1;
+  kScalarMul<<<block_size,1024>>>(A.data, a, out.data, A.size);
+}
+
+Matrix gpuExp(Matrix A)
+{
+  Matrix out = zeros(A.shape[0],A.shape[1]);
+  gpuExp(A, out);
+
+  return out;
+}
+
+void gpuExp(Matrix A, Matrix out)
+{
+  int block_size = (A.size/1024) + 1;
+  kExp<<<block_size,1024>>>(A.data, out.data, A.size);
+}
+
+Matrix gpuLog(Matrix A)
+{
+  Matrix out = zeros(A.shape[0],A.shape[1]);
+  gpuLog(A, out);
+
+  return out;
+}
+
+void gpuLog(Matrix A, Matrix out)
+{
+  int block_size = (A.size/1024) + 1;
+  kLog<<<block_size,1024>>>(A.data, out.data, A.size);
+}
+
+Matrix gpuSqrt(Matrix A)
+{
+  Matrix out = zeros(A.shape[0],A.shape[1]);
+  gpuSqrt(A, out);
+
+  return out;
+}
+
+void gpuSqrt(Matrix A, Matrix out)
+{
+  int block_size = (A.size/1024) + 1;
+  kSqrt<<<block_size,1024>>>(A.data, out.data, A.size);
+}
+
+Matrix square(Matrix A)
+{
+  Matrix out = zeros(A.shape[0],A.shape[1]);
+  square(A, out);
+
+  return out;
+}
+
+void square(Matrix A, Matrix out)
+{
+  int block_size = (A.size/1024) + 1;
+  kSquare<<<block_size,1024>>>(A.data, out.data, A.size);
+}
+
