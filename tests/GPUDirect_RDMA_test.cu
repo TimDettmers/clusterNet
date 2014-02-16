@@ -35,41 +35,41 @@ int main(int argc, char *argv[])
     const int size =10;
     const size_t bytes = size*sizeof(float);
     const int grid_size = 1024;
-
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
 
     cudaMalloc((void**) &pdata,bytes);
-	    if(myrank == 0)
-      {
-		    cudaMemcpy(pdata, data, bytes, cudaMemcpyDefault);
-	      times_two<<<grid_size, 1024>>>(pdata, size);
-		    MPI_Send(pdata, size, MPI_FLOAT, 1, 100, MPI_COMM_WORLD);
-	    }
-	    else
-	    {
-	 	    MPI_Recv(pdata, size, MPI_FLOAT, 0, 100, MPI_COMM_WORLD, &status);
+    if(myrank == 0)
+    {
+	cudaMemcpy(pdata, data, bytes, cudaMemcpyDefault);
+	times_two<<<grid_size, 1024>>>(pdata, size);
+	MPI_Send(pdata, size, MPI_FLOAT, 1, 100, MPI_COMM_WORLD);
+    }
+    else
+    {
+ 	MPI_Recv(pdata, size, MPI_FLOAT, 0, 100, MPI_COMM_WORLD, &status);
         times_three<<<grid_size,1024>>>(pdata, size);
-      }
+    }
 
-        float *output;
-        output = (float*)malloc(bytes);
-        cudaMemcpy(output,pdata,bytes,cudaMemcpyDefault);
+    float *output;
+    output = (float*)malloc(bytes);
+    cudaMemcpy(output,pdata,bytes,cudaMemcpyDefault);
 
-        for(int i = 0; i< 10; i++)
-        {
-          if(myrank == 0)
-          {
-            assert(data[i]*2==output[i]);
-          }
-          else
-          {
-            assert(data[i]*6==output[i]);
-          }
-        }
+    for(int i = 0; i< 10; i++)
+    {
+       if(myrank == 0)
+       {
+	 assert(data[i]*2==output[i]);
+       }
+       else
+       {
+	 assert(data[i]*6==output[i]);
+       }
+    }
 
+    printf("NVIDIA GPUDirect RDMA test successful for node %i\n", myrank);
 
-       MPI_Finalize();
+    MPI_Finalize();
 
     return 0;
 }

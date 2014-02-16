@@ -1,9 +1,0 @@
-#ifndef clusterNet
-struct Matrix
-{
-  const int shape[2];
-  const size_t bytes;
-  const int size;
-  const float *data;
-};
-#endif
