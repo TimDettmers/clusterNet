@@ -1,5 +1,10 @@
 #ifndef basicOps
 #define basicOps
+
+#define TILE_DIM (32)
+#define BLOCK_ROWS (8)
+#define COPY_BLOCK_SIZE 16
+
 typedef struct Matrix
 {
   int shape[2];
@@ -8,8 +13,6 @@ typedef struct Matrix
   float *data;
 } Matrix;
 
-
-Matrix allocate(Matrix m);
 Matrix dot(Matrix A, Matrix B);
 Matrix fill_matrix(int rows, int cols, float fill_value);
 Matrix ones(int rows, int cols);
@@ -22,7 +25,11 @@ Matrix mul(Matrix A, Matrix B);
 void mul(Matrix A, Matrix B, Matrix out);
 Matrix div(Matrix A, Matrix B);
 void div(Matrix A, Matrix B, Matrix out);
-Matrix to_host(Matrix m);
+
+Matrix to_host(Matrix A);
+Matrix to_gpu(Matrix A);
+Matrix T(Matrix A);
+void T(Matrix A, Matrix out);
 
 Matrix scalarMul(Matrix A, float a);
 void scalarMul(Matrix A, float a, Matrix out);
@@ -36,4 +43,9 @@ void gpuLog(Matrix A, Matrix out);
 Matrix gpuSqrt(Matrix A);
 void gpuSqrt(Matrix A, Matrix out);
 
+void checkMatrixOperation(Matrix A, Matrix B, Matrix C, int blnMatrixProduct);
+int blnFaultySizes(Matrix A, Matrix B, Matrix C);
+int blnFaultyMatrixProductSizes(Matrix A, Matrix B, Matrix C);
+void printFaultySizeError(Matrix A, Matrix B, Matrix C);
+void printFaultyMatrixProductSizeError(Matrix A, Matrix B, Matrix C);
 #endif

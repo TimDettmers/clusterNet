@@ -25,7 +25,7 @@ __global__ void times_three(float *data, long size)
   }
 }
 
-int main(int argc, char *argv[])
+int run_GPUDirect_RDMA_test(int argc, char *argv[])
 {
     int myrank;
     MPI_Status status;
@@ -66,8 +66,6 @@ int main(int argc, char *argv[])
 	 assert(data[i]*6==output[i]);
        }
     }
-
-    printf("NVIDIA GPUDirect RDMA test successful for node %i\n", myrank);
 
     MPI_Finalize();
 

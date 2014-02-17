@@ -11,8 +11,8 @@ int main(int argc, char *argv[])
   Matrix h_y = read_csv("/home/tim/Downloads/mnist_full_y.csv");
   Matrix h_X = read_csv("/home/tim/Downloads/mnist_full_X.csv");
 
-  Matrix d_y = allocate(h_y);
-  Matrix d_X = allocate(h_X);
+  Matrix d_y = to_gpu(h_y);
+  Matrix d_X = to_gpu(h_X);
 
   printf("Done.\n");
 
