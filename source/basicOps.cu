@@ -23,6 +23,18 @@ Matrix ones(int rows, int cols)
   return fill_matrix(rows, cols, 1.0f);
 }
 
+Matrix empty(int rows, int cols)
+{
+  float *gpu_data;
+  int size = rows*cols;
+  size_t bytes = rows*cols*sizeof(float);
+  cudaMalloc((void**)&gpu_data, bytes);
+  
+  Matrix A = {{rows, cols}, bytes, size, gpu_data};
+
+  return A;
+}
+
 Matrix fill_matrix(int rows, int cols, float fill_value)
 {
   if(rows < 1 || cols < 1)

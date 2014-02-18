@@ -5,6 +5,9 @@
 #define BLOCK_ROWS (8)
 #define COPY_BLOCK_SIZE 16
 
+#define RDM_NUMBERS_PER_THREAD (512)
+#define THREADS_PER_BLOCKS (1024)
+
 typedef struct Matrix
 {
   int shape[2];
@@ -13,10 +16,11 @@ typedef struct Matrix
   float *data;
 } Matrix;
 
-Matrix dot(Matrix A, Matrix B);
 Matrix fill_matrix(int rows, int cols, float fill_value);
 Matrix ones(int rows, int cols);
 Matrix zeros(int rows, int cols);
+Matrix empty(int rows, int cols);
+
 Matrix add(Matrix A, Matrix B);
 void add(Matrix A, Matrix B, Matrix out);
 Matrix sub(Matrix A, Matrix B);

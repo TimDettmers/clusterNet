@@ -3,8 +3,11 @@
 #include <clusterKernels.cuh>
 #include <cublas_v2.h>
 #include <stdio.h>
-#include "curand.h"
-#include "curand_kernel.h"
+#include <curand.h>
+#include <curand_kernel.h>
+#include <util.cuh>
+
+
 
 Matrix dot(Matrix A, Matrix B)
 {
@@ -23,7 +26,6 @@ void dot(Matrix A, Matrix B, Matrix out)
   const float alpha = 1.0f;
   const float beta = 0.0f;
 
-  //cublas
   cublasHandle_t h;
   cublasCreate(&h);      
     
@@ -37,36 +39,33 @@ void dot(Matrix A, Matrix B, Matrix out)
     printf("CUBLAS ERROR!");
 }
 
-Matrix rand(int rows, int cols){ return rand(rows, cols, time(0)); }
-Matrix rand(int rows, int cols, int seed)
-{	
-    curandState *devStates;
-    int size = rows * cols;	
-    const int bytes = sizeof(float)*size;
-    float *rdm_data;
-    cudaMalloc((void**) &rdm_data, bytes);
-    cudaMalloc((void**) &devStates, sizeof(curandState)*size);
-    setup_kernel<<<1 + (size/1024),1024>>>(devStates, seed);
-    generate_uniform_kernel<<<1 + (size/(1024*256)),1024>>>(devStates, size, rdm_data);
-        
-    Matrix ret = {{rows, cols}, bytes, size, rdm_data};
-    
-    return ret;
+curandGenerator_t random_init(){ return random_init(time(0)); }
+curandGenerator_t random_init(int seed)
+{
+    curandGenerator_t gen;
+    curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_DEFAULT);    
+    curandSetPseudoRandomGeneratorSeed(gen, seed);
+    curandSetGeneratorOffset(gen, 100);
+
+    return gen;
 }
 
-Matrix randn(int rows, int cols){ return randn(rows, cols, time(0)); }
-Matrix randn(int rows, int cols, int seed)
-{	
-    curandState *devStates;
-    int size = rows * cols;	
-    const int bytes = sizeof(float)*size;
-    float *rdm_data;
-    cudaMalloc((void**) &rdm_data, bytes);
-    cudaMalloc((void**) &devStates, sizeof(curandState)*size);
-    setup_kernel<<<1 + (size/1024),1024>>>(devStates, seed);
-    generate_normal_kernel<<<1 + (size/(1024*256)),1024>>>(devStates, size, rdm_data);
-        
-    Matrix ret = {{rows, cols}, bytes, size, rdm_data};
-    
-    return ret;
+Matrix rand(curandGenerator_t gen, int rows, int cols)
+{ 
+    Matrix out = empty(rows, cols);
+    rand(gen, rows, cols, out);
+
+    return out;
 }
+void rand(curandGenerator_t gen, int rows, int cols, Matrix out){ curandGenerateUniform(gen, out.data, rows*cols); }
+
+Matrix randn(curandGenerator_t gen, int rows, int cols){ return randn(gen, rows, cols, 0, 1); }
+Matrix randn(curandGenerator_t gen, int rows, int cols, float mean, float std)
+{
+    Matrix out = empty(rows,cols);  
+    randn(gen, rows, cols, mean, std, out);
+    
+    return out;
+}
+void randn(curandGenerator_t gen, int rows, int cols, float mean, float std, Matrix out){ curandGenerateNormal(gen, out.data, rows*cols, 0.0f, 1.0f); }
+

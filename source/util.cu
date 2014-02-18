@@ -45,3 +45,23 @@ Matrix read_csv (char* filename)
 }
 
 
+cudaEvent_t* tick()
+{
+    cudaEvent_t* startstop;
+    startstop = (cudaEvent_t*)malloc(2*sizeof(cudaEvent_t));
+    cudaEventCreate(&startstop[0]);
+    cudaEventCreate(&startstop[1]);
+    cudaEventRecord(startstop[0], 0);
+
+    return startstop;
+}
+
+void tock(cudaEvent_t* startstop)
+{
+    float time;
+    cudaEventRecord(startstop[1], 0);
+    cudaEventSynchronize(startstop[1]);   
+    cudaEventElapsedTime(&time, startstop[0], startstop[1]);
+    printf ("Time for the kernel: %f ms\n", time);
+}
+
