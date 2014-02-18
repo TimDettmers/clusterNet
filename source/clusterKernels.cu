@@ -1,4 +1,6 @@
 #include <basicOps.cuh>
+#include "curand.h"
+#include "curand_kernel.h"
 
 __global__ void kFill_with(float *m, float fill_value, int size)
 {
@@ -139,3 +141,54 @@ __global__ void kTranspose(float *A, float *out, int width, int height)
         out[index_out] = block[threadIdx.x][threadIdx.y];
     }
 }
+
+__global__ void setup_kernel(curandState *state, int seed)
+{
+  const int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
+  curand_init(seed, idx, 0, &state[idx]);
+}
+
+
+__global__ void generate_uniform_kernel(curandState *state, int size, float *out)
+{	
+  //each thread generates 256 random numbers
+  //max random numbers generated in one go: 256*1024*1024 = 268435456
+
+  const int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
+  curandState localState = state[idx];	 
+  int start = (blockIdx.x * blockDim.x * 256) + threadIdx.x *256;
+  int end = start+256;
+
+  for(unsigned int i = start; (i < end) && (i < size); i++)
+  { 
+    out[i]  = curand_uniform(&localState);	 
+  }
+
+  state[idx] = localState;
+}
+
+__global__ void generate_normal_kernel(curandState *state, int size, float *out)
+{	
+  //each thread generates 256 random numbers
+  //max random numbers generated in one go: 256*1024*1024 = 268435456
+
+  const int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
+  curandState localState = state[idx];	 
+  int start = (blockIdx.x * blockDim.x * 256) + threadIdx.x *256;
+  int end = start+256;
+
+  for(unsigned int i = start; (i < end) && (i < size); i++)
+  { 
+    out[i]  = curand_normal(&localState);	 
+  }
+
+  state[idx] = localState;
+}
+
+
+
+
+
+
+
+
