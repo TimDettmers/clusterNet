@@ -16,4 +16,7 @@ __global__ void kTranspose(float *A, float *out, int width, int height);
 __global__ void setup_kernel(curandState *state, int seed);
 __global__ void generate_uniform_kernel(curandState *state, int size, float *out);
 __global__ void generate_normal_kernel(curandState *state, int size, float *out);
+__global__ void slice_rows(float *A, int start, int end, int cols, float *out);
+__global__ void slice_cols(float *A, int start, int end, int rows, int cols, float *out);
+__global__ void kMerge(float *A, float *B, float *out, int size_a, int size_b);
 #endif

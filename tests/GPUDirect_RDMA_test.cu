@@ -38,6 +38,7 @@ int run_GPUDirect_RDMA_test(int argc, char *argv[])
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
 
+
     cudaMalloc((void**) &pdata,bytes);
     if(myrank == 0)
     {
@@ -50,6 +51,8 @@ int run_GPUDirect_RDMA_test(int argc, char *argv[])
  	MPI_Recv(pdata, size, MPI_FLOAT, 0, 100, MPI_COMM_WORLD, &status);
         times_three<<<grid_size,1024>>>(pdata, size);
     }
+
+
 
     float *output;
     output = (float*)malloc(bytes);

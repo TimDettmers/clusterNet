@@ -3,14 +3,92 @@
 #include <clusterKernels.cuh>
 #include <assert.h>
 
-Matrix to_gpu(Matrix A)
+Matrix to_gpu(Matrix A){ return to_gpu(A, 0); }
+Matrix to_gpu(Matrix A, int is_col_major)
 {
   float * gpu_data;
   cudaMalloc((void**)&gpu_data,A.bytes);
   cudaMemcpy(gpu_data,A.data,A.bytes,cudaMemcpyDefault);
-  Matrix gpu_matrix = {{A.shape[0],A.shape[1]},A.bytes,A.size,gpu_data};
+  Matrix out = {{A.shape[0],A.shape[1]},A.bytes,A.size,gpu_data};
 
-  return gpu_matrix;
+  if(is_col_major == 0)
+	  out = to_col_major(out);
+
+  return out;
+}
+
+Matrix to_host(Matrix A){ return to_host(A, 0); }
+Matrix to_host(Matrix A, int is_row_major)
+{
+  Matrix row_major = A;
+	 if(is_row_major == 0)
+		 row_major = to_row_major(A);
+  float *cpu_data;
+  cpu_data = (float*)malloc(row_major.bytes);
+  cudaMemcpy(cpu_data,row_major.data,row_major.bytes,cudaMemcpyDefault);
+  Matrix out = {{row_major.shape[0],row_major.shape[1]},row_major.bytes,row_major.size,cpu_data};
+
+
+
+  return out;
+}
+
+
+static inline void T(Matrix A, Matrix out, int rows, int cols)
+{
+  // setup execution parameters
+  int grid_x = rows / COPY_BLOCK_SIZE;
+  if (rows % COPY_BLOCK_SIZE)
+    grid_x++;
+
+  int grid_y = cols / COPY_BLOCK_SIZE;
+  if (cols % COPY_BLOCK_SIZE)
+    grid_y++;
+
+  dim3 grid(grid_x, grid_y, 1);
+  dim3 threads(COPY_BLOCK_SIZE, COPY_BLOCK_SIZE, 1);
+  kTranspose<<< grid, threads >>>(A.data, out.data, rows, cols);
+
+}
+
+Matrix to_col_major(Matrix A)
+{
+  Matrix out = empty(A.shape[0],A.shape[1]);
+  T(A, out, A.shape[1],A.shape[0]);
+  //cudaFree(A.data);
+  return out;
+}
+
+Matrix to_row_major(Matrix A)
+{
+  Matrix out = empty(A.shape[0],A.shape[1]);
+  T(A, out, A.shape[0],A.shape[1]);
+  //cudaFree(A.data);
+  return out;
+}
+
+Matrix T(Matrix A)
+{
+  Matrix out = empty(A.shape[1],A.shape[0]);
+  T(A, out, A.shape[0],A.shape[1]);
+
+  out.shape[0] = A.shape[1];
+  out.shape[1] = A.shape[0];
+  return out;
+}
+
+
+
+
+Matrix slice_rows(Matrix A, int start, int end)
+{
+  Matrix out = empty(end - start, A.shape[1]);
+  int block_size = (out.size/1024) + 1;
+  slice_rows<<<block_size,1024>>>(A.data, start, end, A.shape[1], out.data);
+
+  cudaDeviceSynchronize();
+
+  return out;
 }
 
 Matrix zeros(int rows, int cols)
@@ -81,6 +159,13 @@ Matrix sub(Matrix A, Matrix B)
   return out;
 }
 
+
+void merge(Matrix A, Matrix B, Matrix out)
+{
+  int block_size = (out.size/512) + 1;
+  kMerge<<<block_size,512>>>(A.data, B.data, out.data, A.size, B.size);
+}
+
 void sub(Matrix A, Matrix B, Matrix out)
 {
   int block_size = (A.size/1024) + 1;
@@ -120,14 +205,7 @@ void div(Matrix A, Matrix B, Matrix out)
 
 
 
-Matrix to_host(Matrix A)
-{
-  float *cpu_data;
-  cpu_data = (float*)malloc(A.bytes);
-  cudaMemcpy(cpu_data,A.data,A.bytes,cudaMemcpyDefault);
-  Matrix host_matrix = {{A.shape[0],A.shape[1]},A.bytes,A.size,cpu_data};
-  return host_matrix;
-}
+
 
 Matrix scalarMul(Matrix A, float a)
 {
@@ -277,28 +355,14 @@ void checkMatrixOperation(Matrix A, Matrix B, Matrix C, int blnMatrixProduct)
   }
 }
 
-Matrix T(Matrix A)
+
+
+Matrix slice_cols(Matrix A, int start, int end)
 {
-  Matrix out = zeros(A.shape[0],A.shape[1]);
-  T(A, out);
+  Matrix out = empty(A.shape[0], end - start);
+  int block_size = (out.size/1024) + 1;
+  slice_cols<<<block_size,1024>>>(A.data, start, end, A.shape[0], A.shape[1], out.data);
 
   return out;
 }
-
-void T(Matrix A, Matrix out)
-{
-  // setup execution parameters
-  int grid_x = A.shape[0] / COPY_BLOCK_SIZE;
-  if (A.shape[0] % COPY_BLOCK_SIZE)
-    grid_x++;
-
-  int grid_y = A.shape[1] / COPY_BLOCK_SIZE;
-  if (A.shape[1] % COPY_BLOCK_SIZE)
-    grid_y++;
-
-  dim3 grid(grid_x, grid_y, 1);
-  dim3 threads(COPY_BLOCK_SIZE, COPY_BLOCK_SIZE, 1);
-  kTranspose<<< grid, threads >>>(A.data, out.data, A.shape[0], A.shape[1]);
-}
-
 

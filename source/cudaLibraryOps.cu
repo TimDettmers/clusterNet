@@ -9,6 +9,8 @@
 
 
 
+
+
 Matrix dot(Matrix A, Matrix B)
 {
   Matrix out = zeros(A.shape[0],B.shape[1]);
@@ -36,7 +38,7 @@ void dot(Matrix A, Matrix B, Matrix out)
                 &beta, out.data, out.shape[0]);   
                 
   if(status != CUBLAS_STATUS_SUCCESS)
-    printf("CUBLAS ERROR!");
+    printf("CUBLAS ERROR!\n");
 }
 
 curandGenerator_t random_init(){ return random_init(time(0)); }
@@ -49,7 +51,7 @@ curandGenerator_t random_init(int seed)
 
     return gen;
 }
-
+//Uniform
 Matrix rand(curandGenerator_t gen, int rows, int cols)
 { 
     Matrix out = empty(rows, cols);
@@ -59,6 +61,7 @@ Matrix rand(curandGenerator_t gen, int rows, int cols)
 }
 void rand(curandGenerator_t gen, int rows, int cols, Matrix out){ curandGenerateUniform(gen, out.data, rows*cols); }
 
+//Gaussian
 Matrix randn(curandGenerator_t gen, int rows, int cols){ return randn(gen, rows, cols, 0, 1); }
 Matrix randn(curandGenerator_t gen, int rows, int cols, float mean, float std)
 {
@@ -67,5 +70,6 @@ Matrix randn(curandGenerator_t gen, int rows, int cols, float mean, float std)
     
     return out;
 }
-void randn(curandGenerator_t gen, int rows, int cols, float mean, float std, Matrix out){ curandGenerateNormal(gen, out.data, rows*cols, 0.0f, 1.0f); }
+void randn(curandGenerator_t gen, int rows, int cols, float mean, float std, Matrix out)
+{ curandGenerateNormal(gen, out.data, rows*cols, 0.0f, 1.0f); }
 

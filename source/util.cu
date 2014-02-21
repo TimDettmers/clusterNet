@@ -44,7 +44,6 @@ Matrix read_csv (char* filename)
   return m;
 }
 
-
 cudaEvent_t* tick()
 {
     cudaEvent_t* startstop;
@@ -62,6 +61,74 @@ void tock(cudaEvent_t* startstop)
     cudaEventRecord(startstop[1], 0);
     cudaEventSynchronize(startstop[1]);   
     cudaEventElapsedTime(&time, startstop[0], startstop[1]);
-    printf ("Time for the kernel: %f ms\n", time);
+    printf ("Time for the kernel(s): %f ms.\n", time);
 }
+
+int test_eq(float f1, float f2, char* message)
+{
+  if(f1 == f2){ return 1;}
+  else{ printf("%s: %f != %f\n", message, f1, f2); }
+  return 0;
+}
+
+int test_eq(float f1, float f2, int idx1, int idx2, char* message)
+{
+  if(f1 == f2){ return 1;}
+  else{ printf("%s: %f != %f for index %i and %i.\n", message, f1, f2, idx1, idx2); }
+  return 0;
+}
+
+int test_eq(int i1, int i2, char* message)
+{
+  if(i1 == i2){ return 1;}
+  else{ printf("%s: %i != %i\n", message, i1, i2); }
+  return 0;
+}
+
+int test_eq(int i1, int i2, int idx1, int idx2, char* message)
+{
+  if(i1 == i2){ return 1;}
+  else{ printf("%s: %i != %i for index %i and %i.\n", message, i1, i2, idx1, idx2); }
+  return 0;
+}
+
+int test_matrix(Matrix A, int rows, int cols)
+{
+  if((A.shape[0] == rows) &&
+     (A.shape[1] == cols) &&
+     (A.size == cols*rows) &&
+     (A.bytes == cols*rows*sizeof(float)))
+      {return 1;}
+  else
+  {
+    test_eq(A.shape[0],rows,"Matrix rows");
+    test_eq(A.shape[1],cols,"Matrix cols");
+    test_eq(A.size,cols*rows,"Matrix size");
+    test_eq((int)(A.bytes),(int)(cols*rows*sizeof(float)),"Matrix bytes");
+  }
+
+  return 0;
+}
+
+void print_matrix(Matrix A)
+{
+  for(int i = 0; i< A.size; i++)
+  {
+    printf("%f\n",A.data[i]);
+  }
+}
+
+void print_gpu_matrix(Matrix A)
+{
+  float *data = (float*)malloc(A.bytes);
+  cudaMemcpy(data,A.data,A.bytes,cudaMemcpyDefault);
+  for(int i = 0; i< A.size; i++)
+  {
+    printf("%f\n",data[i]);
+  }
+  cudaFree(data);
+  free(data);
+}
+
+
 

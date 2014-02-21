@@ -16,11 +16,11 @@ EXECSRC = build/clusterNet.out
 EXECTEST = build/testSuite.out
 
 all : $(EXECSRC) $(EXECTEST)
-
+	
 $(EXECSRC) : $(SCR) 
 	$(CC) $^ -o $@ $(CFLAGS)
 
-$(EXECTEST): $(TESTS) $(SCR) 	     
+$(EXECTEST): $(SCR) $(TESTS)  	     
 	$(CC) $(TESTS) $(LINK) -o $@ $(CFLAGS)
 
 test:

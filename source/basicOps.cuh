@@ -8,6 +8,15 @@
 #define RDM_NUMBERS_PER_THREAD (512)
 #define THREADS_PER_BLOCKS (1024)
 
+#define DOT_BLOCKS (128)
+#define TILE_SIZE (32)
+#define DOT_REPS (4)
+
+
+//working
+//128,16,8
+//64,16,4
+
 typedef struct Matrix
 {
   int shape[2];
@@ -31,9 +40,12 @@ Matrix div(Matrix A, Matrix B);
 void div(Matrix A, Matrix B, Matrix out);
 
 Matrix to_host(Matrix A);
+Matrix to_host(Matrix A, int is_row_major);
 Matrix to_gpu(Matrix A);
+Matrix to_gpu(Matrix A, int is_col_major);
 Matrix T(Matrix A);
-void T(Matrix A, Matrix out);
+Matrix to_col_major(Matrix A);
+Matrix to_row_major(Matrix A);
 
 Matrix scalarMul(Matrix A, float a);
 void scalarMul(Matrix A, float a, Matrix out);
@@ -52,4 +64,8 @@ int blnFaultySizes(Matrix A, Matrix B, Matrix C);
 int blnFaultyMatrixProductSizes(Matrix A, Matrix B, Matrix C);
 void printFaultySizeError(Matrix A, Matrix B, Matrix C);
 void printFaultyMatrixProductSizeError(Matrix A, Matrix B, Matrix C);
+
+Matrix slice_rows(Matrix A, int start, int end);
+Matrix slice_cols(Matrix A, int start, int end);
+void merge(Matrix A, Matrix B, Matrix out);
 #endif
