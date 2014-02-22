@@ -113,6 +113,23 @@ Matrix empty(int rows, int cols)
   return A;
 }
 
+Matrix* empty2(int rows, int cols)
+{
+	  float *gpu_data;
+	  int size = rows*cols;
+	  size_t bytes = rows*cols*sizeof(float);
+	  cudaMalloc((void**)&gpu_data, bytes);
+
+	  Matrix *A =(Matrix*)malloc(sizeof(Matrix));
+	  A->shape[0]= rows;
+	  A->shape[1]=cols;
+	  A->bytes =bytes;
+	  A->size=size;
+	  A->data=gpu_data;
+
+	  return A;
+}
+
 Matrix fill_matrix(int rows, int cols, float fill_value)
 {
   if(rows < 1 || cols < 1)
@@ -120,7 +137,7 @@ Matrix fill_matrix(int rows, int cols, float fill_value)
     printf("Error: Dimensions must be greater than zero!\n");
     assert(0);  
   }
-
+ 
 
   float *gpu_data;
   int size = rows*cols;

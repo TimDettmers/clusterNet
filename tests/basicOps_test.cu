@@ -5,21 +5,18 @@
 #include <math.h>
 #include <curand.h>
 #include <curand_kernel.h>
-#include <cudaLibraryOps.cuh>
 #include <util.cuh>
+#include <clusterNet.cuh>
 
 int run_basicOps_test(int argc, char *argv[])
 {
+
+  ClusterNet gpu = ClusterNet();
+
   Matrix m1 = ones(5,6);
   Matrix m2 = ones(5,6);  
   Matrix m3 = zeros(5,6);
   Matrix out = zeros(5,6);
-  
-
-
-
-
-
   
   //to_col_major test
   //      0 2    3             
@@ -238,8 +235,7 @@ int run_basicOps_test(int argc, char *argv[])
 
 
   //slice rows
-  curandGenerator_t gen1 = random_init();
-  m1 = rand(gen1, 10,10);  
+  m1 = gpu.rand(10,10);
   m2 = to_host(slice_rows(m1, 2,5),1);
   m1 = to_host(m1,1);
   assert(test_matrix(m2,3,10));

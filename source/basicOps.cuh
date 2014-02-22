@@ -29,6 +29,7 @@ Matrix fill_matrix(int rows, int cols, float fill_value);
 Matrix ones(int rows, int cols);
 Matrix zeros(int rows, int cols);
 Matrix empty(int rows, int cols);
+Matrix* empty2(int rows, int cols);
 
 Matrix add(Matrix A, Matrix B);
 void add(Matrix A, Matrix B, Matrix out);

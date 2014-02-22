@@ -1,5 +1,4 @@
 #include <stdio.h>
-#include <clusterNet.cuh>
 #include <stdlib.h>
 #include <iostream>
 #include <sstream>
@@ -123,6 +122,18 @@ void print_gpu_matrix(Matrix A)
   float *data = (float*)malloc(A.bytes);
   cudaMemcpy(data,A.data,A.bytes,cudaMemcpyDefault);
   for(int i = 0; i< A.size; i++)
+  {
+    printf("%f\n",data[i]);
+  }
+  cudaFree(data);
+  free(data);
+}
+
+void print_gpu_matrix2(Matrix *A)
+{
+  float *data = (float*)malloc(A->bytes);
+  cudaMemcpy(data,A->data,A->bytes,cudaMemcpyDefault);
+  for(int i = 0; i< A->size; i++)
   {
     printf("%f\n",data[i]);
   }
