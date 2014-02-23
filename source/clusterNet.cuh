@@ -13,7 +13,6 @@ public:
 	 ClusterNet();
 	 ClusterNet(int seed);
 	 ClusterNet(int argc, char *argv[], int seed);
-	 //~ClusterNet();
 	 int m_rank;
 
 	 Matrix dot(Matrix A, Matrix B);
@@ -27,10 +26,16 @@ public:
 	 Matrix randn(int rows, int cols, float mean, float std);
 	 void randn(int rows, int cols, float mean, float std, Matrix out);
 
+	 void tick(std::string name);
+	 void tick();
+	 void tock(std::string name);
+	 void tock();
+
 	 void shutdown_MPI();
 private:
 	 cublasHandle_t m_handle;
 	 curandGenerator_t m_generator;
+	 std::map<std::string,cudaEvent_t*> m_dictTickTock;
 
 	 int m_nodes;
 	 bool m_hasMPI;

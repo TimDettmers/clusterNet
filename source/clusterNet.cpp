@@ -7,12 +7,12 @@
 #include <stdlib.h>
 #include <iostream>
 #include <mpi.h>
+#include <assert.h>
 
 
 ClusterNet::ClusterNet(){ init((int)(time(0) % 10000)); }
 ClusterNet::ClusterNet(int seed){ init(seed);}
 ClusterNet::ClusterNet(int argc, char* argv[], int seed){ init(seed); init_MPI(argc, argv); }
-//ClusterNet::~ClusterNet(){ if(m_hasMPI) MPI_Finalize(); }
 void ClusterNet::init(int seed)
 {
 	curandCreateGenerator(&m_generator, CURAND_RNG_PSEUDO_DEFAULT);
@@ -122,5 +122,20 @@ void ClusterNet::randn(int rows, int cols, float mean, float std, Matrix out)
 {
 	curandGenerateNormal(m_generator, out.data, rows*cols, 0.0f, 1.0f);
 }
+
+//{ Tick ... Tock
+void ClusterNet::tick(){tick("default"); }
+void ClusterNet::tick(std::string name)
+{
+	m_dictTickTock[name] = ::tick();
+}
+void ClusterNet::tock(){tock("default"); }
+void ClusterNet::tock(std::string name)
+{
+	assert(("No tick event was registered for the name" + name, m_dictTickTock.count(name) > 0));
+	::tock(m_dictTickTock[name], name);
+}
+//}
+
 
 

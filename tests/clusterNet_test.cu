@@ -7,8 +7,9 @@
 
 int run_clusterNet_test(int argc, char *argv[])
 {
-
   ClusterNet gpu = ClusterNet();
+  ClusterNet ticktock_test = ClusterNet();
+  ticktock_test.tick("ClusterNet test ran in");
 
   //dot test
   //      0 2    3             17 0
@@ -149,6 +150,9 @@ int run_clusterNet_test(int argc, char *argv[])
   }
 
   gpu.shutdown_MPI();
+
+  //These should just pass without error
+  ticktock_test.tock("ClusterNet test ran in");
 
   return 0;
 }
