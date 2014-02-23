@@ -5,6 +5,7 @@
 #include <basicOps.cuh>
 #include <curand.h>
 #include <mpi.h>
+#include <list>
 
 class ClusterNet
 {
@@ -36,6 +37,8 @@ private:
 	 cublasHandle_t m_handle;
 	 curandGenerator_t m_generator;
 	 std::map<std::string,cudaEvent_t*> m_dictTickTock;
+	 std::map<std::string,float> m_dictTickTockCumulative;
+	 std::list<MPI_Request*> m_requests;
 
 	 int m_nodes;
 	 bool m_hasMPI;
@@ -43,5 +46,7 @@ private:
 
 	 void init(int seed);
 	 void init_MPI(int argc, char *argv[]);
+	 void waitForAllRequests();
 };
 #endif
+

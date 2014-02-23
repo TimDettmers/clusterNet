@@ -117,30 +117,65 @@ void MPI_benchmark(int argc, char *argv[])
 
     out = empty(batch_rows/2,w_out);
     startstop = tick();
+    gpu.tick("aa");
     //out = empty(w_in/2,w_out);
     for(int i = 0; i < 100; i++)
     {
+    	gpu.tick("dot");
+		gpu.dot(C,B, out);
+		gpu.tick("dot");
+
 	    if(myrank == 0)
 	    {
-		gpu.dot(C,B, out);
     		//add(A1, B,out);
+		gpu.tick("send");
 		MPI_Send(out.data, out.size, MPI_FLOAT, 1, 100, MPI_COMM_WORLD);
+		gpu.tick("send");
 	    }
 	    else
 	    {
-		gpu.dot(C,B, out);
 		//add(A2,B, out);
+		gpu.tick("receive");
 	 	MPI_Recv(C_out.data, C_out.size, MPI_FLOAT, 0, 100, MPI_COMM_WORLD, &status);
                 merge(out,C_out, grand_out);
+                gpu.tick("receive");
+	    }
+
+	    if(myrank == 1)
+	    {
+    		//add(A1, B,out);
+		gpu.tick("send");
+		MPI_Send(out.data, out.size, MPI_FLOAT, 0, 100, MPI_COMM_WORLD);
+		gpu.tick("send");
+	    }
+	    else
+	    {
+		//add(A2,B, out);
+		gpu.tick("receive");
+	 	MPI_Recv(C_out.data, C_out.size, MPI_FLOAT, 1, 100, MPI_COMM_WORLD, &status);
+                merge(out,C_out, grand_out);
+                gpu.tick("receive");
 	    }
 
     }
+
+    gpu.tock("dot");
 
     if(myrank == 1)
     {
       printf("GPUDirect RDMA batch:\n");
       tock(startstop);
+
+      gpu.tock("receive");
+      gpu.tock("aa");
     }
+    else
+    {
+
+        gpu.tock("send");
+    }
+
+
 
 
 
@@ -162,15 +197,56 @@ void MPI_benchmark(int argc, char *argv[])
 int main(int argc, char *argv[])
 {
 
-  //MPI_benchmark(argc, argv);
-	ClusterNet gpu = ClusterNet(argc, argv, 12345);
+  MPI_benchmark(argc, argv);
+  /*
+	ClusterNet gpu = ClusterNet();
 
 
+	Matrix A = gpu.rand(128,10000);
+	Matrix B = gpu.rand(10000,6000);
+    int m_rank = 0;
+	MPI_Init(&argc, &argv);
+	MPI_Comm_rank(MPI_COMM_WORLD, &m_rank);
+	MPI_Status status;
+
+
+	if(m_rank == 0)
+	{
+		gpu.tick("MPI test send");
+		MPI_Send(A.data, A.size, MPI_FLOAT, 1, 100, MPI_COMM_WORLD);
+		gpu.tock("MPI test send");
+	}
+	if(m_rank == 1)
+	{
+		gpu.tick("MPI test receive");
+		MPI_Recv(A.data, A.size, MPI_FLOAT, 0, 100, MPI_COMM_WORLD, &status);
+		gpu.tock("MPI test receive");
+	}
+
+	gpu.tick("to beat");
+	gpu.dot(A,B);
+	gpu.tock("to beat");
+
+*/
+
+	/*
+	gpu.tick("dot mpi");
+	gpu.dotMPI(A,B);
+	gpu.tock("dot mpi");
+
+	gpu.tick("dot normal");
+	gpu.dot(A,B);
+	gpu.tock("dot normal");
+	*/
+
+
+	//gpu.shutdown_MPI();
 
 
 
 
 
 }
+
 
 

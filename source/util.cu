@@ -63,6 +63,19 @@ void tock(cudaEvent_t* startstop, std::string text)
 	cudaEventElapsedTime(&time, startstop[0], startstop[1]);
 	printf((text + ": %f ms.\n").c_str(), time);
 }
+void tock(std::string text, float tocks)
+{
+	printf((text + ": %f ms.\n").c_str(), tocks);
+}
+float tock(cudaEvent_t* startstop, float tocks)
+{
+	float time;
+	cudaEventRecord(startstop[1], 0);
+	cudaEventSynchronize(startstop[1]);
+	cudaEventElapsedTime(&time, startstop[0], startstop[1]);
+
+	return time+tocks;
+}
 
 int test_eq(float f1, float f2, char* message)
 {

@@ -8,6 +8,7 @@
 #include <iostream>
 #include <mpi.h>
 #include <assert.h>
+#include <algorithm>
 
 
 ClusterNet::ClusterNet(){ init((int)(time(0) % 10000)); }
@@ -53,20 +54,38 @@ Matrix ClusterNet::dotMPI(Matrix A, Matrix B)
 	Matrix out = empty(split_size,B.shape[1]);
 	Matrix out_rev = empty(split_size,B.shape[1]);
 
+	tick("slice rows");
 	Matrix A1 = slice_rows(A, split_size*m_rank,split_size*(m_rank+1)-1);
+	tock("slice rows");
 	dot(A1,B,out);
 	for(int i = 0; i < m_nodes; i++)
 	{
 		if(m_rank == i) { continue; }
-		MPI_Send(out.data, out.size, MPI_FLOAT, i, 100, MPI_COMM_WORLD);
+		MPI_Request *request = (MPI_Request*)malloc(sizeof(MPI_Request));
+		m_requests.push_back(request);
+		tick("send");
+		MPI_Isend(out.data, out.size, MPI_FLOAT, i, 100, MPI_COMM_WORLD, request);
+		tock("send");
 	}
+
+
+
+
 
 	for(int i = 0; i < m_nodes; i++)
 	{
 		if(m_rank == i) { continue; }
-		MPI_Recv(out_rev.data, out_rev.size, MPI_FLOAT, i, 100, MPI_COMM_WORLD, &m_status);
+		tick("receive");
+		MPI_Request *request = (MPI_Request*)malloc(sizeof(MPI_Request));
+		m_requests.push_back(request);
+		MPI_Irecv(out_rev.data, out_rev.size, MPI_FLOAT, i, 100, MPI_COMM_WORLD, request);
+		tock("receive");
+		tick("merge");
 		out = merge(out,out_rev);
+		tock("merge");
 	}
+
+	waitForAllRequests();
 
 	return out;
 }
@@ -123,19 +142,51 @@ void ClusterNet::randn(int rows, int cols, float mean, float std, Matrix out)
 	curandGenerateNormal(m_generator, out.data, rows*cols, 0.0f, 1.0f);
 }
 
-//{ Tick ... Tock
+
 void ClusterNet::tick(){tick("default"); }
 void ClusterNet::tick(std::string name)
 {
-	m_dictTickTock[name] = ::tick();
+	if(m_dictTickTock.count(name) > 0)
+	{
+		if(m_dictTickTockCumulative.count(name) > 0)
+		{
+			m_dictTickTockCumulative[name] += ::tock(m_dictTickTock[name],0.0f);
+			m_dictTickTock.erase(name);
+		}
+		else
+		{
+			m_dictTickTockCumulative[name]  = ::tock(m_dictTickTock[name],0.0f);
+			m_dictTickTock.erase(name);
+		}
+	}
+	else
+	{
+		m_dictTickTock[name] = ::tick();
+	}
 }
 void ClusterNet::tock(){tock("default"); }
 void ClusterNet::tock(std::string name)
 {
-	assert(("No tick event was registered for the name" + name, m_dictTickTock.count(name) > 0));
-	::tock(m_dictTickTock[name], name);
+	if(m_dictTickTockCumulative.count(name) > 0)
+	{
+		::tock("<<<Cumulative>>>: " + name , m_dictTickTockCumulative[name]);
+	}
+	else
+	{
+		assert(("No tick event was registered for the name" + name, m_dictTickTock.count(name) > 0));
+		::tock(m_dictTickTock[name], name);
+	}
 }
-//}
 
+
+void ClusterNet::waitForAllRequests()
+{
+	tick("wait...");
+	for (std::list<MPI_Request*>::const_iterator request = m_requests.begin(); request != m_requests.end(); ++request)
+	{
+	    MPI_Wait(*request, &m_status);
+	}
+	tock("wait...");
+}
 
 
