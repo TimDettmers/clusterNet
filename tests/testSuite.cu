@@ -6,7 +6,7 @@
 int main(int argc, char *argv[])
 {
   run_basicOps_test(argc, argv);
-  run_GPUDirect_RDMA_test(argc, argv);
+  //run_GPUDirect_RDMA_test(argc, argv);
   run_clusterNet_test(argc, argv);
 
   printf("----------------------\n");

@@ -6,25 +6,73 @@
 #include <time.h>
 #include <stdlib.h>
 #include <iostream>
+#include <mpi.h>
 
 
 ClusterNet::ClusterNet(){ init((int)(time(0) % 10000)); }
 ClusterNet::ClusterNet(int seed){ init(seed);}
+ClusterNet::ClusterNet(int argc, char* argv[], int seed){ init(seed); init_MPI(argc, argv); }
+//ClusterNet::~ClusterNet(){ if(m_hasMPI) MPI_Finalize(); }
 void ClusterNet::init(int seed)
 {
 	curandCreateGenerator(&m_generator, CURAND_RNG_PSEUDO_DEFAULT);
 	curandSetPseudoRandomGeneratorSeed(m_generator, seed);
 	curandSetGeneratorOffset(m_generator, 100);
 	cublasCreate(&m_handle);
+	m_hasMPI = false;
+}
+
+void ClusterNet::init_MPI(int argc, char * argv[])
+{
+	MPI_Init(&argc, &argv);
+	MPI_Comm_rank(MPI_COMM_WORLD, &m_rank);
+	m_nodes = MPI::COMM_WORLD.Get_size();
+	m_hasMPI = true;
+}
+
+void ClusterNet::shutdown_MPI()
+{
+	MPI_Finalize();
 }
 
 Matrix ClusterNet::dot(Matrix A, Matrix B)
 {
+	//if(m_hasMPI){ return dotMPI(A,B);}
+
+
 	Matrix out = zeros(A.shape[0],B.shape[1]);
 	dot(A, B, out);
 	checkMatrixOperation(A, B, out, 1);
 
 	return out;
+}
+
+Matrix ClusterNet::dotMPI(Matrix A, Matrix B)
+{
+	int split_size = A.shape[0]/m_nodes;
+	Matrix out = empty(split_size,B.shape[1]);
+	Matrix out_rev = empty(split_size,B.shape[1]);
+
+	Matrix A1 = slice_rows(A, split_size*m_rank,split_size*(m_rank+1)-1);
+	dot(A1,B,out);
+	for(int i = 0; i < m_nodes; i++)
+	{
+		if(m_rank == i) { continue; }
+		MPI_Send(out.data, out.size, MPI_FLOAT, i, 100, MPI_COMM_WORLD);
+	}
+
+	for(int i = 0; i < m_nodes; i++)
+	{
+		if(m_rank == i) { continue; }
+		MPI_Recv(out_rev.data, out_rev.size, MPI_FLOAT, i, 100, MPI_COMM_WORLD, &m_status);
+		out = merge(out,out_rev);
+	}
+
+	return out;
+}
+void ClusterNet::dotMPI(Matrix A, Matrix B, Matrix out)
+{
+
 }
 
 void ClusterNet::dot(Matrix A, Matrix B, Matrix out)

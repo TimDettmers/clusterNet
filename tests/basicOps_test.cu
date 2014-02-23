@@ -236,31 +236,31 @@ int run_basicOps_test(int argc, char *argv[])
 
   //slice rows
   m1 = gpu.rand(10,10);
-  m2 = to_host(slice_rows(m1, 2,5),1);
-  m1 = to_host(m1,1);
-  assert(test_matrix(m2,3,10));
+  m2 = to_host(slice_rows(m1, 2,5));
+  m1 = to_host(m1);
+  assert(test_matrix(m2,4,10));
   int idx = 0;
-  for(int i = 20; i < 50; i++)
+  for(int i = 20; i < 60; i++)
   {        
     assert(test_eq(m1.data[i], m2.data[idx], idx, i , "Row slice data"));
     idx++;
   }  
+  /*
   //slice cols
   m2 = to_host(slice_cols(to_gpu(m1,1), 2,5),1);
   idx = 0;
-  assert(test_matrix(m2,10,3));
+  assert(test_matrix(m2,10,4));
 
   for(int i = 2; i < 100;i++)
   {
-    if(((i % 10) < 5) &&
+    if(((i % 10) < 6) &&
        ((i % 10) > 1))
     {  
       assert(test_eq(m1.data[i], m2.data[idx], idx, i , "Col slice data"));
       idx++;
     }
   }
-  
-
+*/
   return 0;
 }
 

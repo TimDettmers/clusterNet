@@ -29,7 +29,6 @@ Matrix fill_matrix(int rows, int cols, float fill_value);
 Matrix ones(int rows, int cols);
 Matrix zeros(int rows, int cols);
 Matrix empty(int rows, int cols);
-Matrix* empty2(int rows, int cols);
 
 Matrix add(Matrix A, Matrix B);
 void add(Matrix A, Matrix B, Matrix out);
@@ -67,6 +66,7 @@ void printFaultySizeError(Matrix A, Matrix B, Matrix C);
 void printFaultyMatrixProductSizeError(Matrix A, Matrix B, Matrix C);
 
 Matrix slice_rows(Matrix A, int start, int end);
-Matrix slice_cols(Matrix A, int start, int end);
+//Matrix slice_cols(Matrix A, int start, int end);
 void merge(Matrix A, Matrix B, Matrix out);
+Matrix merge(Matrix A, Matrix B);
 #endif

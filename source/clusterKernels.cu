@@ -12,22 +12,33 @@ __global__ void kFill_with(float *m, float fill_value, int size)
        m[i] = fill_value;
 }
 
-__global__ void kMerge(float *A, float *B, float *out, int size_a, int size_b)
+//vertical stack for column major format
+__global__ void kMerge(float *A, float *B, float *out, int size_out, int rows_a, int rows, int cols)
 {
   const unsigned int numThreads = blockDim.x * gridDim.x;
   const int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
-  const int size = size_a + size_b;
 
-  for (unsigned int i = idx;i < size; i += numThreads)
+  int current_col = 0;
+  int current_row = 0;
+  int offset = 0;
+  const int rows_b = rows - rows_a;
+
+  for (unsigned int i = idx;i < size_out; i += numThreads)
   {
-    if(i >= size_a)
-    {
-       out[i] = B[i - size_a];
-    }
-    else
-    {
-       out[i] = A[i];
-    }
+	  current_col = i / rows; //int arithmetic
+	  offset = (current_col*rows);
+	  current_row = i - offset;
+
+	  if(current_row >= rows_a)
+	  {
+		  //fetch b value
+		  out[i] = B[(current_col*rows_b) + current_row - rows_a];
+	  }
+	  else
+	  {
+		  //fetch a value
+		  out[i] = A[(current_col*rows_a) + current_row];
+	  }
   }
 }
 
@@ -140,23 +151,31 @@ __global__ void kTranspose(float *A, float *out, int width, int height)
     }
 }
 
-
-__global__ void slice_rows(float *A, int start, int end, int cols, float *out)
+//for column major data
+__global__ void slice_rows(float *A, float *out, int size_out, int rows_A, int start, int end)
 {
   const unsigned int numThreads = blockDim.x * gridDim.x;
-  int offset = start*cols;
-  const int idx = (blockIdx.x * blockDim.x) + threadIdx.x + offset;
-  int slice_end = (end*cols);
+  const int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
+  int current_col = 0;
+  int current_row = 0;
+  int offset = 0;
+  int rows_out = end - start + 1;
 
-  for (unsigned int i = idx;i < slice_end; i += numThreads)
-       out[i-offset] = A[i];
+  for (unsigned int i = idx;i < size_out; i += numThreads)
+  {
+	  current_col = i / rows_out; //note: int arithmetic
+	  current_row = i - (current_col*rows_out);
+	  offset = rows_A*current_col;
+
+	  out[i] = A[offset + start + current_row];
+  }
 }
 
 __global__ void slice_cols(float *A, int start, int end, int rows, int cols, float *out)
 {
   const unsigned int numThreads = blockDim.x * gridDim.x;
   const int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
-  const int width = end - start;  
+  const int width = end - start + 1;
   int current_row = 0;
   int size = cols*rows;
 

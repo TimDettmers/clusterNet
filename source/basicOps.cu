@@ -82,11 +82,11 @@ Matrix T(Matrix A)
 
 Matrix slice_rows(Matrix A, int start, int end)
 {
-  Matrix out = empty(end - start, A.shape[1]);
-  int block_size = (out.size/1024) + 1;
-  slice_rows<<<block_size,1024>>>(A.data, start, end, A.shape[1], out.data);
+  //align memory in contiguous array
 
-  cudaDeviceSynchronize();
+  Matrix out = empty(end - start + 1, A.shape[1]);
+  int block_size = (out.size/1024) + 1;
+  slice_rows<<<block_size,1024>>>(A.data, out.data, out.size, A.shape[0], start, end);
 
   return out;
 }
@@ -113,22 +113,6 @@ Matrix empty(int rows, int cols)
   return A;
 }
 
-Matrix* empty2(int rows, int cols)
-{
-	  float *gpu_data;
-	  int size = rows*cols;
-	  size_t bytes = rows*cols*sizeof(float);
-	  cudaMalloc((void**)&gpu_data, bytes);
-
-	  Matrix *A =(Matrix*)malloc(sizeof(Matrix));
-	  A->shape[0]= rows;
-	  A->shape[1]=cols;
-	  A->bytes =bytes;
-	  A->size=size;
-	  A->data=gpu_data;
-
-	  return A;
-}
 
 Matrix fill_matrix(int rows, int cols, float fill_value)
 {
@@ -176,11 +160,40 @@ Matrix sub(Matrix A, Matrix B)
   return out;
 }
 
+Matrix merge(Matrix A, Matrix B)
+{
+
+  Matrix out;
+  if(A.shape[1] == B.shape[1])
+  {
+	  out = empty(A.shape[0] + B.shape[0],A.shape[1]);
+  }
+  else
+  {
+	  out = empty(1,1);
+	  printf("Wrong merge sizes!");
+	  assert(0);
+  }
+  int block_size = (out.size/512) + 1;
+  kMerge<<<block_size,512>>>(A.data, B.data, out.data, out.size, A.shape[0], A.shape[0] + B.shape[0],A.shape[1]);
+
+  return out;
+}
 
 void merge(Matrix A, Matrix B, Matrix out)
 {
+  if(A.shape[1] == B.shape[1])
+  {
+	  out = empty(A.shape[0] + B.shape[0],A.shape[1]);
+  }
+  else
+  {
+	  out = empty(1,1);
+	  printf("Wrong merge sizes!");
+	  assert(0);
+  }
   int block_size = (out.size/512) + 1;
-  kMerge<<<block_size,512>>>(A.data, B.data, out.data, A.size, B.size);
+  kMerge<<<block_size,512>>>(A.data, B.data, out.data, out.size, A.shape[0], A.shape[0] + B.shape[0],A.shape[1]);
 }
 
 void sub(Matrix A, Matrix B, Matrix out)
@@ -347,14 +360,12 @@ void printFaultyMatrixProductSizeError(Matrix A, Matrix B, Matrix C)
   {
     printf("Matrix A is of size %ix%i while matrix B is of size %ix%i.\n",
            A.shape[0],A.shape[1],B.shape[0],B.shape[1]);
-    assert(0);
   }
   else if((A.shape[1] == B.shape[0])  &&          
   	  ((C.shape[0] != A.shape[0]) || (C.shape[1] != B.shape[1])))
   {
     printf("Output matrix is of size %ix%i while Matrix A and B have sizes %ix%i and %ix%i.\n",
            C.shape[0],C.shape[1],A.shape[0],A.shape[1], B.shape[0],B.shape[1]);
-    assert(0);
   }
 }
 
@@ -373,13 +384,14 @@ void checkMatrixOperation(Matrix A, Matrix B, Matrix C, int blnMatrixProduct)
 }
 
 
-
+/*
 Matrix slice_cols(Matrix A, int start, int end)
 {
-  Matrix out = empty(A.shape[0], end - start);
+  Matrix out = empty(A.shape[0], end - start + 1);
   int block_size = (out.size/1024) + 1;
   slice_cols<<<block_size,1024>>>(A.data, start, end, A.shape[0], A.shape[1], out.data);
 
   return out;
 }
+*/
 

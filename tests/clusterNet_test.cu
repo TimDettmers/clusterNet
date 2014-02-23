@@ -127,6 +127,29 @@ int run_clusterNet_test(int argc, char *argv[])
   assert(m_host.size==100*100);
   assert(m_host.bytes==r1.size*sizeof(float));
 
+  //dotMPI test
+  gpu = ClusterNet(argc, argv, 12345);
+  m1 = gpu.rand(2,4);
+  //print_matrix(to_host(m1));
+  m2 = gpu.rand(4,8);
+  m3 = gpu.dot(m1,m2);
+  Matrix m4 = gpu.dotMPI(m1,m2);
+  m3 = to_host(m3);
+  m4 = to_host(m4);
+  if(gpu.m_rank == 0)
+  {
+
+	  for (int i = 0; i < 16; ++i)
+	  {
+		  assert(test_eq(m3.data[i],m4.data[i],i,i,"dotMPI Test"));
+	  }
+
+	  assert(test_matrix(m3,2,8));
+	  assert(test_matrix(m4,2,8));
+  }
+
+  gpu.shutdown_MPI();
 
   return 0;
 }
+
