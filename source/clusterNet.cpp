@@ -9,6 +9,7 @@
 #include <mpi.h>
 #include <assert.h>
 #include <algorithm>
+#include <vector>
 
 
 ClusterNet::ClusterNet(){ init((int)(time(0) % 10000)); }
@@ -264,5 +265,73 @@ void ClusterNet::benchmark_dot()
 	tock("slice unit");
 	tock("dot unit");
 }
+
+void ClusterNet::init_batch_allocator(Matrix X, Matrix y, int batch_size)
+{
+
+	float * pinned_memory_X;
+	cudaHostAlloc(&pinned_memory_X, X.bytes, cudaHostAllocPortable);
+	memcpy(pinned_memory_X,X.data,X.bytes);
+	free(X.data);
+
+	m_full_X.shape[0] = X.shape[0];
+	m_full_X.shape[1] = X.shape[1];
+	m_full_X.bytes = X.bytes;
+	m_full_X.size = X.size;
+	m_full_X.data = pinned_memory_X;
+
+	float * pinned_memory_y;
+	cudaHostAlloc(&pinned_memory_y, y.bytes, cudaHostAllocPortable);
+	memcpy(pinned_memory_y,y.data,y.bytes);
+	free(y.data);
+
+	m_full_y.shape[0] = y.shape[0];
+	m_full_y.shape[1] = y.shape[1];
+	m_full_y.bytes = y.bytes;
+	m_full_y.size = y.size;
+	m_full_y.data = pinned_memory_y;
+
+	m_batch_size = batch_size;
+	m_total_batches = m_full_X.shape[0]/m_batch_size;
+
+	cudaStreamCreate(&m_streamNext_batch_X);
+	cudaStreamCreate(&m_streamNext_batch_y);
+
+	m_current_batch_X = empty(m_batch_size,m_full_X.shape[1]);
+	m_next_batch_X = empty(m_batch_size,m_full_X.shape[1]);
+
+	m_current_batch_y = empty(m_batch_size,m_full_y.shape[1]);
+	m_next_batch_y = empty(m_batch_size,m_full_y.shape[1]);
+
+
+
+	cudaMemcpy(&m_current_batch_X.data[0],&m_full_X.data[0],m_current_batch_X.bytes,cudaMemcpyDefault);
+	cudaMemcpy(&m_current_batch_y.data[0],&m_full_y.data[0],m_current_batch_y.bytes,cudaMemcpyDefault);
+
+	m_next_batch_number = 1;
+}
+
+
+void ClusterNet::allocate_next_batch_async()
+{
+	cudaMemcpyAsync(&m_next_batch_X.data[0],&m_full_X.data[(m_full_X.shape[1] + m_next_batch_number)],m_next_batch_X.bytes,cudaMemcpyHostToDevice,m_streamNext_batch_X);
+	cudaMemcpyAsync(&m_next_batch_y.data[0],&m_full_y.data[(m_full_y.shape[1] + m_next_batch_number)],m_next_batch_y.bytes,cudaMemcpyHostToDevice,m_streamNext_batch_y);
+}
+
+void ClusterNet::replace_current_batch_with_next()
+{
+	cudaStreamSynchronize(m_streamNext_batch_X);
+	m_current_batch_X = m_next_batch_X;
+	cudaStreamSynchronize(m_streamNext_batch_y);
+	m_current_batch_y = m_next_batch_y;
+	m_next_batch_number += 1;
+}
+
+void ClusterNet::finish_batch_allocator()
+{
+	cudaStreamDestroy(m_streamNext_batch_X);
+	cudaStreamDestroy(m_streamNext_batch_y);
+}
+
 
 

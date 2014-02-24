@@ -15,8 +15,8 @@ using std::vector;
 Matrix read_csv (char* filename)
 {
   std::ifstream  dStream(filename);
-  int dimX = 0;
-  int dimY = 0;
+  int columns = 0;
+  int rows = 0;
   vector<float> X;
 
     string line;
@@ -26,19 +26,18 @@ Matrix read_csv (char* filename)
         string        cell;
         while(std::getline(lineStream,cell,','))
         {
-	    X.push_back(::atof(cell.c_str()));
-	    
-	if(dimY == 0)
-	    dimX++;
+			X.push_back(::atof(cell.c_str()));
+
+			if(rows == 0)
+				columns++;
         }
-	dimY++;
+	rows++;
     }
 
-  
-  float *data;  
-  data = (float*)malloc(dimX*dimY*sizeof(float));
-  memcpy(data,&X[0], dimX*dimY*sizeof(float));
-  Matrix m = {{dimX,dimY},dimX*dimY*sizeof(float),dimX*dimY,data};  
+  float *data;
+  data = (float*)malloc(columns*rows*sizeof(float));
+  memcpy(data,&X[0], columns*rows*sizeof(float));
+  Matrix m = {{rows, columns},columns*rows*sizeof(float),columns*rows,data};
 
   return m;
 }

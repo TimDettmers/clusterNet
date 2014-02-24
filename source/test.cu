@@ -7,17 +7,54 @@
 #include <assert.h>
 #include <util.cuh>
 #include <clusterNet.cuh>
-
+#include <time.h>
 
 void run_neural_network()
 {
   Matrix X = read_csv("/home/tim/Downloads/mnist_full_X.csv");
   Matrix y = read_csv("/home/tim/Downloads/mnist_full_y.csv");
+  printf("read MNIST\n");
 
-  //w1 = gpu.rand(784,1000);
-  //w2 = gpu.rand(1000,10);
+  ClusterNet gpu = ClusterNet();
 
-  printf("Finished!");
+  Matrix result;
+  Matrix w1 = gpu.rand(784,1000);
+  Matrix w2 = gpu.rand(1000,10);
+
+  printf("init batch allocator\n");
+  gpu.init_batch_allocator(X, y, 124);
+
+  clock_t t1,t2;
+  t1=clock();
+  //code goes here
+
+  gpu.tick();
+  for(int i = 0; i < gpu.m_total_batches; i++)
+  {
+	  gpu.allocate_next_batch_async();
+
+
+	  result = gpu.dot(gpu.m_current_batch_X,w1);
+	  result = gpuExp(result);
+	  result = gpu.dot(result,w2);
+
+	  gpu.replace_current_batch_with_next();
+
+  }
+  cudaThreadSynchronize();
+  t2=clock();
+  float diff ((float)t2-(float)t1);
+  float mseconds = (diff / CLOCKS_PER_SEC)/1000;
+  std::cout<<mseconds<<std::endl;
+  gpu.tock();
+
+  gpu.finish_batch_allocator();
+  //gpu.tock("batch replace");
+  //gpu.tock("async batch allocate");
+  //gpu.tock("feedforward");
+
+
+  printf("Finished!\n");
 }
 
 void MPI_benchmark(int argc, char *argv[])
@@ -190,69 +227,8 @@ void MPI_benchmark(int argc, char *argv[])
 
 
 
-
-
-
-
-int main(int argc, char *argv[])
+void dotMPI_test(int argc, char *argv[])
 {
-
-  //MPI_benchmark(argc, argv);
-
-	/*
-	ClusterNet gpu = ClusterNet();
-	Matrix A = gpu.rand(128,10000);
-	Matrix B = gpu.rand(10000,8000);
-
-    int m_rank = 0;
-	MPI_Init(&argc, &argv);
-	MPI_Comm_rank(MPI_COMM_WORLD, &m_rank);
-	MPI_Status status;
-
-
-	for(int i = 0; i < 100; i++)
-	{
-		if(m_rank == 0)
-		{
-			Matrix out = gpu.rand(64,8000);
-			gpu.tick("MPI test send");
-			MPI_Send(out.data, out.size, MPI_FLOAT, 1, 100, MPI_COMM_WORLD);
-			gpu.tick("MPI test send");
-		}
-		if(m_rank == 1)
-		{
-			Matrix out_recv = empty(64,8000);
-			gpu.tick("MPI test receive");
-			MPI_Recv(out_recv.data, out_recv.size, MPI_FLOAT, 0, 100, MPI_COMM_WORLD, &status);
-			gpu.tick("MPI test receive");
-		}
-	}
-
-	for(int i = 0; i < 100; i++)
-	{
-		gpu.tick("to beat");
-		gpu.dot(A,B);
-		gpu.tick("to beat");
-	}
-
-
-	if(m_rank == 0)
-	{
-		gpu.tock("MPI test send");
-	}
-	else
-	{
-		gpu.tock("MPI test receive");
-	}
-
-	gpu.tock("to beat");
-
-	MPI_Finalize();
-
-*/
-
-
-
 	ClusterNet gpu = ClusterNet(argc, argv, 123465);
 	Matrix A = gpu.rand(128,1000);
 	Matrix B = gpu.rand(1000,400);
@@ -288,6 +264,17 @@ int main(int argc, char *argv[])
 
 
 	gpu.shutdown_MPI();
+}
+
+
+
+int main(int argc, char *argv[])
+{
+
+  //MPI_benchmark(argc, argv);
+
+
+	run_neural_network();
 
 
 
