@@ -10,7 +10,7 @@ Deep neural network framework for GPU clusters:
 	Matrix C = dotPCI(A,B); //uses all GPUs on the board  
 	Matrix C = dotMPI(A,B); //uses all GPUs in the network  
 - no delay between batches due to asynchronous host to GPU memory copies:  
-<code>gpu.init_batch_allocator(X, y, 124);  
+<code>gpu.init_batch_allocator(X, y, 128);  
 	for(int i = 0; i < gpu.m_total_batches; i++)  
 		{  
 	  	gpu.allocate_next_batch_async(); //loads the next batch while you do computations  
