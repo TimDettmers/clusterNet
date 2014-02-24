@@ -18,8 +18,8 @@ public:
 
 	 Matrix dot(Matrix A, Matrix B);
 	 void dot(Matrix A, Matrix B, Matrix out);
-	 Matrix dotMPI(Matrix A, Matrix B);
-	 void dotMPI(Matrix A, Matrix B, Matrix out);
+	 Matrix dotMPI_unitSlice(Matrix A, Matrix B);
+	 Matrix dotMPI_batchSlice(Matrix A, Matrix B);
 
 	 Matrix rand(int rows, int cols);
 	 void rand(int rows, int cols, Matrix out);
@@ -32,6 +32,7 @@ public:
 	 void tock(std::string name);
 	 void tock();
 
+	 void benchmark_dot();
 	 void shutdown_MPI();
 private:
 	 cublasHandle_t m_handle;
@@ -39,6 +40,8 @@ private:
 	 std::map<std::string,cudaEvent_t*> m_dictTickTock;
 	 std::map<std::string,float> m_dictTickTockCumulative;
 	 std::list<MPI_Request*> m_requests;
+	 std::map<std::string,Matrix> m_matrixCache;
+	 std::map<std::string,int> m_matrixCacheUsage;
 
 	 int m_nodes;
 	 bool m_hasMPI;

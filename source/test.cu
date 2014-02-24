@@ -82,7 +82,7 @@ void MPI_benchmark(int argc, char *argv[])
     {
       gpu.dot(A,B1, out);
       gpu.dot(A,B2, out2);
-      merge(out,out2,grand_out);
+      vStack(out,out2,grand_out);
     }
     printf("Direct compute x2:\n");
     tock(startstop);
@@ -104,7 +104,7 @@ void MPI_benchmark(int argc, char *argv[])
 		gpu.dot(A,B2, out);
 		//add(A2,B, out);
 	 	MPI_Recv(D.data, D.size, MPI_FLOAT, 0, 100, MPI_COMM_WORLD, &status);
-                merge(out,D, mergemat);
+                vStack(out,D, mergemat);
 	    }
 
     }
@@ -137,7 +137,7 @@ void MPI_benchmark(int argc, char *argv[])
 		//add(A2,B, out);
 		gpu.tick("receive");
 	 	MPI_Recv(C_out.data, C_out.size, MPI_FLOAT, 0, 100, MPI_COMM_WORLD, &status);
-                merge(out,C_out, grand_out);
+                vStack(out,C_out, grand_out);
                 gpu.tick("receive");
 	    }
 
@@ -153,7 +153,7 @@ void MPI_benchmark(int argc, char *argv[])
 		//add(A2,B, out);
 		gpu.tick("receive");
 	 	MPI_Recv(C_out.data, C_out.size, MPI_FLOAT, 1, 100, MPI_COMM_WORLD, &status);
-                merge(out,C_out, grand_out);
+                vStack(out,C_out, grand_out);
                 gpu.tick("receive");
 	    }
 
@@ -197,50 +197,97 @@ void MPI_benchmark(int argc, char *argv[])
 int main(int argc, char *argv[])
 {
 
-  MPI_benchmark(argc, argv);
-  /*
+  //MPI_benchmark(argc, argv);
+
+	/*
 	ClusterNet gpu = ClusterNet();
-
-
 	Matrix A = gpu.rand(128,10000);
-	Matrix B = gpu.rand(10000,6000);
+	Matrix B = gpu.rand(10000,8000);
+
     int m_rank = 0;
 	MPI_Init(&argc, &argv);
 	MPI_Comm_rank(MPI_COMM_WORLD, &m_rank);
 	MPI_Status status;
 
 
+	for(int i = 0; i < 100; i++)
+	{
+		if(m_rank == 0)
+		{
+			Matrix out = gpu.rand(64,8000);
+			gpu.tick("MPI test send");
+			MPI_Send(out.data, out.size, MPI_FLOAT, 1, 100, MPI_COMM_WORLD);
+			gpu.tick("MPI test send");
+		}
+		if(m_rank == 1)
+		{
+			Matrix out_recv = empty(64,8000);
+			gpu.tick("MPI test receive");
+			MPI_Recv(out_recv.data, out_recv.size, MPI_FLOAT, 0, 100, MPI_COMM_WORLD, &status);
+			gpu.tick("MPI test receive");
+		}
+	}
+
+	for(int i = 0; i < 100; i++)
+	{
+		gpu.tick("to beat");
+		gpu.dot(A,B);
+		gpu.tick("to beat");
+	}
+
+
 	if(m_rank == 0)
 	{
-		gpu.tick("MPI test send");
-		MPI_Send(A.data, A.size, MPI_FLOAT, 1, 100, MPI_COMM_WORLD);
 		gpu.tock("MPI test send");
 	}
-	if(m_rank == 1)
+	else
 	{
-		gpu.tick("MPI test receive");
-		MPI_Recv(A.data, A.size, MPI_FLOAT, 0, 100, MPI_COMM_WORLD, &status);
 		gpu.tock("MPI test receive");
 	}
 
-	gpu.tick("to beat");
-	gpu.dot(A,B);
 	gpu.tock("to beat");
+
+	MPI_Finalize();
 
 */
 
-	/*
-	gpu.tick("dot mpi");
-	gpu.dotMPI(A,B);
-	gpu.tock("dot mpi");
+
+
+	ClusterNet gpu = ClusterNet(argc, argv, 123465);
+	Matrix A = gpu.rand(128,1000);
+	Matrix B = gpu.rand(1000,400);
+
+	gpu.tick("dot mpi batch");
+	for(int i = 0; i < 100; i++)
+	{
+		gpu.dotMPI_batchSlice(A,B);
+	}
+	gpu.tock("dot mpi batch");
+
+
+
+	gpu.tick("dot mpi unit");
+	for(int i = 0; i < 100; i++)
+	{
+		gpu.dotMPI_unitSlice(A,B);
+	}
+	gpu.tock("dot mpi unit");
+
+	printf("My rank: %i\n",gpu.m_rank);
+	gpu.benchmark_dot();
+
+
 
 	gpu.tick("dot normal");
-	gpu.dot(A,B);
+	for(int i = 0; i < 100; i++)
+	{
+		gpu.dot(A,B);
+	}
 	gpu.tock("dot normal");
-	*/
 
 
-	//gpu.shutdown_MPI();
+
+	gpu.shutdown_MPI();
 
 
 

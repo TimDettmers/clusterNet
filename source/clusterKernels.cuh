@@ -17,6 +17,7 @@ __global__ void setup_kernel(curandState *state, int seed);
 __global__ void generate_uniform_kernel(curandState *state, int size, float *out);
 __global__ void generate_normal_kernel(curandState *state, int size, float *out);
 __global__ void slice_rows(float *A, float *out, int size_out, int rows_A, int start, int end);
-__global__ void slice_cols(float *A, int start, int end, int rows, int cols, float *out);
-__global__ void kMerge(float *A, float *B, float *out, int size_out, int rows_a, int rows, int cols);
+__global__ void slice_cols(float *A, float *out, int start, int rows, int size_out);
+__global__ void vStack(float *A, float *B, float *out, int size_out, int rows_a, int rows, int cols);
+__global__ void hStack(float *A, float *B, float *out, int size_out, int size_a);
 #endif

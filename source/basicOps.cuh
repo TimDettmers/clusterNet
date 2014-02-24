@@ -59,14 +59,16 @@ void gpuLog(Matrix A, Matrix out);
 Matrix gpuSqrt(Matrix A);
 void gpuSqrt(Matrix A, Matrix out);
 
-void checkMatrixOperation(Matrix A, Matrix B, Matrix C, int blnMatrixProduct);
+int checkMatrixOperation(Matrix A, Matrix B, Matrix C, int blnMatrixProduct);
 int blnFaultySizes(Matrix A, Matrix B, Matrix C);
 int blnFaultyMatrixProductSizes(Matrix A, Matrix B, Matrix C);
 void printFaultySizeError(Matrix A, Matrix B, Matrix C);
 void printFaultyMatrixProductSizeError(Matrix A, Matrix B, Matrix C);
 
 Matrix slice_rows(Matrix A, int start, int end);
-//Matrix slice_cols(Matrix A, int start, int end);
-void merge(Matrix A, Matrix B, Matrix out);
-Matrix merge(Matrix A, Matrix B);
+Matrix slice_cols(Matrix A, int start, int end);
+void vStack(Matrix A, Matrix B, Matrix out);
+Matrix vStack(Matrix A, Matrix B);
+void hStack(Matrix A, Matrix B, Matrix out);
+Matrix hStack(Matrix A, Matrix B);
 #endif

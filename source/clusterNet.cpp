@@ -39,64 +39,126 @@ void ClusterNet::shutdown_MPI()
 Matrix ClusterNet::dot(Matrix A, Matrix B)
 {
 	//if(m_hasMPI){ return dotMPI(A,B);}
-
-
 	Matrix out = zeros(A.shape[0],B.shape[1]);
+	if(checkMatrixOperation(A, B, out, 1) == 1){ throw "Matrix size error:\n"; }
 	dot(A, B, out);
-	checkMatrixOperation(A, B, out, 1);
 
 	return out;
 }
 
-Matrix ClusterNet::dotMPI(Matrix A, Matrix B)
+Matrix ClusterNet::dotMPI_batchSlice(Matrix A, Matrix B)
 {
 	int split_size = A.shape[0]/m_nodes;
 	Matrix out = empty(split_size,B.shape[1]);
 	Matrix out_rev = empty(split_size,B.shape[1]);
 
-	tick("slice rows");
+	tick("slice batch");
 	Matrix A1 = slice_rows(A, split_size*m_rank,split_size*(m_rank+1)-1);
-	tock("slice rows");
+	tick("slice batch");
+	tick("dot batch");
 	dot(A1,B,out);
+	tick("dot batch");
 	for(int i = 0; i < m_nodes; i++)
 	{
 		if(m_rank == i) { continue; }
 		MPI_Request *request = (MPI_Request*)malloc(sizeof(MPI_Request));
-		m_requests.push_back(request);
-		tick("send");
+		tick("send batch");
 		MPI_Isend(out.data, out.size, MPI_FLOAT, i, 100, MPI_COMM_WORLD, request);
-		tock("send");
+		tick("send batch");
 	}
 
-
-
-
-
 	for(int i = 0; i < m_nodes; i++)
 	{
 		if(m_rank == i) { continue; }
-		tick("receive");
+		tick("receive batch");
 		MPI_Request *request = (MPI_Request*)malloc(sizeof(MPI_Request));
-		m_requests.push_back(request);
-		MPI_Irecv(out_rev.data, out_rev.size, MPI_FLOAT, i, 100, MPI_COMM_WORLD, request);
-		tock("receive");
-		tick("merge");
-		out = merge(out,out_rev);
-		tock("merge");
+		//m_receiveRequests[i].push_back(request);
+		MPI_Recv(out_rev.data, out_rev.size, MPI_FLOAT, i, 100, MPI_COMM_WORLD, &m_status);
+		tick("receive batch");
+		tick("merge batch");
+		out = vStack(out,out_rev);
+		tick("merge batch");
 	}
 
 	waitForAllRequests();
 
 	return out;
 }
-void ClusterNet::dotMPI(Matrix A, Matrix B, Matrix out)
-{
 
+Matrix ClusterNet::dotMPI_unitSlice(Matrix A, Matrix B)
+{
+	int split_size = B.shape[1]/m_nodes;
+	std::string matrix_size = A.shape[0] + "x" + split_size;
+	Matrix out;
+	Matrix out_rev;
+	if(m_matrixCache.count("out " + matrix_size) > 0)
+	{
+		out = m_matrixCache["out " + matrix_size];
+		m_matrixCacheUsage["out " + matrix_size] -= 1;
+	}
+	else
+	{
+		out = empty(A.shape[0],split_size);
+		m_matrixCache["out " + matrix_size] = out;
+		m_matrixCacheUsage["out " + matrix_size] = 0;
+	}
+	if(m_matrixCache.count("out_rev " + matrix_size) > 0)
+	{
+		out_rev = m_matrixCache["out_rev " + matrix_size];
+		m_matrixCacheUsage["out_rev " + matrix_size] -= 1;
+	}
+	else
+	{
+		out_rev = empty(A.shape[0],split_size);
+		m_matrixCache["out_rev " + matrix_size] = out_rev;
+		m_matrixCacheUsage["out_rev " + matrix_size] = 0;
+	}
+
+	tick("slice unit");
+	Matrix B1 = slice_cols(B, split_size*m_rank,split_size*(m_rank+1)-1);
+	tick("slice unit");
+	tick("dot unit");
+	dot(A,B1,out);
+	tick("dot unit");
+	for(int i = 0; i < m_nodes; i++)
+	{
+		if(m_rank == i) { continue; }
+		MPI_Request *request = (MPI_Request*)malloc(sizeof(MPI_Request));
+		tick("send unit");
+		MPI_Isend(out.data, out.size, MPI_FLOAT, i, 100, MPI_COMM_WORLD, request);
+		tick("send unit");
+	}
+
+	for(int i = 0; i < m_nodes; i++)
+	{
+		if(m_rank == i) { continue; }
+		tick("receive unit");
+		MPI_Request *request = (MPI_Request*)malloc(sizeof(MPI_Request));
+		//m_receiveRequests[i].push_back(request);
+		MPI_Recv(out_rev.data, out_rev.size, MPI_FLOAT, i, 100, MPI_COMM_WORLD, &m_status);
+		tick("receive unit");
+		tick("merge unit");
+		out = hStack(out,out_rev);
+		tick("merge unit");
+	}
+
+	//waitForAllRequests();
+	/* TODO: Manage matrix cache
+	typedef std::map<std::string, std::map<std::string, int>>::iterator it_type;
+	for(it_type pair = m_matrixCacheUsage.begin(); iterator != m_matrixCacheUsage.end(); iterator++)
+	{
+
+		pair.first
+	}
+	*/
+
+
+	return out;
 }
 
 void ClusterNet::dot(Matrix A, Matrix B, Matrix out)
 {
-	checkMatrixOperation(A, B, out, 1);
+	if(checkMatrixOperation(A, B, out, 1) == 1){ throw "Matrix size error:\n"; }
 	cublasStatus_t status;
 
 	const float alpha = 1.0f;
@@ -178,7 +240,6 @@ void ClusterNet::tock(std::string name)
 	}
 }
 
-
 void ClusterNet::waitForAllRequests()
 {
 	tick("wait...");
@@ -186,7 +247,22 @@ void ClusterNet::waitForAllRequests()
 	{
 	    MPI_Wait(*request, &m_status);
 	}
-	tock("wait...");
+	tick("wait...");
+}
+
+void ClusterNet::benchmark_dot()
+{
+	tock("send batch");
+	tock("merge batch");
+	tock("receive batch");
+	tock("slice batch");
+	tock("dot batch");
+
+	tock("send unit");
+	tock("merge unit");
+	tock("receive unit");
+	tock("slice unit");
+	tock("dot unit");
 }
 
 

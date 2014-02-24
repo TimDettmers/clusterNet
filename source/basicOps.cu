@@ -84,9 +84,18 @@ Matrix slice_rows(Matrix A, int start, int end)
 {
   //align memory in contiguous array
 
-  Matrix out = empty(end - start + 1, A.shape[1]);
+  Matrix out = empty((end - start) + 1, A.shape[1]);
   int block_size = (out.size/1024) + 1;
   slice_rows<<<block_size,1024>>>(A.data, out.data, out.size, A.shape[0], start, end);
+
+  return out;
+}
+
+Matrix slice_cols(Matrix A, int start, int end)
+{
+  Matrix out = empty(A.shape[0], end - start + 1);
+  int block_size = (out.size/1024) + 1;
+  slice_cols<<<block_size,1024>>>(A.data, out.data, start, A.shape[0], out.size);
 
   return out;
 }
@@ -160,7 +169,7 @@ Matrix sub(Matrix A, Matrix B)
   return out;
 }
 
-Matrix merge(Matrix A, Matrix B)
+Matrix vStack(Matrix A, Matrix B)
 {
 
   Matrix out;
@@ -175,16 +184,30 @@ Matrix merge(Matrix A, Matrix B)
 	  assert(0);
   }
   int block_size = (out.size/512) + 1;
-  kMerge<<<block_size,512>>>(A.data, B.data, out.data, out.size, A.shape[0], A.shape[0] + B.shape[0],A.shape[1]);
+  vStack<<<block_size,512>>>(A.data, B.data, out.data, out.size, A.shape[0], A.shape[0] + B.shape[0],A.shape[1]);
 
   return out;
 }
 
-void merge(Matrix A, Matrix B, Matrix out)
+void vStack(Matrix A, Matrix B, Matrix out)
 {
-  if(A.shape[1] == B.shape[1])
+  if(A.shape[1] != B.shape[1])
   {
-	  out = empty(A.shape[0] + B.shape[0],A.shape[1]);
+	  printf("Wrong merge sizes!");
+	  assert(0);
+  }
+
+  int block_size = (out.size/512) + 1;
+  vStack<<<block_size,512>>>(A.data, B.data, out.data, out.size, A.shape[0], A.shape[0] + B.shape[0],A.shape[1]);
+}
+
+Matrix hStack(Matrix A, Matrix B)
+{
+
+  Matrix out;
+  if(A.shape[0] == B.shape[0])
+  {
+	  out = empty(A.shape[0],A.shape[1] + B.shape[1]);
   }
   else
   {
@@ -193,7 +216,21 @@ void merge(Matrix A, Matrix B, Matrix out)
 	  assert(0);
   }
   int block_size = (out.size/512) + 1;
-  kMerge<<<block_size,512>>>(A.data, B.data, out.data, out.size, A.shape[0], A.shape[0] + B.shape[0],A.shape[1]);
+  hStack<<<block_size,512>>>(A.data, B.data, out.data, out.size, A.size);
+
+  return out;
+}
+
+void hStack(Matrix A, Matrix B, Matrix out)
+{
+  if(A.shape[0] != B.shape[0])
+  {
+	  printf("Wrong merge sizes!");
+	  assert(0);
+  }
+
+  int block_size = (out.size/512) + 1;
+  hStack<<<block_size,512>>>(A.data, B.data, out.data, out.size, A.size);
 }
 
 void sub(Matrix A, Matrix B, Matrix out)
@@ -369,29 +406,31 @@ void printFaultyMatrixProductSizeError(Matrix A, Matrix B, Matrix C)
   }
 }
 
-void checkMatrixOperation(Matrix A, Matrix B, Matrix C, int blnMatrixProduct)
+int checkMatrixOperation(Matrix A, Matrix B, Matrix C, int blnMatrixProduct)
 {
   if(blnMatrixProduct == 0)
   {
     if(blnFaultySizes(A, B, C) == 1)
-      printFaultySizeError(A, B, C);    
+    {
+    	printFaultySizeError(A, B, C);
+    	return 1;
+    }
+
   }
   else
   {
     if(blnFaultyMatrixProductSizes(A, B, C) == 1)
+    {
       printFaultyMatrixProductSizeError(A, B, C);
+      return 1;
+    }
   }
+
+  return 0;
 }
 
 
-/*
-Matrix slice_cols(Matrix A, int start, int end)
-{
-  Matrix out = empty(A.shape[0], end - start + 1);
-  int block_size = (out.size/1024) + 1;
-  slice_cols<<<block_size,1024>>>(A.data, start, end, A.shape[0], A.shape[1], out.data);
 
-  return out;
-}
-*/
+
+
 

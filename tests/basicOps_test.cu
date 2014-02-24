@@ -245,11 +245,14 @@ int run_basicOps_test(int argc, char *argv[])
     assert(test_eq(m1.data[i], m2.data[idx], idx, i , "Row slice data"));
     idx++;
   }  
-  /*
+
   //slice cols
-  m2 = to_host(slice_cols(to_gpu(m1,1), 2,5),1);
+  m1 = gpu.rand(10,10);
+  m2 = to_host(slice_cols(m1, 2,5));
+  m1 = to_host(m1);
   idx = 0;
   assert(test_matrix(m2,10,4));
+
 
   for(int i = 2; i < 100;i++)
   {
@@ -260,7 +263,7 @@ int run_basicOps_test(int argc, char *argv[])
       idx++;
     }
   }
-*/
+
   return 0;
 }
 
