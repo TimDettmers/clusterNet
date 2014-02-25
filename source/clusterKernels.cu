@@ -334,3 +334,18 @@ __global__ void kSoftMax(float* mat, float* target, unsigned int rows, unsigned 
   }
 }
 
+//for column major data
+__global__ void kSubMatrixVector(float *A, float *v, float *out, int rows, int size)
+{
+  const unsigned int numThreads = blockDim.x * gridDim.x;
+  const int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
+  //offset = current_column * rows
+  int offset = 0;
+
+  for (unsigned int i = idx;i < size; i += numThreads)
+  {
+	  offset = (i / rows)*rows; //note: int arithmetic
+	  out[i] =  A[i] - v[i - offset];
+  }
+}
+

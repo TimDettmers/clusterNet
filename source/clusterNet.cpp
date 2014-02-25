@@ -1,5 +1,5 @@
 #include <cublas_v2.h>
-#include <clusterNet.cuh>
+#include <clusterNet.h>
 #include <basicOps.cuh>
 #include <util.cuh>
 #include <cstdlib>
@@ -172,7 +172,10 @@ void ClusterNet::dot(Matrix A, Matrix B, Matrix out)
 				&beta, out.data, out.shape[0]);
 
 	if(status != CUBLAS_STATUS_SUCCESS)
+	{
 		std::cout << "CUBLAS ERROR!\n";
+		throw "CUBLAS ERROR";
+	}
 }
 
 
@@ -323,7 +326,8 @@ void ClusterNet::allocate_next_batch_async()
 		int partial_batch_size = m_full_X.shape[0] % m_batch_size;
 		copy_range_bytes_X = partial_batch_size*m_full_X.shape[1]*sizeof(float);
 		copy_range_bytes_y = partial_batch_size*m_full_y.shape[1]*sizeof(float);
-
+		cudaFree(m_next_batch_X.data);
+		cudaFree(m_next_batch_y.data);
 		m_next_batch_X = empty(partial_batch_size, m_full_X.shape[1]);
 		m_next_batch_y = empty(partial_batch_size, m_full_y.shape[1]);
 	}
@@ -348,6 +352,10 @@ void ClusterNet::replace_current_batch_with_next()
 		m_next_batch_number = 0;
 		if(m_current_batch_X.shape[0] != m_batch_size)
 		{
+			cudaFree(m_current_batch_X.data);
+			cudaFree(m_next_batch_X.data);
+			cudaFree(m_current_batch_y.data);
+			cudaFree(m_next_batch_y.data);
 			m_current_batch_X = empty(m_batch_size,m_full_X.shape[1]);
 			m_next_batch_X = empty(m_batch_size,m_full_X.shape[1]);
 

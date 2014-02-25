@@ -436,6 +436,20 @@ Matrix softmax(Matrix A)
 	return out;
 }
 
+Matrix subMatrixVector(Matrix A, Matrix v)
+{
+	Matrix out = empty(A.shape[0],A.shape[1]);
+	subMatrixVector(A, v, out);
+
+	return out;
+}
+
+void subMatrixVector(Matrix A, Matrix v, Matrix out)
+{
+	int blocks = (A.size/1024) + 1;
+	kSubMatrixVector<<<blocks,THREADS_PER_BLOCKS>>>(A.data, v.data, out.data, A.shape[0], A.size);
+}
+
 void softmax(Matrix A, Matrix out)
 {
     unsigned int cols = A.shape[1],

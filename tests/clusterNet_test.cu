@@ -1,5 +1,5 @@
 #include <basicOps.cuh>
-#include <clusterNet.cuh>
+#include <clusterNet.h>
 #include <assert.h>
 #include <stdio.h>
 #include <util.cuh>

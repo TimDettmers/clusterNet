@@ -5,7 +5,7 @@ TESTS := tests/testSuite.cu $(wildcard tests/*_test.cu)
 BUILD := $(subst .cu,.out,$(subst tests/, build/, $(wildcard tests/*_test.cu)))
 NODES=tim@10.0.0.2
 HOSTFILE=/home/tim/cluster
-SCR := $(wildcard source/*.cu)
+SCR := $(wildcard source/*.cu) $(wildcard source/*.cpp)
 INCLUDE = -I $(MPI_DIR)/include -I $(TOP)source -I $(TOP)tests -I /usr/local/cuda-5.5/include
 LIB = -L $(MPI_DIR)/lib -L /usr/local/cuda-5.5/lib64
 CFLAGS = -gencode arch=compute_35,code=sm_35 -lcublas -lcurand -lmpi_cxx -lmpi $(LIB) $(INCLUDE) 
@@ -16,10 +16,10 @@ EXECTEST = build/testSuite.out
 
 all : $(EXECSRC) $(EXECTEST) 
 	
-$(EXECSRC) : $(SCR) source/clusterNet.cpp
+$(EXECSRC) : $(SCR) 
 	$(CC) $^ -o $@ $(CFLAGS)
 
-$(EXECTEST): $(SCR) $(TESTS) source/clusterNet.cpp    
+$(EXECTEST): $(SCR) $(TESTS)    
 	$(CC) $(TESTS) $(LINK) -o $@ $(CFLAGS)
 
 test:

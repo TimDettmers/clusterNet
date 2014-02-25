@@ -6,7 +6,7 @@
 #include <cuda.h>
 #include <assert.h>
 #include <util.cuh>
-#include <clusterNet.cuh>
+#include <clusterNet.h>
 #include <time.h>
 
 void run_neural_network()
@@ -17,28 +17,59 @@ void run_neural_network()
 
   ClusterNet gpu = ClusterNet();
 
-  Matrix result;
   Matrix w1 = gpu.rand(784,1000);
   Matrix w2 = gpu.rand(1000,10);
+  Matrix grad1 = empty(1000,10);
+  Matrix grad2 = empty(784,1000);
 
-  printf("init batch allocator\n");
   gpu.init_batch_allocator(X, y, 128);
-  std::cout << gpu.m_total_batches << std::endl;
   clock_t t1,t2;
   t1=clock();
   //code goes here
   int epochs  = 10;
   gpu.tick();
+  float learning_rate = 0.1;
+  size_t free = 0;
+  size_t total = 0;
   for(int EPOCH = 1; EPOCH < epochs; EPOCH++)
   {
+
+	  cudaMemGetInfo(&free, &total);
+	  std::cout << free << std::endl;
 	  std::cout << "EPOCH: " << EPOCH << std::endl;
+
 	  for(int i = 0; i < gpu.m_total_batches; i++)
 	  {
 		  gpu.allocate_next_batch_async();
 
-		  result = gpu.dot(gpu.m_current_batch_X,w1);
-		  result = gpuExp(result);
-		  result = gpu.dot(result,w2);
+		  Matrix a1 = gpu.dot(gpu.m_current_batch_X,w1);
+		  gpuExp(a1, a1);
+		  Matrix a2 = gpu.dot(a1,w2);
+		  gpuExp(a2, a2);
+		  Matrix out = softmax(a2);
+
+		  Matrix a1_T = T(a1);
+		  Matrix X_T = T(gpu.m_current_batch_X);
+		  Matrix w2_T = T(w2);
+		  //backprop
+		  Matrix e1 = subMatrixVector(out, gpu.m_current_batch_y);
+		  Matrix e2 = gpu.dot(e1, w2_T);
+		  gpu.dot(a1_T,e1,grad1);
+		  gpu.dot(X_T,e2,grad2);
+
+		  scalarMul(grad1,learning_rate,grad1);
+		  scalarMul(grad2,learning_rate,grad2);
+		  add(w2,grad1,w2);
+		  add(w1,grad2,w1);
+
+		  cudaFree(e1.data);
+		  cudaFree(e2.data);
+		  cudaFree(a1.data);
+		  cudaFree(a2.data);
+		  cudaFree(out.data);
+		  cudaFree(a1_T.data);
+		  cudaFree(X_T.data);
+		  cudaFree(w2_T.data);
 
 		  gpu.replace_current_batch_with_next();
 

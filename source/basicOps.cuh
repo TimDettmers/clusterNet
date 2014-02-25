@@ -61,6 +61,9 @@ void gpuSqrt(Matrix A, Matrix out);
 
 Matrix softmax(Matrix A);
 void softmax(Matrix A, Matrix out);
+Matrix subMatrixVector(Matrix A, Matrix v);
+void subMatrixVector(Matrix A, Matrix v, Matrix out);
+
 
 int checkMatrixOperation(Matrix A, Matrix B, Matrix C, int blnMatrixProduct);
 int blnFaultySizes(Matrix A, Matrix B, Matrix C);

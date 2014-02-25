@@ -9,6 +9,8 @@
 #include <util.cuh>
 #include <basicOps.cuh>
 
+
+
 using std::string;
 using std::vector;
 
@@ -75,6 +77,8 @@ float tock(cudaEvent_t* startstop, float tocks)
 
 	return time+tocks;
 }
+
+
 
 int test_eq(float f1, float f2, char* message)
 {

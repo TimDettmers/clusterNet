@@ -6,7 +6,7 @@
 #include <curand.h>
 #include <curand_kernel.h>
 #include <util.cuh>
-#include <clusterNet.cuh>
+#include <clusterNet.h>
 
 int run_basicOps_test(int argc, char *argv[])
 {
@@ -279,7 +279,16 @@ int run_basicOps_test(int argc, char *argv[])
 	  sum += m_host.data[i];
   }
 
-  assert(test_eq((int)sum,1,"Softmax sum to one test"));
+  ASSERT(sum > 0.98, "Softmax row sum equal one");
+  ASSERT(sum < 1.02, "Softmax row sum equal one");
+
+  m1 = ones(10,10);
+  m2 = ones(10,1);
+  m_host= to_host(subMatrixVector(m1,m2));
+  for(int i = 0; i < m_host.size; i++)
+  {
+	  assert(test_eq(m_host.data[i],0.0f, "Matrix - vector, equal data test"));
+  }
 
 
   return 0;
