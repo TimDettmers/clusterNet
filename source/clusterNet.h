@@ -16,20 +16,20 @@ public:
 	 ClusterNet(int argc, char *argv[], int seed);
 
 	 int m_rank;
-	 Matrix m_current_batch_X;
-	 Matrix m_current_batch_y;
+	 Matrix *m_current_batch_X;
+	 Matrix *m_current_batch_y;
 	 int m_total_batches;
 
-	 Matrix dot(Matrix A, Matrix B);
-	 void dot(Matrix A, Matrix B, Matrix out);
-	 Matrix dotMPI_unitSlice(Matrix A, Matrix B);
-	 Matrix dotMPI_batchSlice(Matrix A, Matrix B);
+	 Matrix *dot(Matrix *A, Matrix *B);
+	 void dot(Matrix *A, Matrix *B, Matrix *out);
+	 Matrix *dotMPI_unitSlice(Matrix *A, Matrix *B);
+	 Matrix *dotMPI_batchSlice(Matrix *A, Matrix *B);
 
-	 Matrix rand(int rows, int cols);
-	 void rand(int rows, int cols, Matrix out);
-	 Matrix randn(int rows, int cols);
-	 Matrix randn(int rows, int cols, float mean, float std);
-	 void randn(int rows, int cols, float mean, float std, Matrix out);
+	 Matrix *rand(int rows, int cols);
+	 void rand(int rows, int cols, Matrix *out);
+	 Matrix *randn(int rows, int cols);
+	 Matrix *randn(int rows, int cols, float mean, float std);
+	 void randn(int rows, int cols, float mean, float std, Matrix *out);
 
 	 void tick(std::string name);
 	 void tick();
@@ -40,7 +40,7 @@ public:
 	 void shutdown_MPI();
 
 	 void finish_batch_allocator();
-	 void init_batch_allocator(Matrix X, Matrix y, int batch_size);
+	 void init_batch_allocator(Matrix *X, Matrix *y, int batch_size);
 	 void allocate_next_batch_async();
 	 void replace_current_batch_with_next();
 private:
@@ -49,14 +49,14 @@ private:
 	 std::map<std::string,cudaEvent_t*> m_dictTickTock;
 	 std::map<std::string,float> m_dictTickTockCumulative;
 	 std::list<MPI_Request*> m_requests;
-	 std::map<std::string,Matrix> m_matrixCache;
+	 std::map<std::string,Matrix*> m_matrixCache;
 	 std::map<std::string,int> m_matrixCacheUsage;
 	 float* m_next_batch_X_cpu;
 	 float* m_next_batch_y_cpu;
-	 Matrix m_next_batch_X;
-	 Matrix m_next_batch_y;
-	 Matrix m_full_X;
-	 Matrix m_full_y;
+	 Matrix *m_next_batch_X;
+	 Matrix *m_next_batch_y;
+	 Matrix *m_full_X;
+	 Matrix *m_full_y;
 	 int m_batch_size;
 	 int m_next_batch_number;
 	 cudaStream_t m_streamNext_batch_X;

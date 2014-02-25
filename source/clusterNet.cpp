@@ -37,24 +37,24 @@ void ClusterNet::shutdown_MPI()
 	MPI_Finalize();
 }
 
-Matrix ClusterNet::dot(Matrix A, Matrix B)
+Matrix *ClusterNet::dot(Matrix *A, Matrix *B)
 {
 	//if(m_hasMPI){ return dotMPI(A,B);}
-	Matrix out = zeros(A.shape[0],B.shape[1]);
-	if(checkMatrixOperation(A, B, out, 1) == 1){ throw "Matrix size error:\n"; }
+	Matrix *out = zeros(A->shape[0],B->shape[1]);
+	if(checkMatrixOperation(A, B, out, 1) == 1){ throw "Matrix *size error:\n"; }
 	dot(A, B, out);
 
 	return out;
 }
 
-Matrix ClusterNet::dotMPI_batchSlice(Matrix A, Matrix B)
+Matrix *ClusterNet::dotMPI_batchSlice(Matrix *A, Matrix *B)
 {
-	int split_size = A.shape[0]/m_nodes;
-	Matrix out = empty(split_size,B.shape[1]);
-	Matrix out_rev = empty(split_size,B.shape[1]);
+	int split_size = A->shape[0]/m_nodes;
+	Matrix *out = empty(split_size,B->shape[1]);
+	Matrix *out_rev = empty(split_size,B->shape[1]);
 
 	tick("slice batch");
-	Matrix A1 = slice_rows(A, split_size*m_rank,split_size*(m_rank+1)-1);
+	Matrix *A1 = slice_rows(A, split_size*m_rank,split_size*(m_rank+1)-1);
 	tick("slice batch");
 	tick("dot batch");
 	dot(A1,B,out);
@@ -64,7 +64,7 @@ Matrix ClusterNet::dotMPI_batchSlice(Matrix A, Matrix B)
 		if(m_rank == i) { continue; }
 		MPI_Request *request = (MPI_Request*)malloc(sizeof(MPI_Request));
 		tick("send batch");
-		MPI_Isend(out.data, out.size, MPI_FLOAT, i, 100, MPI_COMM_WORLD, request);
+		MPI_Isend(out->data, out->size, MPI_FLOAT, i, 100, MPI_COMM_WORLD, request);
 		tick("send batch");
 	}
 
@@ -74,7 +74,7 @@ Matrix ClusterNet::dotMPI_batchSlice(Matrix A, Matrix B)
 		tick("receive batch");
 		MPI_Request *request = (MPI_Request*)malloc(sizeof(MPI_Request));
 		//m_receiveRequests[i].push_back(request);
-		MPI_Recv(out_rev.data, out_rev.size, MPI_FLOAT, i, 100, MPI_COMM_WORLD, &m_status);
+		MPI_Recv(out_rev->data, out_rev->size, MPI_FLOAT, i, 100, MPI_COMM_WORLD, &m_status);
 		tick("receive batch");
 		tick("merge batch");
 		out = vStack(out,out_rev);
@@ -86,12 +86,12 @@ Matrix ClusterNet::dotMPI_batchSlice(Matrix A, Matrix B)
 	return out;
 }
 
-Matrix ClusterNet::dotMPI_unitSlice(Matrix A, Matrix B)
+Matrix *ClusterNet::dotMPI_unitSlice(Matrix *A, Matrix *B)
 {
-	int split_size = B.shape[1]/m_nodes;
-	std::string matrix_size = A.shape[0] + "x" + split_size;
-	Matrix out;
-	Matrix out_rev;
+	int split_size = B->shape[1]/m_nodes;
+	std::string matrix_size = A->shape[0] + "x" + split_size;
+	Matrix *out;
+	Matrix *out_rev;
 	if(m_matrixCache.count("out " + matrix_size) > 0)
 	{
 		out = m_matrixCache["out " + matrix_size];
@@ -99,7 +99,7 @@ Matrix ClusterNet::dotMPI_unitSlice(Matrix A, Matrix B)
 	}
 	else
 	{
-		out = empty(A.shape[0],split_size);
+		out = empty(A->shape[0],split_size);
 		m_matrixCache["out " + matrix_size] = out;
 		m_matrixCacheUsage["out " + matrix_size] = 0;
 	}
@@ -110,13 +110,13 @@ Matrix ClusterNet::dotMPI_unitSlice(Matrix A, Matrix B)
 	}
 	else
 	{
-		out_rev = empty(A.shape[0],split_size);
+		out_rev = empty(A->shape[0],split_size);
 		m_matrixCache["out_rev " + matrix_size] = out_rev;
 		m_matrixCacheUsage["out_rev " + matrix_size] = 0;
 	}
 
 	tick("slice unit");
-	Matrix B1 = slice_cols(B, split_size*m_rank,split_size*(m_rank+1)-1);
+	Matrix *B1 = slice_cols(B, split_size*m_rank,split_size*(m_rank+1)-1);
 	tick("slice unit");
 	tick("dot unit");
 	dot(A,B1,out);
@@ -126,7 +126,7 @@ Matrix ClusterNet::dotMPI_unitSlice(Matrix A, Matrix B)
 		if(m_rank == i) { continue; }
 		MPI_Request *request = (MPI_Request*)malloc(sizeof(MPI_Request));
 		tick("send unit");
-		MPI_Isend(out.data, out.size, MPI_FLOAT, i, 100, MPI_COMM_WORLD, request);
+		MPI_Isend(out->data, out->size, MPI_FLOAT, i, 100, MPI_COMM_WORLD, request);
 		tick("send unit");
 	}
 
@@ -136,7 +136,7 @@ Matrix ClusterNet::dotMPI_unitSlice(Matrix A, Matrix B)
 		tick("receive unit");
 		MPI_Request *request = (MPI_Request*)malloc(sizeof(MPI_Request));
 		//m_receiveRequests[i].push_back(request);
-		MPI_Recv(out_rev.data, out_rev.size, MPI_FLOAT, i, 100, MPI_COMM_WORLD, &m_status);
+		MPI_Recv(out_rev->data, out_rev->size, MPI_FLOAT, i, 100, MPI_COMM_WORLD, &m_status);
 		tick("receive unit");
 		tick("merge unit");
 		out = hStack(out,out_rev);
@@ -144,7 +144,7 @@ Matrix ClusterNet::dotMPI_unitSlice(Matrix A, Matrix B)
 	}
 
 	//waitForAllRequests();
-	/* TODO: Manage matrix cache
+	/* TODO: Manage Matrix *cache
 	typedef std::map<std::string, std::map<std::string, int>>::iterator it_type;
 	for(it_type pair = m_matrixCacheUsage.begin(); iterator != m_matrixCacheUsage.end(); iterator++)
 	{
@@ -157,19 +157,19 @@ Matrix ClusterNet::dotMPI_unitSlice(Matrix A, Matrix B)
 	return out;
 }
 
-void ClusterNet::dot(Matrix A, Matrix B, Matrix out)
+void ClusterNet::dot(Matrix *A, Matrix *B, Matrix *out)
 {
-	if(checkMatrixOperation(A, B, out, 1) == 1){ throw "Matrix size error:\n"; }
+	if(checkMatrixOperation(A, B, out, 1) == 1){ throw "Matrix *size error:\n"; }
 	cublasStatus_t status;
 
 	const float alpha = 1.0f;
 	const float beta = 0.0f;
 
 	status = cublasSgemm(m_handle, CUBLAS_OP_N, CUBLAS_OP_N,
-				A.shape[0], B.shape[1], A.shape[1],
-				&alpha, A.data, A.shape[0],
-				B.data, B.shape[0],
-				&beta, out.data, out.shape[0]);
+				A->shape[0], B->shape[1], A->shape[1],
+				&alpha, A->data, A->shape[0],
+				B->data, B->shape[0],
+				&beta, out->data, out->shape[0]);
 
 	if(status != CUBLAS_STATUS_SUCCESS)
 	{
@@ -180,32 +180,32 @@ void ClusterNet::dot(Matrix A, Matrix B, Matrix out)
 
 
 //Uniform
-Matrix ClusterNet::rand(int rows, int cols)
+Matrix *ClusterNet::rand(int rows, int cols)
 {
-  Matrix out = empty(rows,cols);
+  Matrix *out = empty(rows,cols);
 
   rand(rows, cols, out);
 
     return out;
 }
-void ClusterNet::rand(int rows, int cols, Matrix out)
+void ClusterNet::rand(int rows, int cols, Matrix *out)
 {
-	curandGenerateUniform(m_generator, out.data, rows*cols);
+	curandGenerateUniform(m_generator, out->data, rows*cols);
 	//print_gpu_matrix(*out);
 }
 
 //Gaussian
-Matrix ClusterNet::randn(int rows, int cols){ return randn(rows, cols, 0, 1); }
-Matrix ClusterNet::randn(int rows, int cols, float mean, float std)
+Matrix *ClusterNet::randn(int rows, int cols){ return randn(rows, cols, 0, 1); }
+Matrix *ClusterNet::randn(int rows, int cols, float mean, float std)
 {
-    Matrix out = empty(rows,cols);
+    Matrix *out = empty(rows,cols);
     randn(rows, cols, mean, std, out);
 
     return out;
 }
-void ClusterNet::randn(int rows, int cols, float mean, float std, Matrix out)
+void ClusterNet::randn(int rows, int cols, float mean, float std, Matrix *out)
 {
-	curandGenerateNormal(m_generator, out.data, rows*cols, 0.0f, 1.0f);
+	curandGenerateNormal(m_generator, out->data, rows*cols, 0.0f, 1.0f);
 }
 
 
@@ -269,46 +269,48 @@ void ClusterNet::benchmark_dot()
 	tock("dot unit");
 }
 
-void ClusterNet::init_batch_allocator(Matrix X, Matrix y, int batch_size)
+void ClusterNet::init_batch_allocator(Matrix *X, Matrix *y, int batch_size)
 {
 
 	float * pinned_memory_X;
-	cudaHostAlloc(&pinned_memory_X, X.bytes, cudaHostAllocPortable);
-	memcpy(pinned_memory_X,X.data,X.bytes);
-	free(X.data);
+	cudaHostAlloc(&pinned_memory_X, X->bytes, cudaHostAllocPortable);
+	memcpy(pinned_memory_X,X->data,X->bytes);
+	free(X->data);
 
-	m_full_X.shape[0] = X.shape[0];
-	m_full_X.shape[1] = X.shape[1];
-	m_full_X.bytes = X.bytes;
-	m_full_X.size = X.size;
-	m_full_X.data = pinned_memory_X;
+	m_full_X = (Matrix*)malloc(sizeof(Matrix));
+	m_full_X->shape[0] = X->shape[0];
+	m_full_X->shape[1] = X->shape[1];
+	m_full_X->bytes = X->bytes;
+	m_full_X->size = X->size;
+	m_full_X->data = pinned_memory_X;
 
 	float * pinned_memory_y;
-	cudaHostAlloc(&pinned_memory_y, y.bytes, cudaHostAllocPortable);
-	memcpy(pinned_memory_y,y.data,y.bytes);
-	free(y.data);
+	cudaHostAlloc(&pinned_memory_y, y->bytes, cudaHostAllocPortable);
+	memcpy(pinned_memory_y,y->data,y->bytes);
+	free(y->data);
 
-	m_full_y.shape[0] = y.shape[0];
-	m_full_y.shape[1] = y.shape[1];
-	m_full_y.bytes = y.bytes;
-	m_full_y.size = y.size;
-	m_full_y.data = pinned_memory_y;
+	m_full_y = (Matrix*)malloc(sizeof(Matrix));
+	m_full_y->shape[0] = y->shape[0];
+	m_full_y->shape[1] = y->shape[1];
+	m_full_y->bytes = y->bytes;
+	m_full_y->size = y->size;
+	m_full_y->data = pinned_memory_y;
 
 	m_batch_size = batch_size;
-	m_total_batches = ceil(m_full_X.shape[0]/(m_batch_size*1.0f));
+	m_total_batches = ceil(m_full_X->shape[0]/(m_batch_size*1.0f));
 
 	cudaStreamCreate(&m_streamNext_batch_X);
 	cudaStreamCreate(&m_streamNext_batch_y);
 
-	m_current_batch_X = empty(m_batch_size,m_full_X.shape[1]);
-	m_next_batch_X = empty(m_batch_size,m_full_X.shape[1]);
+	m_current_batch_X = empty(m_batch_size,m_full_X->shape[1]);
+	m_next_batch_X = empty(m_batch_size,m_full_X->shape[1]);
 
-	m_current_batch_y = empty(m_batch_size,m_full_y.shape[1]);
-	m_next_batch_y = empty(m_batch_size,m_full_y.shape[1]);
+	m_current_batch_y = empty(m_batch_size,m_full_y->shape[1]);
+	m_next_batch_y = empty(m_batch_size,m_full_y->shape[1]);
 
 
-	cudaMemcpy(&m_current_batch_X.data[0],&m_full_X.data[0],m_current_batch_X.bytes,cudaMemcpyDefault);
-	cudaMemcpy(&m_current_batch_y.data[0],&m_full_y.data[0],m_current_batch_y.bytes,cudaMemcpyDefault);
+	cudaMemcpy(&m_current_batch_X->data[0],&m_full_X->data[0],m_current_batch_X->bytes,cudaMemcpyDefault);
+	cudaMemcpy(&m_current_batch_y->data[0],&m_full_y->data[0],m_current_batch_y->bytes,cudaMemcpyDefault);
 
 	m_next_batch_number = 1;
 }
@@ -316,24 +318,24 @@ void ClusterNet::init_batch_allocator(Matrix X, Matrix y, int batch_size)
 
 void ClusterNet::allocate_next_batch_async()
 {
-	int copy_range_bytes_X = m_next_batch_X.bytes;
-	int copy_range_bytes_y = m_next_batch_y.bytes;
+	int copy_range_bytes_X = m_next_batch_X->bytes;
+	int copy_range_bytes_y = m_next_batch_y->bytes;
 
-	if((m_batch_size * (m_next_batch_number + 1)) > m_full_X.shape[0])
+	if((m_batch_size * (m_next_batch_number + 1)) > m_full_X->shape[0])
 	{
 		//the next batch is smaller than the given standard batch size
 
-		int partial_batch_size = m_full_X.shape[0] % m_batch_size;
-		copy_range_bytes_X = partial_batch_size*m_full_X.shape[1]*sizeof(float);
-		copy_range_bytes_y = partial_batch_size*m_full_y.shape[1]*sizeof(float);
-		cudaFree(m_next_batch_X.data);
-		cudaFree(m_next_batch_y.data);
-		m_next_batch_X = empty(partial_batch_size, m_full_X.shape[1]);
-		m_next_batch_y = empty(partial_batch_size, m_full_y.shape[1]);
+		int partial_batch_size = m_full_X->shape[0] % m_batch_size;
+		copy_range_bytes_X = partial_batch_size*m_full_X->shape[1]*sizeof(float);
+		copy_range_bytes_y = partial_batch_size*m_full_y->shape[1]*sizeof(float);
+		cudaFree(m_next_batch_X->data);
+		cudaFree(m_next_batch_y->data);
+		m_next_batch_X = empty(partial_batch_size, m_full_X->shape[1]);
+		m_next_batch_y = empty(partial_batch_size, m_full_y->shape[1]);
 	}
 
-	cudaMemcpyAsync(&m_next_batch_X.data[0],&m_full_X.data[(m_full_X.shape[1] * m_next_batch_number)],copy_range_bytes_X, cudaMemcpyHostToDevice,m_streamNext_batch_X);
-	cudaMemcpyAsync(&m_next_batch_y.data[0],&m_full_y.data[(m_full_y.shape[1] * m_next_batch_number)],copy_range_bytes_y, cudaMemcpyHostToDevice,m_streamNext_batch_y);
+	cudaMemcpyAsync(&m_next_batch_X->data[0],&m_full_X->data[(m_full_X->shape[1] * m_next_batch_number)],copy_range_bytes_X, cudaMemcpyHostToDevice,m_streamNext_batch_X);
+	cudaMemcpyAsync(&m_next_batch_y->data[0],&m_full_y->data[(m_full_y->shape[1] * m_next_batch_number)],copy_range_bytes_y, cudaMemcpyHostToDevice,m_streamNext_batch_y);
 
 }
 
@@ -350,17 +352,17 @@ void ClusterNet::replace_current_batch_with_next()
 	{
 		//reset to the intial state
 		m_next_batch_number = 0;
-		if(m_current_batch_X.shape[0] != m_batch_size)
+		if(m_current_batch_X->shape[0] != m_batch_size)
 		{
-			cudaFree(m_current_batch_X.data);
-			cudaFree(m_next_batch_X.data);
-			cudaFree(m_current_batch_y.data);
-			cudaFree(m_next_batch_y.data);
-			m_current_batch_X = empty(m_batch_size,m_full_X.shape[1]);
-			m_next_batch_X = empty(m_batch_size,m_full_X.shape[1]);
+			cudaFree(m_current_batch_X->data);
+			cudaFree(m_next_batch_X->data);
+			cudaFree(m_current_batch_y->data);
+			cudaFree(m_next_batch_y->data);
+			m_current_batch_X = empty(m_batch_size,m_full_X->shape[1]);
+			m_next_batch_X = empty(m_batch_size,m_full_X->shape[1]);
 
-			m_current_batch_y = empty(m_batch_size,m_full_y.shape[1]);
-			m_next_batch_y = empty(m_batch_size,m_full_y.shape[1]);
+			m_current_batch_y = empty(m_batch_size,m_full_y->shape[1]);
+			m_next_batch_y = empty(m_batch_size,m_full_y->shape[1]);
 		}
 	}
 

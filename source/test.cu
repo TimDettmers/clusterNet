@@ -11,18 +11,19 @@
 
 void run_neural_network()
 {
-  Matrix X = read_csv("/home/tim/Downloads/mnist_full_X.csv");
-  Matrix y = read_csv("/home/tim/Downloads/mnist_full_y.csv");
+  Matrix *X = read_csv("/home/tim/Downloads/mnist_full_X.csv");
+  Matrix *y = read_csv("/home/tim/Downloads/mnist_full_y.csv");
   printf("read MNIST\n");
 
   ClusterNet gpu = ClusterNet();
 
-  Matrix w1 = gpu.rand(784,1000);
-  Matrix w2 = gpu.rand(1000,10);
-  Matrix grad1 = empty(1000,10);
-  Matrix grad2 = empty(784,1000);
+  Matrix *w1 = gpu.rand(784,1000);
+  Matrix *w2 = gpu.rand(1000,10);
+  Matrix *grad1 = empty(1000,10);
+  Matrix *grad2 = empty(784,1000);
 
   gpu.init_batch_allocator(X, y, 128);
+
   clock_t t1,t2;
   t1=clock();
   //code goes here
@@ -31,6 +32,7 @@ void run_neural_network()
   float learning_rate = 0.1;
   size_t free = 0;
   size_t total = 0;
+
   for(int EPOCH = 1; EPOCH < epochs; EPOCH++)
   {
 
@@ -42,18 +44,18 @@ void run_neural_network()
 	  {
 		  gpu.allocate_next_batch_async();
 
-		  Matrix a1 = gpu.dot(gpu.m_current_batch_X,w1);
+		  Matrix *a1 = gpu.dot(gpu.m_current_batch_X,w1);
 		  gpuExp(a1, a1);
-		  Matrix a2 = gpu.dot(a1,w2);
+		  Matrix *a2 = gpu.dot(a1,w2);
 		  gpuExp(a2, a2);
-		  Matrix out = softmax(a2);
+		  Matrix *out = softmax(a2);
 
-		  Matrix a1_T = T(a1);
-		  Matrix X_T = T(gpu.m_current_batch_X);
-		  Matrix w2_T = T(w2);
+		  Matrix *a1_T = T(a1);
+		  Matrix *X_T = T(gpu.m_current_batch_X);
+		  Matrix *w2_T = T(w2);
 		  //backprop
-		  Matrix e1 = subMatrixVector(out, gpu.m_current_batch_y);
-		  Matrix e2 = gpu.dot(e1, w2_T);
+		  Matrix *e1 = subMatrixVector(out, gpu.m_current_batch_y);
+		  Matrix *e2 = gpu.dot(e1, w2_T);
 		  gpu.dot(a1_T,e1,grad1);
 		  gpu.dot(X_T,e2,grad2);
 
@@ -62,19 +64,20 @@ void run_neural_network()
 		  add(w2,grad1,w2);
 		  add(w1,grad2,w1);
 
-		  cudaFree(e1.data);
-		  cudaFree(e2.data);
-		  cudaFree(a1.data);
-		  cudaFree(a2.data);
-		  cudaFree(out.data);
-		  cudaFree(a1_T.data);
-		  cudaFree(X_T.data);
-		  cudaFree(w2_T.data);
+		  cudaFree(e1->data);
+		  cudaFree(e2->data);
+		  cudaFree(a1->data);
+		  cudaFree(a2->data);
+		  cudaFree(out->data);
+		  cudaFree(a1_T->data);
+		  cudaFree(X_T->data);
+		  cudaFree(w2_T->data);
 
 		  gpu.replace_current_batch_with_next();
 
 	  }
   }
+
   cudaThreadSynchronize();
   t2=clock();
   float diff ((float)t2-(float)t1);
@@ -83,6 +86,7 @@ void run_neural_network()
   gpu.tock();
 
   gpu.finish_batch_allocator();
+
   //gpu.tock("batch replace");
   //gpu.tock("async batch allocate");
   //gpu.tock("feedforward");
@@ -104,26 +108,26 @@ void MPI_benchmark(int argc, char *argv[])
     int w_out = 8000;
 
     //dot
-    Matrix B = gpu.rand(w_in,w_out);
-    Matrix A = gpu.rand(batch_rows,w_in);
+    Matrix *B = gpu.rand(w_in,w_out);
+    Matrix *A = gpu.rand(batch_rows,w_in);
     assert(test_matrix(A,batch_rows,w_in));
     assert(test_matrix(B,w_in,w_out));
-    Matrix out = empty(batch_rows, w_out);
+    Matrix *out = empty(batch_rows, w_out);
 
-    Matrix B1 = gpu.rand(w_in,w_out/2);
-    Matrix B2 = gpu.rand(w_in,w_out/2);
-    Matrix D = empty(batch_rows,w_out/2);
-    Matrix A1 = gpu.rand(batch_rows/2,w_in);
-    Matrix big_out = gpu.rand(batch_rows/2,w_out);
-    Matrix grand_out = empty(batch_rows, w_out);
+    Matrix *B1 = gpu.rand(w_in,w_out/2);
+    Matrix *B2 = gpu.rand(w_in,w_out/2);
+    Matrix *D = empty(batch_rows,w_out/2);
+    Matrix *A1 = gpu.rand(batch_rows/2,w_in);
+    Matrix *big_out = gpu.rand(batch_rows/2,w_out);
+    Matrix *grand_out = empty(batch_rows, w_out);
 
-    Matrix C = gpu.rand(batch_rows/2,w_in);
-    Matrix C_out = empty(batch_rows/2,w_out);
+    Matrix *C = gpu.rand(batch_rows/2,w_in);
+    Matrix *C_out = empty(batch_rows/2,w_out);
 
-    Matrix E = gpu.rand(batch_rows/4,w_in);
-    Matrix E_out = empty(batch_rows/4,w_out);
-    Matrix E_merge = empty(batch_rows/2,w_out);
-    Matrix E_merge2 = empty(batch_rows/2,w_out);
+    Matrix *E = gpu.rand(batch_rows/4,w_in);
+    Matrix *E_out = empty(batch_rows/4,w_out);
+    Matrix *E_merge = empty(batch_rows/2,w_out);
+    Matrix *E_merge2 = empty(batch_rows/2,w_out);
 
     //add
 
@@ -132,7 +136,7 @@ void MPI_benchmark(int argc, char *argv[])
     A = gpu.rand(w_in,w_out);
     out = empty(w_in, w_out);
     A1 = gpu.rand(w_in/2,w_out);
-    Matrix A2 = gpu.rand(w_in/2,w_out);
+    Matrix *A2 = gpu.rand(w_in/2,w_out);
     D = empty(w_in/2,w_out);
 */
 
@@ -147,7 +151,7 @@ void MPI_benchmark(int argc, char *argv[])
 
 
     out = empty(batch_rows,w_out/2);
-    Matrix out2 = empty(batch_rows,w_out/2);
+    Matrix *out2 = empty(batch_rows,w_out/2);
     startstop = tick();
     for(int i = 0; i< 100; i++)
     {
@@ -158,7 +162,7 @@ void MPI_benchmark(int argc, char *argv[])
     printf("Direct compute x2:\n");
     tock(startstop);
 
-    Matrix mergemat = empty(batch_rows, w_out);
+    Matrix *mergemat = empty(batch_rows, w_out);
     out = empty(batch_rows,w_out/2);
     startstop = tick();
     //out = empty(w_in/2,w_out);
@@ -168,13 +172,13 @@ void MPI_benchmark(int argc, char *argv[])
 	    {
 		gpu.dot(A,B1, out);
     		//add(A1, B,out);
-		MPI_Send(out.data, out.size, MPI_FLOAT, 1, 100, MPI_COMM_WORLD);
+		MPI_Send(out->data, out->size, MPI_FLOAT, 1, 100, MPI_COMM_WORLD);
 	    }
 	    else
 	    {
 		gpu.dot(A,B2, out);
 		//add(A2,B, out);
-	 	MPI_Recv(D.data, D.size, MPI_FLOAT, 0, 100, MPI_COMM_WORLD, &status);
+	 	MPI_Recv(D->data, D->size, MPI_FLOAT, 0, 100, MPI_COMM_WORLD, &status);
                 vStack(out,D, mergemat);
 	    }
 
@@ -200,14 +204,14 @@ void MPI_benchmark(int argc, char *argv[])
 	    {
     		//add(A1, B,out);
 		gpu.tick("send");
-		MPI_Send(out.data, out.size, MPI_FLOAT, 1, 100, MPI_COMM_WORLD);
+		MPI_Send(out->data, out->size, MPI_FLOAT, 1, 100, MPI_COMM_WORLD);
 		gpu.tick("send");
 	    }
 	    else
 	    {
 		//add(A2,B, out);
 		gpu.tick("receive");
-	 	MPI_Recv(C_out.data, C_out.size, MPI_FLOAT, 0, 100, MPI_COMM_WORLD, &status);
+	 	MPI_Recv(C_out->data, C_out->size, MPI_FLOAT, 0, 100, MPI_COMM_WORLD, &status);
                 vStack(out,C_out, grand_out);
                 gpu.tick("receive");
 	    }
@@ -216,14 +220,14 @@ void MPI_benchmark(int argc, char *argv[])
 	    {
     		//add(A1, B,out);
 		gpu.tick("send");
-		MPI_Send(out.data, out.size, MPI_FLOAT, 0, 100, MPI_COMM_WORLD);
+		MPI_Send(out->data, out->size, MPI_FLOAT, 0, 100, MPI_COMM_WORLD);
 		gpu.tick("send");
 	    }
 	    else
 	    {
 		//add(A2,B, out);
 		gpu.tick("receive");
-	 	MPI_Recv(C_out.data, C_out.size, MPI_FLOAT, 1, 100, MPI_COMM_WORLD, &status);
+	 	MPI_Recv(C_out->data, C_out->size, MPI_FLOAT, 1, 100, MPI_COMM_WORLD, &status);
                 vStack(out,C_out, grand_out);
                 gpu.tick("receive");
 	    }
@@ -264,8 +268,8 @@ void MPI_benchmark(int argc, char *argv[])
 void dotMPI_test(int argc, char *argv[])
 {
 	ClusterNet gpu = ClusterNet(argc, argv, 123465);
-	Matrix A = gpu.rand(128,1000);
-	Matrix B = gpu.rand(1000,400);
+	Matrix *A = gpu.rand(128,1000);
+	Matrix *B = gpu.rand(1000,400);
 
 	gpu.tick("dot mpi batch");
 	for(int i = 0; i < 100; i++)

@@ -13,10 +13,10 @@ int run_basicOps_test(int argc, char *argv[])
 
   ClusterNet gpu = ClusterNet();
 
-  Matrix m1 = ones(5,6);
-  Matrix m2 = ones(5,6);  
-  Matrix m3 = zeros(5,6);
-  Matrix out = zeros(5,6);
+  Matrix *m1 = ones(5,6);
+  Matrix *m2 = ones(5,6);
+  Matrix *m3 = zeros(5,6);
+  Matrix *out = zeros(5,6);
   
   //to_col_major test
   //      0 2    3             
@@ -24,14 +24,19 @@ int run_basicOps_test(int argc, char *argv[])
   //                           
   float m1_data[6] = {0,2,3,0,0.83,59.1387};
   size_t m1_bytes = 2*3*sizeof(float);
-  Matrix m1_cpu = {{2,3},m1_bytes,6,m1_data};
+  Matrix *m1_cpu = (Matrix*)malloc(sizeof(Matrix));
+  m1_cpu->shape[0] = 2;
+  m1_cpu->shape[1] = 3;
+  m1_cpu->bytes = m1_bytes;
+  m1_cpu->size = 6;
+  m1_cpu->data = m1_data;
 
   m1 = to_gpu(m1_cpu,1);
   //to_col_major test
   m1 = to_col_major(m1);
   float *test;
-  test = (float*)malloc(m1.bytes);
-  cudaMemcpy(test,m1.data,m1.bytes,cudaMemcpyDefault);
+  test = (float*)malloc(m1->bytes);
+  cudaMemcpy(test,m1->data,m1->bytes,cudaMemcpyDefault);
 
   assert(test_eq(test[0], 0.0f,"To col major data."));
   assert(test_eq(test[1], 0.0f,"To col major data."));
@@ -41,7 +46,7 @@ int run_basicOps_test(int argc, char *argv[])
   assert(test_eq(test[5], 59.1387f,"To col major data."));
 
    m1 = to_row_major(m1);
-   cudaMemcpy(test,m1.data,m1.bytes,cudaMemcpyDefault);
+   cudaMemcpy(test,m1->data,m1->bytes,cudaMemcpyDefault);
 
    assert(test_eq(test[0], 0.0f,"To row major data."));
    assert(test_eq(test[1], 2.0f,"To row major data."));
@@ -53,14 +58,14 @@ int run_basicOps_test(int argc, char *argv[])
 
   //test to_host
   //data is converted to column major and then back to row major
-  Matrix m_host = to_host(to_gpu(m1_cpu));
-  assert(m_host.shape[0]==m1.shape[0]);
-  assert(m_host.shape[1]==m1.shape[1]);
-  assert(m_host.size==m1.size);
-  assert(m_host.bytes==m1.bytes);
+  Matrix *m_host = to_host(to_gpu(m1_cpu));
+  assert(m_host->shape[0]==m1->shape[0]);
+  assert(m_host->shape[1]==m1->shape[1]);
+  assert(m_host->size==m1->size);
+  assert(m_host->bytes==m1->bytes);
   for(int i = 0; i< 5; i++)
   {
-    assert(m_host.data[i]==m1_cpu.data[i]);
+    assert(m_host->data[i]==m1_cpu->data[i]);
   }
 
 
@@ -69,7 +74,7 @@ int run_basicOps_test(int argc, char *argv[])
   m_host = to_host(m1);
   for(int i = 0; i< 30; i++)
   {
-    assert(m_host.data[i]==1.0f);
+    assert(m_host->data[i]==1.0f);
   }
 
   //test add
@@ -77,14 +82,14 @@ int run_basicOps_test(int argc, char *argv[])
   m_host = to_host(m3);
   for(int i = 0; i< 30; i++)
   {
-    assert(m_host.data[i]==2.0f);
+    assert(m_host->data[i]==2.0f);
   } 
 
   //test to_gpu
   m_host =  to_host(add(to_gpu(m_host),to_gpu(m_host)));
   for(int i = 0; i< 30; i++)
   {
-    assert(test_eq(m_host.data[i],4.0f,"To gpu data"));
+    assert(test_eq(m_host->data[i],4.0f,"To gpu data"));
   } 
 
   //test mul
@@ -92,7 +97,7 @@ int run_basicOps_test(int argc, char *argv[])
   m_host = to_host(m3);
   for(int i = 0; i< 30; i++)
   {
-    assert(test_eq(m_host.data[i],4.0f,"Multiplication data"));
+    assert(test_eq(m_host->data[i],4.0f,"Multiplication data"));
   } 
 
   //test sub
@@ -100,7 +105,7 @@ int run_basicOps_test(int argc, char *argv[])
   m_host = to_host(m3);
   for(int i = 0; i< 30; i++)
   {
-    assert(m_host.data[i]==3.0f);
+    assert(m_host->data[i]==3.0f);
   } 
 
   //test div
@@ -109,74 +114,74 @@ int run_basicOps_test(int argc, char *argv[])
   m_host = to_host(m3);
   for(int i = 0; i< 30; i++)
   {
-    assert(m_host.data[i]==1.5f);
+    assert(m_host->data[i]==1.5f);
   } 
 
-  //test add with given output matrix  
+  //test add with given output Matrix *
   add(m3,m2,out);
   m_host = to_host(out);
   for(int i = 0; i< 30; i++)
   {
-    assert(m_host.data[i]==3.5f);
+    assert(m_host->data[i]==3.5f);
   }
 
-  //test sub with given output matrix  
+  //test sub with given output Matrix *
   sub(m3,m2,out);
   m_host = to_host(out);
   for(int i = 0; i< 30; i++)
   {
-    assert(m_host.data[i]==-0.5f);
+    assert(m_host->data[i]==-0.5f);
   }
 
-  //test mul with given output matrix  
+  //test mul with given output Matrix *
   mul(m3,m2,out);
   m_host = to_host(out);
   for(int i = 0; i< 30; i++)
   {
-    assert(m_host.data[i]==3.0f);
+    assert(m_host->data[i]==3.0f);
   }
 
-  //test div with given output matrix  
+  //test div with given output Matrix *
   div(m3,m2,out);
   m_host = to_host(out);
   for(int i = 0; i< 30; i++)
   {
-    assert(m_host.data[i]==0.75f);
+    assert(m_host->data[i]==0.75f);
   }
   
   //test exp
   m_host = to_host(gpuExp(zeros(5,6)));
   for(int i = 0; i< 30; i++)
   {
-    assert(m_host.data[i]==1.0f);
+    assert(m_host->data[i]==1.0f);
   }
 
   //test scalar mul
   m_host = to_host(scalarMul(ones(5,6),1.83));
   for(int i = 0; i< 30; i++)
   {
-    assert(m_host.data[i]==1.83f);
+    assert(m_host->data[i]==1.83f);
   }
 
   //test sqrt
   m_host = to_host(gpuSqrt(scalarMul(ones(5,6),4)));
   for(int i = 0; i< 30; i++)
   {
-    assert(m_host.data[i]==2.0f);
+    assert(m_host->data[i]==2.0f);
   }
 
   //test log
   m_host = to_host(gpuLog(scalarMul(ones(5,6),2.0)));
   for(int i = 0; i< 30; i++)
   {   
-    assert(m_host.data[i]==log(2.0f));
+    assert(m_host->data[i]==log(2.0f));
   }
 
   //test square
   m_host = to_host(square(scalarMul(ones(5,6),2)));
   for(int i = 0; i< 30; i++)
   {
-    assert(m_host.data[i]==4.0f);
+    assert(m_host->data[i]==4.0f);
   }
 
   //test blnFaultySizes
@@ -196,12 +201,12 @@ int run_basicOps_test(int argc, char *argv[])
   //
   //test to_gpu with is_col_major = 1
   m_host = to_host(T(to_gpu(m1_cpu)));
-  assert(test_eq(m_host.data[0],0.0f,"Transpose data."));
-  assert(m_host.data[1]==0.0f);
-  assert(m_host.data[2]==2.0f);
-  assert(m_host.data[3]==0.83f);
-  assert(m_host.data[4]==3.0f);
-  assert(m_host.data[5]==59.1387f);
+  assert(test_eq(m_host->data[0],0.0f,"Transpose data."));
+  assert(m_host->data[1]==0.0f);
+  assert(m_host->data[2]==2.0f);
+  assert(m_host->data[3]==0.83f);
+  assert(m_host->data[4]==3.0f);
+  assert(m_host->data[5]==59.1387f);
   assert(test_matrix(m_host,3,2));
 
   //to host and to gpu test
@@ -210,27 +215,32 @@ int run_basicOps_test(int argc, char *argv[])
   //
   //to gpu and to host should cancel each other out
   m_host = to_host(to_gpu(m1_cpu));
-  assert(m_host.data[0]==0.0f);
-  assert(m_host.data[1]==2.0f);
-  assert(m_host.data[2]==3.0f);
-  assert(m_host.data[3]==0.0f);
-  assert(m_host.data[4]==0.83f);
-  assert(m_host.data[5]==59.1387f);
+  assert(m_host->data[0]==0.0f);
+  assert(m_host->data[1]==2.0f);
+  assert(m_host->data[2]==3.0f);
+  assert(m_host->data[3]==0.0f);
+  assert(m_host->data[4]==0.83f);
+  assert(m_host->data[5]==59.1387f);
   assert(test_matrix(m_host,2,3));
 
   //to_gpu for col major data test
   //col major data
   float m2_data[6] = {0,0,2,0.83,3,59.1387};
   size_t m2_bytes = 2*3*sizeof(float);
-  Matrix m2_cpu = {{2,3},m2_bytes,6,m2_data};
+  Matrix *m2_cpu = (Matrix*)malloc(sizeof(Matrix));
+  m2_cpu->shape[0] = 2;
+  m2_cpu->shape[1] = 3;
+  m2_cpu->bytes = m2_bytes;
+  m2_cpu->size = 6;
+  m2_cpu->data = m2_data;
   m_host = to_host(to_gpu(m2_cpu,1));
   //should be in row major now
-  assert(m_host.data[0]==0.0f);
-  assert(m_host.data[1]==2.0f);
-  assert(m_host.data[2]==3.0f);
-  assert(m_host.data[3]==0.0f);
-  assert(m_host.data[4]==0.83f);
-  assert(m_host.data[5]==59.1387f);
+  assert(m_host->data[0]==0.0f);
+  assert(m_host->data[1]==2.0f);
+  assert(m_host->data[2]==3.0f);
+  assert(m_host->data[3]==0.0f);
+  assert(m_host->data[4]==0.83f);
+  assert(m_host->data[5]==59.1387f);
   assert(test_matrix(m_host,2,3));
 
 
@@ -242,7 +252,7 @@ int run_basicOps_test(int argc, char *argv[])
   int idx = 0;
   for(int i = 20; i < 60; i++)
   {        
-    assert(test_eq(m1.data[i], m2.data[idx], idx, i , "Row slice data"));
+    assert(test_eq(m1->data[i], m2->data[idx], idx, i , "Row slice data"));
     idx++;
   }  
 
@@ -259,24 +269,24 @@ int run_basicOps_test(int argc, char *argv[])
     if(((i % 10) < 6) &&
        ((i % 10) > 1))
     {  
-      assert(test_eq(m1.data[i], m2.data[idx], idx, i , "Col slice data"));
+      assert(test_eq(m1->data[i], m2->data[idx], idx, i , "Col slice data"));
       idx++;
     }
   }
 
   m1 = softmax(ones(1,10));
   m_host = to_host(m1,1);
-  for(int i = 0; i < m_host.size; i++)
+  for(int i = 0; i < m_host->size; i++)
   {
-	  assert(test_eq(m_host.data[i],0.1,"Softmax equal test"));
+	  assert(test_eq(m_host->data[i],0.1,"Softmax equal test"));
   }
 
   m1 = softmax(gpu.rand(1,10));
   m_host = to_host(m1,1);
   float sum = 0;
-  for(int i = 0; i < m_host.size; i++)
+  for(int i = 0; i < m_host->size; i++)
   {
-	  sum += m_host.data[i];
+	  sum += m_host->data[i];
   }
 
   ASSERT(sum > 0.98, "Softmax row sum equal one");
@@ -285,9 +295,9 @@ int run_basicOps_test(int argc, char *argv[])
   m1 = ones(10,10);
   m2 = ones(10,1);
   m_host= to_host(subMatrixVector(m1,m2));
-  for(int i = 0; i < m_host.size; i++)
+  for(int i = 0; i < m_host->size; i++)
   {
-	  assert(test_eq(m_host.data[i],0.0f, "Matrix - vector, equal data test"));
+	  assert(test_eq(m_host->data[i],0.0f, "Matrix - vector, equal data test"));
   }
 
 

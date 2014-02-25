@@ -151,7 +151,7 @@ __global__ void kTranspose(float *A, float *out, int width, int height)
 {
     __shared__ float block[COPY_BLOCK_SIZE][COPY_BLOCK_SIZE+1];
 
-    // read the matrix tile into shared memory
+    // read the Matrix *tile into shared memory
     unsigned int xIndex = blockIdx.x * COPY_BLOCK_SIZE + threadIdx.x;
     unsigned int yIndex = blockIdx.y * COPY_BLOCK_SIZE + threadIdx.y;
 
@@ -163,7 +163,7 @@ __global__ void kTranspose(float *A, float *out, int width, int height)
 
     __syncthreads();
 
-    // write the transposed matrix tile to global memory
+    // write the transposed Matrix *tile to global memory
     xIndex = blockIdx.y * COPY_BLOCK_SIZE + threadIdx.x;
     yIndex = blockIdx.x * COPY_BLOCK_SIZE + threadIdx.y;
 
