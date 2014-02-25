@@ -22,24 +22,27 @@ void run_neural_network()
   Matrix w2 = gpu.rand(1000,10);
 
   printf("init batch allocator\n");
-  gpu.init_batch_allocator(X, y, 124);
-
+  gpu.init_batch_allocator(X, y, 128);
+  std::cout << gpu.m_total_batches << std::endl;
   clock_t t1,t2;
   t1=clock();
   //code goes here
-
+  int epochs  = 10;
   gpu.tick();
-  for(int i = 0; i < gpu.m_total_batches; i++)
+  for(int EPOCH = 1; EPOCH < epochs; EPOCH++)
   {
-	  gpu.allocate_next_batch_async();
+	  std::cout << "EPOCH: " << EPOCH << std::endl;
+	  for(int i = 0; i < gpu.m_total_batches; i++)
+	  {
+		  gpu.allocate_next_batch_async();
 
+		  result = gpu.dot(gpu.m_current_batch_X,w1);
+		  result = gpuExp(result);
+		  result = gpu.dot(result,w2);
 
-	  result = gpu.dot(gpu.m_current_batch_X,w1);
-	  result = gpuExp(result);
-	  result = gpu.dot(result,w2);
+		  gpu.replace_current_batch_with_next();
 
-	  gpu.replace_current_batch_with_next();
-
+	  }
   }
   cudaThreadSynchronize();
   t2=clock();
