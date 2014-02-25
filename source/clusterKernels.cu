@@ -2,6 +2,8 @@
 #include <curand.h>
 #include <curand_kernel.h>
 #include <stdio.h>
+#include <float.h>
+const int NUM_THREADS = 32;
 
 __global__ void kFill_with(float *m, float fill_value, int size)
 {
@@ -204,4 +206,131 @@ __global__ void slice_cols(float *A, float *out, int start, int rows, int size_o
   }
 }
 
+
+
+__device__ void reduceToMax(float* sdata, unsigned int tid)
+{
+
+  //Synchronize threads to share shared memory data
+  __syncthreads();
+
+  float mySum = sdata[tid];
+
+  // do reduction in shared mem
+  if (NUM_THREADS >= 512) { if (tid < 256) { sdata[tid] = mySum = fmaxf(mySum, sdata[tid + 256]); } __syncthreads(); }
+  if (NUM_THREADS >= 256) { if (tid < 128) { sdata[tid] = mySum = fmaxf(mySum, sdata[tid + 128]); } __syncthreads(); }
+  if (NUM_THREADS >= 128) { if (tid <  64) { sdata[tid] = mySum = fmaxf(mySum, sdata[tid +  64]); } __syncthreads(); }
+
+  if (NUM_THREADS == 32){
+    if (tid < 16)
+    {
+      // now that we are using warp-synchronous programming (below)
+      // we need to declare our shared memory volatile so that the compiler
+      // doesn't reorder stores to it and induce incorrect behavior.
+      volatile float* smem = sdata;
+      if (NUM_THREADS >=  32) { smem[tid] = mySum = fmaxf(mySum, smem[tid + 16]); }
+      if (NUM_THREADS >=  16) { smem[tid] = mySum = fmaxf(mySum, smem[tid +  8]); }
+      if (NUM_THREADS >=   8) { smem[tid] = mySum = fmaxf(mySum, smem[tid +  4]); }
+      if (NUM_THREADS >=   4) { smem[tid] = mySum = fmaxf(mySum, smem[tid +  2]); }
+      if (NUM_THREADS >=   2) { smem[tid] = mySum = fmaxf(mySum, smem[tid +  1]); }
+    }
+  }
+  else
+  {
+    if (tid < 32)
+    {
+      // now that we are using warp-synchronous programming (below)
+      // we need to declare our shared memory volatile so that the compiler
+      // doesn't reorder stores to it and induce incorrect behavior.
+      volatile float* smem = sdata;
+      if (NUM_THREADS >=  64) { smem[tid] = mySum = fmaxf(mySum, smem[tid + 32]); }
+      if (NUM_THREADS >=  32) { smem[tid] = mySum = fmaxf(mySum, smem[tid + 16]); }
+      if (NUM_THREADS >=  16) { smem[tid] = mySum = fmaxf(mySum, smem[tid +  8]); }
+      if (NUM_THREADS >=   8) { smem[tid] = mySum = fmaxf(mySum, smem[tid +  4]); }
+      if (NUM_THREADS >=   4) { smem[tid] = mySum = fmaxf(mySum, smem[tid +  2]); }
+      if (NUM_THREADS >=   2) { smem[tid] = mySum = fmaxf(mySum, smem[tid +  1]); }
+    }
+  }
+}
+
+__device__ void reduceToSumLocal(float* sdata, unsigned int tid)
+{
+
+  //Synchronize threads to share shared memory data
+  __syncthreads();
+
+  float mySum = sdata[tid];
+
+  // do reduction in shared mem
+  if (NUM_THREADS >= 512) { if (tid < 256) { sdata[tid] = mySum = mySum + sdata[tid + 256]; } __syncthreads(); }
+  if (NUM_THREADS >= 256) { if (tid < 128) { sdata[tid] = mySum = mySum + sdata[tid + 128]; } __syncthreads(); }
+  if (NUM_THREADS >= 128) { if (tid <  64) { sdata[tid] = mySum = mySum + sdata[tid +  64]; } __syncthreads(); }
+
+  if (NUM_THREADS == 32){
+    if (tid < 16)
+    {
+      // now that we are using warp-synchronous programming (below)
+      // we need to declare our shared memory volatile so that the compiler
+      // doesn't reorder stores to it and induce incorrect behavior.
+      volatile float* smem = sdata;
+      if (NUM_THREADS >=  32) { smem[tid] = mySum = mySum + smem[tid + 16]; }
+      if (NUM_THREADS >=  16) { smem[tid] = mySum = mySum + smem[tid +  8]; }
+      if (NUM_THREADS >=   8) { smem[tid] = mySum = mySum + smem[tid +  4]; }
+      if (NUM_THREADS >=   4) { smem[tid] = mySum = mySum + smem[tid +  2]; }
+      if (NUM_THREADS >=   2) { smem[tid] = mySum = mySum + smem[tid +  1]; }
+    }
+  }
+  else
+  {
+    if (tid < 32)
+    {
+      // now that we are using warp-synchronous programming (below)
+      // we need to declare our shared memory volatile so that the compiler
+      // doesn't reorder stores to it and induce incorrect behavior.
+      volatile float* smem = sdata;
+      if (NUM_THREADS >=  64) { smem[tid] = mySum = mySum + smem[tid + 32]; }
+      if (NUM_THREADS >=  32) { smem[tid] = mySum = mySum + smem[tid + 16]; }
+      if (NUM_THREADS >=  16) { smem[tid] = mySum = mySum + smem[tid +  8]; }
+      if (NUM_THREADS >=   8) { smem[tid] = mySum = mySum + smem[tid +  4]; }
+      if (NUM_THREADS >=   4) { smem[tid] = mySum = mySum + smem[tid +  2]; }
+      if (NUM_THREADS >=   2) { smem[tid] = mySum = mySum + smem[tid +  1]; }
+    }
+  }
+}
+
+//taken from cudamat
+__global__ void kSoftMax(float* mat, float* target, unsigned int rows, unsigned int cols)
+{
+  extern __shared__ float max_vals[] ;
+  float cur_max = -FLT_MAX;
+  float val = 0;
+  const int column = gridDim.x * blockIdx.y + blockIdx.x;
+  if (column < rows) {
+    float *cur_data = &mat[column * cols] ;
+    max_vals[threadIdx.x]=-FLT_MAX;
+    for (unsigned int i = threadIdx.x; i < cols; i += blockDim.x) {
+      val = cur_data[i];
+      if (val > cur_max) {
+        cur_max = val;
+      }
+    }
+    max_vals[threadIdx.x] = cur_max;
+    reduceToMax(max_vals, threadIdx.x);
+    __syncthreads();
+    cur_max = max_vals[0] ;
+    __syncthreads();
+    val = 0;
+    for (unsigned int i = threadIdx.x; i < cols; i += blockDim.x) {
+      val += __expf(cur_data[i]-cur_max);
+    }
+    max_vals[threadIdx.x] = val;
+    reduceToSumLocal(max_vals, threadIdx.x);
+    __syncthreads();
+    float norm = max_vals[0] ;
+    float *cur_target = &target[column * cols] ;
+    for (unsigned int i = threadIdx.x; i < cols; i += blockDim.x) {
+      cur_target[i] = __expf(cur_data[i]-cur_max) / norm ;
+    }
+  }
+}
 

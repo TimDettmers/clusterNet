@@ -429,6 +429,34 @@ int checkMatrixOperation(Matrix A, Matrix B, Matrix C, int blnMatrixProduct)
   return 0;
 }
 
+Matrix softmax(Matrix A)
+{
+	Matrix out = empty(A.shape[0],A.shape[1]);
+	softmax(A, out);
+	return out;
+}
+
+void softmax(Matrix A, Matrix out)
+{
+    unsigned int cols = A.shape[1],
+                 rows = A.shape[0];
+
+
+
+    //if (out.size[0] != h || target->size[1] != w)
+    //    return ERROR_INCOMPATIBLE_DIMENSIONS;
+
+    int shared_mem_size = 32 * sizeof(float) ;
+
+    int w1 = floor(sqrt(rows));
+    int w2 = rows / w1 + (rows % w1 == 0 ? 0 : 1);
+    dim3 gridDim(w1, w2, 1);
+    kSoftMax<<<gridDim, 32, shared_mem_size>>>(A.data, out.data, rows, cols);
+
+    cudaThreadSynchronize();
+
+}
+
 
 
 

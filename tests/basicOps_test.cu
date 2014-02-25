@@ -264,6 +264,24 @@ int run_basicOps_test(int argc, char *argv[])
     }
   }
 
+  m1 = softmax(ones(1,10));
+  m_host = to_host(m1,1);
+  for(int i = 0; i < m_host.size; i++)
+  {
+	  assert(test_eq(m_host.data[i],0.1,"Softmax equal test"));
+  }
+
+  m1 = softmax(gpu.rand(1,10));
+  m_host = to_host(m1,1);
+  float sum = 0;
+  for(int i = 0; i < m_host.size; i++)
+  {
+	  sum += m_host.data[i];
+  }
+
+  assert(test_eq((int)sum,1,"Softmax sum to one test"));
+
+
   return 0;
 }
 

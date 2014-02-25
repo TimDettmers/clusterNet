@@ -20,4 +20,7 @@ __global__ void slice_rows(float *A, float *out, int size_out, int rows_A, int s
 __global__ void slice_cols(float *A, float *out, int start, int rows, int size_out);
 __global__ void vStack(float *A, float *B, float *out, int size_out, int rows_a, int rows, int cols);
 __global__ void hStack(float *A, float *B, float *out, int size_out, int size_a);
+__global__ void kSoftMax(float* mat, float* target, unsigned int width, unsigned int height);
+__device__ void reduceToMax(float* sdata, unsigned int tid);
+__device__ void reduceToSumLocal(float* sdata, unsigned int tid);
 #endif
