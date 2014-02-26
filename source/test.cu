@@ -93,6 +93,8 @@ void run_neural_network()
 
 		  Matrix *result = argmax(out);
 
+		  Matrix *eq = equal(result,gpu.m_current_batch_cv_y);
+
 
 		  cudaFree(a1->data);
 		  cudaFree(a2->data);

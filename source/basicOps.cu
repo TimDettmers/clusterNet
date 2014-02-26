@@ -524,5 +524,14 @@ void equal(Matrix *A, Matrix *B, Matrix *out)
 	kEqual<<<blocks,THREADS_PER_BLOCKS>>>(A->data, B->data, out->data, A->size);
 }
 
+Matrix *vectorSum(Matrix *v)
+{
+
+	Matrix *out = empty(1,1);
+	int blocks = (v->size/THREADS_PER_BLOCKS) + 1;
+	vectorSum<<<blocks,THREADS_PER_BLOCKS>>>(v->data, out->data, v->size);
+
+	return out;
+}
 
 

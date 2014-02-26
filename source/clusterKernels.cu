@@ -410,3 +410,14 @@ __global__ void kEqual(float *A, float *B, float *out, int size)
 		  out[i] = (float)(A[i] == B[i]);
 	  }
 }
+
+__global__ void vectorSum(float *v, float *out, int size)
+{
+	  const unsigned int numThreads = blockDim.x * gridDim.x;
+	  const int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
+	  out[0] = 0.0f;
+	  for (unsigned int i = idx;i < size; i += numThreads)
+	  {
+		  atomicAdd(&out[0],v[i]);
+	  }
+}

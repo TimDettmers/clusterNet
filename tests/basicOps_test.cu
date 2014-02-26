@@ -352,6 +352,18 @@ int run_basicOps_test(int argc, char *argv[])
 	  assert(test_eq(m_host->data[i],0.0f, "Matrix matrix Equal data test"));
   }
 
+  //test vector sum
+  m1 = ones(10,1);
+  m2 = ones(1,10);
+  m1 = to_host(vectorSum(m1));
+  assert(test_matrix(m1,1,1));
+  ASSERT(m1->data[0] == 10.0f, "Vector sum test");
+  m1 = to_host(vectorSum(m2));
+  ASSERT(m1->data[0]  == 10.0f, "Vector sum test");
+  m1 = to_host(vectorSum(scalarMul(m2,1.73)));
+  ASSERT(m1->data[0] > 17.29f, "Vector sum test");
+  ASSERT(m1->data[0] < 17.31f, "Vector sum test");
+
 
 
   return 0;

@@ -27,4 +27,5 @@ __global__ void kSubMatrixVector(float *A, float *v, float *out, int rows, int s
 __global__ void kArgMaxRowwise(float* A, float* out, unsigned int height, unsigned int width);
 __global__ void kCreate_t_matrix(float *labels, float *out, int rows, int size);
 __global__ void kEqual(float *A, float *B, float *out, int size);
+__global__ void vectorSum(float *v, float *out, int size);
 #endif
