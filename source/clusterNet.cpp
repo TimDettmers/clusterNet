@@ -299,8 +299,8 @@ void ClusterNet::init_batch_allocator(Matrix *X, Matrix *y, float cross_validati
 	m_batch_size = batch_size;
 	m_batch_size_cv = batch_size_cv;
 	m_total_batches = ceil(m_full_X->shape[0]/(m_batch_size*1.0f));
-	m_total_batches_cv = ceil(m_cv_beginning/(m_batch_size_cv*1.0f));
 	m_cv_beginning = ceil(X->shape[0] - (X->shape[0]*cross_validation_size));
+	m_total_batches_cv = ceil((m_full_X->shape[0] - m_cv_beginning)/(m_batch_size_cv*1.0f));
 
 	cudaStreamCreate(&m_streamNext_batch_X);
 	cudaStreamCreate(&m_streamNext_batch_y);

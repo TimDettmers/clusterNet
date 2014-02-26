@@ -67,6 +67,8 @@ Matrix *argmax(Matrix *A);
 void argmax(Matrix* A, Matrix* out);
 Matrix *create_t_matrix(Matrix *labels, int max_label);
 void create_t_matrix(Matrix *labels, Matrix *out);
+Matrix *equal(Matrix *A, Matrix *B);
+void equal(Matrix *A, Matrix *B, Matrix *out);
 
 
 int checkMatrixOperation(Matrix *A, Matrix *B, Matrix *C, int blnMatrixProduct);

@@ -53,8 +53,9 @@ void run_neural_network()
 		  Matrix *a1_T = T(a1);
 		  Matrix *X_T = T(gpu.m_current_batch_X);
 		  Matrix *w2_T = T(w2);
+		  Matrix *t = create_t_matrix(gpu.m_current_batch_y,10);
 		  //backprop
-		  Matrix *e1 = subMatrixVector(out, gpu.m_current_batch_y);
+		  Matrix *e1 = sub(out, t);
 		  Matrix *e2 = gpu.dot(e1, w2_T);
 		  gpu.dot(a1_T,e1,grad1);
 		  gpu.dot(X_T,e2,grad2);
@@ -72,16 +73,31 @@ void run_neural_network()
 		  cudaFree(a1_T->data);
 		  cudaFree(X_T->data);
 		  cudaFree(w2_T->data);
+		  cudaFree(t->data);
 
 		  gpu.replace_current_batch_with_next();
 
 	  }
 
+	  std::cout << "begin cv" << std::endl;
 	  for(int i = 0; i < gpu.m_total_batches_cv; i++)
 	  {
 		  gpu.allocate_next_cv_batch_async();
+		  Matrix *a1 = gpu.dot(gpu.m_current_batch_cv_X,w1);
+
+		  gpuExp(a1, a1);
+		  Matrix *a2 = gpu.dot(a1,w2);
+		  gpuExp(a2, a2);
+
+		  Matrix *out = softmax(a2);
+
+		  Matrix *result = argmax(out);
 
 
+		  cudaFree(a1->data);
+		  cudaFree(a2->data);
+		  cudaFree(out->data);
+		  cudaFree(result->data);
 
 		  gpu.replace_current_cv_batch_with_next();
 	  }

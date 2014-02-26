@@ -510,5 +510,19 @@ void argmax(Matrix* A, Matrix* out)
 
 }
 
+Matrix *equal(Matrix *A, Matrix *B)
+{
+	Matrix *out = empty(A->shape[0],A->shape[1]);
+	equal(A, B, out);
+
+	return out;
+}
+
+void equal(Matrix *A, Matrix *B, Matrix *out)
+{
+	int blocks = (A->size/THREADS_PER_BLOCKS) + 1;
+	kEqual<<<blocks,THREADS_PER_BLOCKS>>>(A->data, B->data, out->data, A->size);
+}
+
 
 

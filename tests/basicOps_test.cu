@@ -321,7 +321,7 @@ int run_basicOps_test(int argc, char *argv[])
   m1 = create_t_matrix(m1,7);
   m_host = to_host(m1);
   assert(test_matrix(m_host,10,7));
-  for(int i = 0; i < m1->size; i++)
+  for(int i = 0; i < m_host->size; i++)
   {
 	  if((i % m1->shape[1]) == 4)
 	  {
@@ -332,6 +332,27 @@ int run_basicOps_test(int argc, char *argv[])
 		  assert(test_eq(m_host->data[i],0.0f, "Create t matrix data"));
 	  }
   }
+
+  //equal test
+  gpu = ClusterNet(12345);
+  ClusterNet gpu2 = ClusterNet(12345);
+  m2 = gpu.rand(10,10);
+  m1 = gpu2.rand(10,10);
+  m_host = to_host(equal(m1,m2));
+  assert(test_matrix(m_host,10,10));
+  for(int i = 0; i < m_host->size; i++)
+  {
+	  assert(test_eq(m_host->data[i],1.0f, "Matrix matrix Equal data test"));
+  }
+  m1 = gpu2.rand(10,10);
+  m_host = to_host(equal(m1,m2));
+  assert(test_matrix(m_host,10,10));
+  for(int i = 0; i < m_host->size; i++)
+  {
+	  assert(test_eq(m_host->data[i],0.0f, "Matrix matrix Equal data test"));
+  }
+
+
 
   return 0;
 }

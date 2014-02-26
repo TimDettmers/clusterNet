@@ -399,3 +399,14 @@ __global__ void kCreate_t_matrix(float *labels, float *out, int rows, int size)
 	  }
 
 }
+
+__global__ void kEqual(float *A, float *B, float *out, int size)
+{
+	  const unsigned int numThreads = blockDim.x * gridDim.x;
+	  const int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
+
+	  for (unsigned int i = idx;i < size; i += numThreads)
+	  {
+		  out[i] = (float)(A[i] == B[i]);
+	  }
+}
