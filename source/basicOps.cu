@@ -471,6 +471,8 @@ void softmax(Matrix *A, Matrix *out)
     dim3 gridDim(w1, w2, 1);
     kSoftMax<<<gridDim, 32, shared_mem_size>>>(A->data, out->data, rows, cols);
 
+    cudaThreadSynchronize();
+
 }
 
 Matrix *argmax(Matrix *A)
@@ -489,6 +491,8 @@ void argmax(Matrix* A, Matrix* out)
 	int w2 = cols / w1 + (cols % w1 == 0 ? 0 : 1);
 	dim3 gridDim(w1, w2, 1);
 	kArgMaxRowwise<<<gridDim,32>>>(A->data, out->data, rows, cols);
+
+	cudaThreadSynchronize();
 
 }
 
