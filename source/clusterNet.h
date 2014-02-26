@@ -18,7 +18,10 @@ public:
 	 int m_rank;
 	 Matrix *m_current_batch_X;
 	 Matrix *m_current_batch_y;
+	 Matrix *m_current_batch_cv_X;
+	 Matrix *m_current_batch_cv_y;
 	 int m_total_batches;
+	 int m_total_batches_cv;
 
 	 Matrix *dot(Matrix *A, Matrix *B);
 	 void dot(Matrix *A, Matrix *B, Matrix *out);
@@ -40,9 +43,11 @@ public:
 	 void shutdown_MPI();
 
 	 void finish_batch_allocator();
-	 void init_batch_allocator(Matrix *X, Matrix *y, int batch_size);
+	 void init_batch_allocator(Matrix *X, Matrix *y, float cross_validation_size, int batch_size, int cv_batch_size);
 	 void allocate_next_batch_async();
+	 void allocate_next_cv_batch_async();
 	 void replace_current_batch_with_next();
+	 void replace_current_cv_batch_with_next();
 private:
 	 cublasHandle_t m_handle;
 	 curandGenerator_t m_generator;
@@ -51,8 +56,6 @@ private:
 	 std::list<MPI_Request*> m_requests;
 	 std::map<std::string,Matrix*> m_matrixCache;
 	 std::map<std::string,int> m_matrixCacheUsage;
-	 float* m_next_batch_X_cpu;
-	 float* m_next_batch_y_cpu;
 	 Matrix *m_next_batch_X;
 	 Matrix *m_next_batch_y;
 	 Matrix *m_full_X;
@@ -61,6 +64,14 @@ private:
 	 int m_next_batch_number;
 	 cudaStream_t m_streamNext_batch_X;
 	 cudaStream_t m_streamNext_batch_y;
+
+	 int m_cv_beginning;
+	 int m_batch_size_cv;
+	 int m_next_batch_number_cv;
+	 Matrix *m_next_batch_cv_X;
+	 Matrix *m_next_batch_cv_y;
+	 cudaStream_t m_streamNext_batch_cv_X;
+	 cudaStream_t m_streamNext_batch_cv_y;
 
 
 	 int m_nodes;

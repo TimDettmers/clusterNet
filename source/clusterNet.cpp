@@ -269,7 +269,7 @@ void ClusterNet::benchmark_dot()
 	tock("dot unit");
 }
 
-void ClusterNet::init_batch_allocator(Matrix *X, Matrix *y, int batch_size)
+void ClusterNet::init_batch_allocator(Matrix *X, Matrix *y, float cross_validation_size, int batch_size, int batch_size_cv)
 {
 
 	float * pinned_memory_X;
@@ -297,22 +297,34 @@ void ClusterNet::init_batch_allocator(Matrix *X, Matrix *y, int batch_size)
 	m_full_y->data = pinned_memory_y;
 
 	m_batch_size = batch_size;
+	m_batch_size_cv = batch_size_cv;
 	m_total_batches = ceil(m_full_X->shape[0]/(m_batch_size*1.0f));
+	m_total_batches_cv = ceil(m_cv_beginning/(m_batch_size_cv*1.0f));
+	m_cv_beginning = ceil(X->shape[0] - (X->shape[0]*cross_validation_size));
 
 	cudaStreamCreate(&m_streamNext_batch_X);
 	cudaStreamCreate(&m_streamNext_batch_y);
+	cudaStreamCreate(&m_streamNext_batch_cv_X);
+	cudaStreamCreate(&m_streamNext_batch_cv_y);
 
 	m_current_batch_X = empty(m_batch_size,m_full_X->shape[1]);
 	m_next_batch_X = empty(m_batch_size,m_full_X->shape[1]);
-
 	m_current_batch_y = empty(m_batch_size,m_full_y->shape[1]);
 	m_next_batch_y = empty(m_batch_size,m_full_y->shape[1]);
+
+	m_current_batch_cv_X = empty(m_batch_size_cv,m_full_X->shape[1]);
+	m_next_batch_cv_X = empty(m_batch_size_cv,m_full_X->shape[1]);
+	m_current_batch_cv_y = empty(m_batch_size_cv,m_full_y->shape[1]);
+	m_next_batch_cv_y = empty(m_batch_size_cv,m_full_y->shape[1]);
 
 
 	cudaMemcpy(&m_current_batch_X->data[0],&m_full_X->data[0],m_current_batch_X->bytes,cudaMemcpyDefault);
 	cudaMemcpy(&m_current_batch_y->data[0],&m_full_y->data[0],m_current_batch_y->bytes,cudaMemcpyDefault);
+	cudaMemcpy(&m_current_batch_cv_X->data[0],&m_full_X->data[m_cv_beginning],m_current_batch_cv_X->bytes,cudaMemcpyDefault);
+	cudaMemcpy(&m_current_batch_cv_y->data[0],&m_full_y->data[m_cv_beginning],m_current_batch_cv_y->bytes,cudaMemcpyDefault);
 
 	m_next_batch_number = 1;
+	m_next_batch_number_cv = 1;
 }
 
 
@@ -321,11 +333,11 @@ void ClusterNet::allocate_next_batch_async()
 	int copy_range_bytes_X = m_next_batch_X->bytes;
 	int copy_range_bytes_y = m_next_batch_y->bytes;
 
-	if((m_batch_size * (m_next_batch_number + 1)) > m_full_X->shape[0])
+	if((m_batch_size * (m_next_batch_number + 1)) > m_cv_beginning)
 	{
 		//the next batch is smaller than the given standard batch size
 
-		int partial_batch_size = m_full_X->shape[0] % m_batch_size;
+		int partial_batch_size = m_cv_beginning % m_batch_size;
 		copy_range_bytes_X = partial_batch_size*m_full_X->shape[1]*sizeof(float);
 		copy_range_bytes_y = partial_batch_size*m_full_y->shape[1]*sizeof(float);
 		cudaFree(m_next_batch_X->data);
@@ -334,9 +346,34 @@ void ClusterNet::allocate_next_batch_async()
 		m_next_batch_y = empty(partial_batch_size, m_full_y->shape[1]);
 	}
 
-	cudaMemcpyAsync(&m_next_batch_X->data[0],&m_full_X->data[(m_full_X->shape[1] * m_next_batch_number)],copy_range_bytes_X, cudaMemcpyHostToDevice,m_streamNext_batch_X);
-	cudaMemcpyAsync(&m_next_batch_y->data[0],&m_full_y->data[(m_full_y->shape[1] * m_next_batch_number)],copy_range_bytes_y, cudaMemcpyHostToDevice,m_streamNext_batch_y);
+	cudaMemcpyAsync(&m_next_batch_X->data[0],&m_full_X->data[(m_full_X->shape[1] * m_next_batch_number)],
+					copy_range_bytes_X, cudaMemcpyHostToDevice,m_streamNext_batch_X);
+	cudaMemcpyAsync(&m_next_batch_y->data[0],&m_full_y->data[(m_full_y->shape[1] * m_next_batch_number)],
+					copy_range_bytes_y, cudaMemcpyHostToDevice,m_streamNext_batch_y);
+}
 
+void ClusterNet::allocate_next_cv_batch_async()
+{
+	int copy_range_bytes_X = m_next_batch_cv_X->bytes;
+	int copy_range_bytes_y = m_next_batch_cv_y->bytes;
+
+	if((m_batch_size * (m_next_batch_number + 1)) > m_full_X->shape[0])
+	{
+		//the next batch is smaller than the given standard batch size
+
+		int partial_batch_size = m_full_X->shape[0] % m_batch_size;
+		copy_range_bytes_X = partial_batch_size*m_full_X->shape[1]*sizeof(float);
+		copy_range_bytes_y = partial_batch_size*m_full_y->shape[1]*sizeof(float);
+		cudaFree(m_next_batch_cv_X->data);
+		cudaFree(m_next_batch_cv_y->data);
+		m_next_batch_cv_X = empty(partial_batch_size, m_full_X->shape[1]);
+		m_next_batch_cv_y = empty(partial_batch_size, m_full_y->shape[1]);
+	}
+
+	cudaMemcpyAsync(&m_next_batch_cv_X->data[0],&m_full_X->data[m_cv_beginning + (m_full_X->shape[1] * m_next_batch_number_cv)],
+					copy_range_bytes_X, cudaMemcpyHostToDevice,m_streamNext_batch_cv_X);
+	cudaMemcpyAsync(&m_next_batch_cv_y->data[0],&m_full_y->data[m_cv_beginning + (m_full_y->shape[1] * m_next_batch_number_cv)],
+					copy_range_bytes_y, cudaMemcpyHostToDevice,m_streamNext_batch_cv_y);
 }
 
 void ClusterNet::replace_current_batch_with_next()
@@ -365,7 +402,34 @@ void ClusterNet::replace_current_batch_with_next()
 			m_next_batch_y = empty(m_batch_size,m_full_y->shape[1]);
 		}
 	}
+}
 
+void ClusterNet::replace_current_cv_batch_with_next()
+{
+	cudaStreamSynchronize(m_streamNext_batch_cv_X);
+	m_current_batch_cv_X = m_next_batch_cv_X;
+	cudaStreamSynchronize(m_streamNext_batch_cv_y);
+	m_current_batch_cv_y = m_next_batch_cv_y;
+	m_next_batch_number_cv += 1;
+
+
+	if(m_next_batch_number_cv > m_total_batches_cv)
+	{
+		//reset to the intial state
+		m_next_batch_number_cv = 0;
+		if(m_current_batch_cv_X->shape[0] != m_batch_size_cv)
+		{
+			cudaFree(m_current_batch_cv_X->data);
+			cudaFree(m_next_batch_cv_X->data);
+			cudaFree(m_current_batch_cv_y->data);
+			cudaFree(m_next_batch_cv_y->data);
+			m_current_batch_cv_X = empty(m_batch_size_cv,m_full_X->shape[1]);
+			m_next_batch_cv_X = empty(m_batch_size_cv,m_full_X->shape[1]);
+
+			m_current_batch_cv_y = empty(m_batch_size_cv,m_full_y->shape[1]);
+			m_next_batch_cv_y = empty(m_batch_size_cv,m_full_y->shape[1]);
+		}
+	}
 }
 
 void ClusterNet::finish_batch_allocator()
