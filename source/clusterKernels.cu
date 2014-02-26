@@ -349,3 +349,36 @@ __global__ void kSubMatrixVector(float *A, float *v, float *out, int rows, int s
   }
 }
 
+//cudamat kernel for column major data
+__global__ void kArgMaxRowwise(float* A, float* out, unsigned int rows, unsigned int cols)
+{
+  __shared__ float max_vals[32];
+  __shared__ unsigned int max_val_args[32];
+  float cur_max = -FLT_MAX;
+  unsigned int cur_argmax = 0;
+  float val = 0;
+  const int column = gridDim.x * blockIdx.y + blockIdx.x;
+  if (column < rows) {
+    float *cur_data = &A[column * cols] ;
+    for (unsigned int i = threadIdx.x; i < cols; i += blockDim.x) {
+      val = cur_data[i];
+      if (val > cur_max) {
+        cur_max = val;
+        cur_argmax = i;
+      }
+    }
+    max_vals[threadIdx.x] = cur_max;
+    max_val_args[threadIdx.x] = cur_argmax;
+    __syncthreads();
+    if (threadIdx.x == 0) {
+      cur_max = -FLT_MAX;
+      cur_argmax = 0;
+      for (unsigned int i = 0; i < blockDim.x; i++)
+        if (max_vals[i] > cur_max) {
+          cur_max = max_vals[i];
+          cur_argmax = max_val_args[i];
+        }
+      out[column] = cur_argmax;
+    }
+  }
+}

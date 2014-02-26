@@ -464,11 +464,6 @@ void softmax(Matrix *A, Matrix *out)
     unsigned int cols = A->shape[1],
                  rows = A->shape[0];
 
-
-
-    //if (out->size[0] != h || target->size[1] != w)
-    //    return ERROR_INCOMPATIBLE_DIMENSIONS;
-
     int shared_mem_size = 32 * sizeof(float) ;
 
     int w1 = floor(sqrt(rows));
@@ -476,12 +471,26 @@ void softmax(Matrix *A, Matrix *out)
     dim3 gridDim(w1, w2, 1);
     kSoftMax<<<gridDim, 32, shared_mem_size>>>(A->data, out->data, rows, cols);
 
-    cudaThreadSynchronize();
-
 }
 
+Matrix *argmax(Matrix *A)
+{
+	//note: column major argmax
+	Matrix *out = empty(1,A->shape[1]);
+	argmax(A, out);
+	return out;
+}
+void argmax(Matrix* A, Matrix* out)
+{
+    unsigned int rows = A->shape[0],
+                 cols = A->shape[1];
 
+	int w1 = floor(sqrt(cols));
+	int w2 = cols / w1 + (cols % w1 == 0 ? 0 : 1);
+	dim3 gridDim(w1, w2, 1);
+	kArgMaxRowwise<<<gridDim,32>>>(A->data, out->data, rows, cols);
 
+}
 
 
 

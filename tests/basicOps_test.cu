@@ -274,8 +274,10 @@ int run_basicOps_test(int argc, char *argv[])
     }
   }
 
+  //softmax test
   m1 = softmax(ones(1,10));
   m_host = to_host(m1,1);
+  assert(test_matrix(m_host,1,10));
   for(int i = 0; i < m_host->size; i++)
   {
 	  assert(test_eq(m_host->data[i],0.1,"Softmax equal test"));
@@ -294,12 +296,22 @@ int run_basicOps_test(int argc, char *argv[])
 
   m1 = ones(10,10);
   m2 = ones(10,1);
+  //sub matrix vector test: A - v
   m_host= to_host(subMatrixVector(m1,m2));
   for(int i = 0; i < m_host->size; i++)
   {
 	  assert(test_eq(m_host->data[i],0.0f, "Matrix - vector, equal data test"));
   }
 
+  //column major order
+  //      0 2    3
+  // m1 = 0 0.83 59.1387
+  //
+  //argmax test
+  m1 = argmax(to_gpu(m1_cpu,1));
+  m_host = to_host(m1);
+  ASSERT(m_host->data[0] == 2, "Argmax test");
+  ASSERT(m_host->data[1] == 2, "Argmax test");
 
   return 0;
 }

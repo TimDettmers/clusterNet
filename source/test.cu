@@ -30,14 +30,14 @@ void run_neural_network()
   int epochs  = 10;
   gpu.tick();
   float learning_rate = 0.1;
-  //size_t free = 0;
-  //size_t total = 0;
+  size_t free = 0;
+  size_t total = 0;
 
   for(int EPOCH = 1; EPOCH < epochs; EPOCH++)
   {
 
-	  //cudaMemGetInfo(&free, &total);
-	  //std::cout << free << std::endl;
+	  cudaMemGetInfo(&free, &total);
+	  std::cout << free << std::endl;
 	  std::cout << "EPOCH: " << EPOCH << std::endl;
 
 	  for(int i = 0; i < gpu.m_total_batches; i++)
@@ -79,9 +79,11 @@ void run_neural_network()
 
 	  for(int i = 0; i < gpu.m_total_batches_cv; i++)
 	  {
-		  gpu.allocate_next_cv_batch_async();
+		  //gpu.allocate_next_cv_batch_async();
 
-		  gpu.replace_current_cv_batch_with_next();
+
+
+		  //gpu.replace_current_cv_batch_with_next();
 	  }
   }
 

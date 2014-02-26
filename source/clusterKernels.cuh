@@ -24,4 +24,5 @@ __global__ void kSoftMax(float* mat, float* target, unsigned int width, unsigned
 __device__ void reduceToMax(float* sdata, unsigned int tid);
 __device__ void reduceToSumLocal(float* sdata, unsigned int tid);
 __global__ void kSubMatrixVector(float *A, float *v, float *out, int rows, int size);
+__global__ void kArgMaxRowwise(float* A, float* out, unsigned int height, unsigned int width);
 #endif
