@@ -455,7 +455,7 @@ Matrix *subMatrixVector(Matrix *A, Matrix *v)
 
 void subMatrixVector(Matrix *A, Matrix *v, Matrix *out)
 {
-	int blocks = (A->size/1024) + 1;
+	int blocks = (A->size/THREADS_PER_BLOCKS) + 1;
 	kSubMatrixVector<<<blocks,THREADS_PER_BLOCKS>>>(A->data, v->data, out->data, A->shape[0], A->size);
 }
 
@@ -475,10 +475,24 @@ void softmax(Matrix *A, Matrix *out)
 
 }
 
+
+Matrix *create_t_matrix(Matrix *labels, int max_label)
+{
+	Matrix *out = zeros(labels->shape[0], max_label);
+	create_t_matrix(labels, out);
+	return out;
+}
+
+void create_t_matrix(Matrix *labels, Matrix *out)
+{
+	int blocks = (labels->size/THREADS_PER_BLOCKS) + 1;
+	kCreate_t_matrix<<<blocks,THREADS_PER_BLOCKS>>>(labels->data, out->data, out->shape[0], labels->size);
+}
+
 Matrix *argmax(Matrix *A)
 {
 	//note: column major argmax
-	Matrix *out = empty(1,A->shape[1]);
+	Matrix *out = empty(A->shape[0],1);
 	argmax(A, out);
 	return out;
 }

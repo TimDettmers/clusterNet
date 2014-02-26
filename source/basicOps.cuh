@@ -65,6 +65,8 @@ Matrix *subMatrixVector(Matrix *A, Matrix *v);
 void subMatrixVector(Matrix *A, Matrix *v, Matrix *out);
 Matrix *argmax(Matrix *A);
 void argmax(Matrix* A, Matrix* out);
+Matrix *create_t_matrix(Matrix *labels, int max_label);
+void create_t_matrix(Matrix *labels, Matrix *out);
 
 
 int checkMatrixOperation(Matrix *A, Matrix *B, Matrix *C, int blnMatrixProduct);

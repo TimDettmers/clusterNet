@@ -382,3 +382,20 @@ __global__ void kArgMaxRowwise(float* A, float* out, unsigned int rows, unsigned
     }
   }
 }
+
+__global__ void kCreate_t_matrix(float *labels, float *out, int rows, int size)
+{
+	  const unsigned int numThreads = blockDim.x * gridDim.x;
+	  const int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
+	  int label = 0;
+	  int offset = 0;
+
+	  for (unsigned int i = idx;i < size; i += numThreads)
+	  {
+		  label = (int)(labels[i]);
+		  //offset = (label*rows) gives the current column; i gives the current row
+		  offset = (label*rows) + i;
+		  out[offset] = 1.0f;
+	  }
+
+}

@@ -357,7 +357,7 @@ void ClusterNet::allocate_next_cv_batch_async()
 	int copy_range_bytes_X = m_next_batch_cv_X->bytes;
 	int copy_range_bytes_y = m_next_batch_cv_y->bytes;
 
-	if((m_batch_size * (m_next_batch_number + 1)) > m_full_X->shape[0])
+	if((m_batch_size_cv * (m_next_batch_number_cv + 1)) > m_full_X->shape[0])
 	{
 		//the next batch is smaller than the given standard batch size
 
@@ -436,6 +436,8 @@ void ClusterNet::finish_batch_allocator()
 {
 	cudaStreamDestroy(m_streamNext_batch_X);
 	cudaStreamDestroy(m_streamNext_batch_y);
+	cudaStreamDestroy(m_streamNext_batch_cv_X);
+	cudaStreamDestroy(m_streamNext_batch_cv_y);
 }
 
 

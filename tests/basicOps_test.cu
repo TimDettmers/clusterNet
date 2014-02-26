@@ -285,6 +285,7 @@ int run_basicOps_test(int argc, char *argv[])
 
   m1 = softmax(gpu.rand(1,10));
   m_host = to_host(m1,1);
+  assert(test_matrix(m_host,1,10));
   float sum = 0;
   for(int i = 0; i < m_host->size; i++)
   {
@@ -298,6 +299,7 @@ int run_basicOps_test(int argc, char *argv[])
   m2 = ones(10,1);
   //sub matrix vector test: A - v
   m_host= to_host(subMatrixVector(m1,m2));
+  assert(test_matrix(m_host,10,10));
   for(int i = 0; i < m_host->size; i++)
   {
 	  assert(test_eq(m_host->data[i],0.0f, "Matrix - vector, equal data test"));
@@ -310,8 +312,26 @@ int run_basicOps_test(int argc, char *argv[])
   //argmax test
   m1 = argmax(to_gpu(m1_cpu,1));
   m_host = to_host(m1);
+  assert(test_matrix(m_host,2,1));
   ASSERT(m_host->data[0] == 2, "Argmax test");
   ASSERT(m_host->data[1] == 2, "Argmax test");
+
+  //create t matrix test
+  m1 = scalarMul(ones(10,1),4);
+  m1 = create_t_matrix(m1,7);
+  m_host = to_host(m1);
+  assert(test_matrix(m_host,10,7));
+  for(int i = 0; i < m1->size; i++)
+  {
+	  if((i % m1->shape[1]) == 4)
+	  {
+		  assert(test_eq(m_host->data[i],1.0f, "Create t matrix data"));
+	  }
+	  else
+	  {
+		  assert(test_eq(m_host->data[i],0.0f, "Create t matrix data"));
+	  }
+  }
 
   return 0;
 }
