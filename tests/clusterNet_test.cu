@@ -182,6 +182,45 @@ int run_clusterNet_test(int argc, char *argv[])
   //These should just pass without error
   ticktock_test.tock("ClusterNet test ran in");
 
+  //batch allocator test
+  m1 = to_host(arange(10000,784));
+  m2 = to_host(arange(10000,1));
+  gpu.init_batch_allocator(m1,m2,0.20,128,256);
+  assert(test_matrix(gpu.m_current_batch_X,128,784));
+  assert(test_matrix(gpu.m_current_batch_y,128,1));
+  assert(test_matrix(gpu.m_current_batch_cv_X,256,784));
+  assert(test_matrix(gpu.m_current_batch_cv_y,256,1));
+  int value = 0;
+  for(int batchno = 0; batchno < gpu.m_total_batches; batchno++)
+  {
+	  m_host = to_host(gpu.m_current_batch_X);
+	  gpu.allocate_next_batch_async();
+
+	  for(int i = 0; i < gpu.m_current_batch_X->shape[0]*784; i++)
+	  {
+		  assert(test_eq(m_host->data[i],(float)value,"Batch test"));
+		  value++;
+	  }
+
+	  gpu.replace_current_batch_with_next();
+  }
+
+  for(int batchno = 0; batchno < gpu.m_total_batches_cv; batchno++)
+  {
+	  m_host = to_host(gpu.m_current_batch_cv_X);
+	  gpu.allocate_next_cv_batch_async();
+
+	  for(int i = 0; i < gpu.m_current_batch_cv_X->shape[0]*784; i++)
+	  {
+		  assert(test_eq(m_host->data[i],(float)value,"Batch test"));
+		  value++;
+	  }
+
+	  gpu.replace_current_cv_batch_with_next();
+  }
+
+
   return 0;
 }
+
 

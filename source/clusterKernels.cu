@@ -110,6 +110,26 @@ __global__ void kExp(float *A, float *out, int size)
        out[i] = __expf(A[i]);
 }
 
+__global__ void kLogistic(float *A, float *out, int size)
+{
+  const unsigned int numThreads = blockDim.x * gridDim.x;
+  const int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
+
+  for (unsigned int i = idx;i < size; i += numThreads)
+       out[i] = 1.0f / (1.0 + __expf(-A[i]));
+
+}
+
+__global__ void kLogisticGrad(float *A, float *out, int size)
+{
+  const unsigned int numThreads = blockDim.x * gridDim.x;
+  const int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
+
+  for (unsigned int i = idx;i < size; i += numThreads)
+       out[i] = A[i]*(1 - A[i]);
+
+}
+
 __global__ void kSqrt(float *A, float *out, int size)
 {
   const unsigned int numThreads = blockDim.x * gridDim.x;
@@ -411,7 +431,7 @@ __global__ void kEqual(float *A, float *B, float *out, int size)
 	  }
 }
 
-__global__ void vectorSum(float *v, float *out, int size)
+__global__ void kSum(float *v, float *out, int size)
 {
 	  const unsigned int numThreads = blockDim.x * gridDim.x;
 	  const int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
@@ -419,5 +439,20 @@ __global__ void vectorSum(float *v, float *out, int size)
 	  for (unsigned int i = idx;i < size; i += numThreads)
 	  {
 		  atomicAdd(&out[0],v[i]);
+	  }
+}
+
+
+__global__ void kArange(float *out, int start, int rows, int cols, int size)
+{
+	  const unsigned int numThreads = blockDim.x * gridDim.x;
+	  const int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
+	  int offset = 0;
+
+	  for (unsigned int i = idx;i < size; i += numThreads)
+	  {
+		  offset = (i % rows)*cols;
+
+		  out[i] = (float)(offset + (i/rows) + start);
 	  }
 }

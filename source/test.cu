@@ -13,14 +13,14 @@ void run_neural_network()
 {
   Matrix *X = read_csv("/home/tim/Downloads/mnist_full_X.csv");
   Matrix *y = read_csv("/home/tim/Downloads/mnist_full_y.csv");
-  printf("read MNIST\n");
 
-  ClusterNet gpu = ClusterNet();
+  ClusterNet gpu = ClusterNet(12345);
 
-  Matrix *w1 = gpu.rand(784,1000);
-  Matrix *w2 = gpu.rand(1000,10);
+  Matrix *w1 = scalarMul(gpu.rand(784,1000),4*sqrt(6.0f/(784.0+1000.0)));
+  Matrix *w2 = scalarMul(gpu.rand(1000,10),4*sqrt(6.0f/(10.0+1000.0)));
   Matrix *grad1 = empty(1000,10);
   Matrix *grad2 = empty(784,1000);
+  float error = 0;
 
   gpu.init_batch_allocator(X, y, 0.2, 128, 512);
 
@@ -30,47 +30,58 @@ void run_neural_network()
   int epochs  = 10;
   gpu.tick();
   float learning_rate = 0.1;
-  //size_t free = 0;
-  //size_t total = 0;
+  size_t free = 0;
+  size_t total = 0;
 
   for(int EPOCH = 1; EPOCH < epochs; EPOCH++)
   {
 
-	  //cudaMemGetInfo(&free, &total);
-	  //std::cout << free << std::endl;
+
 	  std::cout << "EPOCH: " << EPOCH << std::endl;
+	  cudaMemGetInfo(&free, &total);
+	  std::cout << free << std::endl;
 
 	  for(int i = 0; i < gpu.m_total_batches; i++)
 	  {
 		  gpu.allocate_next_batch_async();
 
-		  Matrix *a1 = gpu.dot(gpu.m_current_batch_X,w1);
-		  gpuExp(a1, a1);
-		  Matrix *a2 = gpu.dot(a1,w2);
-		  gpuExp(a2, a2);
+		  Matrix *z1 = gpu.dot(gpu.m_current_batch_X,w1);
+		  logistic(z1, z1);
+		  Matrix *a2 = gpu.dot(z1,w2);
+		  //logistic(a2, a2);
 		  Matrix *out = softmax(a2);
 
-		  Matrix *a1_T = T(a1);
+		  /*
+	        e1 = (feedforward - t[i])
+		        grad1 = gpu.dot(z1.T,e1)
+		        grad2 = gpu.dot(X[i].T,(gpu.dot(e1,n2.T)* z1*(1-z1)))#grads 6 sec
+		        */
+
+		  Matrix *z1_T = T(z1);
 		  Matrix *X_T = T(gpu.m_current_batch_X);
 		  Matrix *w2_T = T(w2);
 		  Matrix *t = create_t_matrix(gpu.m_current_batch_y,10);
 		  //backprop
 		  Matrix *e1 = sub(out, t);
 		  Matrix *e2 = gpu.dot(e1, w2_T);
-		  gpu.dot(a1_T,e1,grad1);
+		  logisticGrad(z1,z1);
+		  mul(e2,z1,e2);
+		  gpu.dot(z1_T,e1,grad1);
 		  gpu.dot(X_T,e2,grad2);
+
 
 		  scalarMul(grad1,learning_rate,grad1);
 		  scalarMul(grad2,learning_rate,grad2);
 		  add(w2,grad1,w2);
 		  add(w1,grad2,w1);
 
+
 		  cudaFree(e1->data);
 		  cudaFree(e2->data);
-		  cudaFree(a1->data);
+		  cudaFree(z1->data);
 		  cudaFree(a2->data);
 		  cudaFree(out->data);
-		  cudaFree(a1_T->data);
+		  cudaFree(z1_T->data);
 		  cudaFree(X_T->data);
 		  cudaFree(w2_T->data);
 		  cudaFree(t->data);
@@ -79,30 +90,76 @@ void run_neural_network()
 
 	  }
 
-	  std::cout << "begin cv" << std::endl;
-	  for(int i = 0; i < gpu.m_total_batches_cv; i++)
+
+	  //Matrix *sum_value = sum(w1);
+	  //std::cout << "weight 1 Sum: " << to_host(sum_value)->data[0] << std::endl;
+
+	  error = 0;
+	  for(int i = 0; i < gpu.m_total_batches; i++)
 	  {
 		  gpu.allocate_next_cv_batch_async();
-		  Matrix *a1 = gpu.dot(gpu.m_current_batch_cv_X,w1);
+		  Matrix *a1 = gpu.dot(gpu.m_current_batch_X,w1);
 
-		  gpuExp(a1, a1);
+		  logistic(a1, a1);
 		  Matrix *a2 = gpu.dot(a1,w2);
-		  gpuExp(a2, a2);
 
 		  Matrix *out = softmax(a2);
 
 		  Matrix *result = argmax(out);
 
-		  Matrix *eq = equal(result,gpu.m_current_batch_cv_y);
+		  Matrix *eq = equal(result,gpu.m_current_batch_y);
+		  Matrix *sum_mat = sum(eq);
+		  float sum_value = to_host(sum_mat)->data[0];
+
+		  //std::cout << "Error count: " << 128.0f - sum_value << std::endl;
+		  error += (128.0f - sum_value)/ (128.0f*gpu.m_total_batches) ;
 
 
 		  cudaFree(a1->data);
 		  cudaFree(a2->data);
 		  cudaFree(out->data);
 		  cudaFree(result->data);
+		  cudaFree(eq->data);
+		  cudaFree(sum_mat->data);
 
 		  gpu.replace_current_cv_batch_with_next();
 	  }
+
+
+	  std::cout << "Train error: " << error << std::endl;
+
+	  error = 0;
+	  for(int i = 0; i < gpu.m_total_batches_cv; i++)
+	  {
+		  gpu.allocate_next_cv_batch_async();
+		  Matrix *a1 = gpu.dot(gpu.m_current_batch_cv_X,w1);
+
+		  logistic(a1, a1);
+		  Matrix *a2 = gpu.dot(a1,w2);
+
+		  Matrix *out = softmax(a2);
+
+		  Matrix *result = argmax(out);
+
+		  Matrix *eq = equal(result,gpu.m_current_batch_cv_y);
+		  Matrix *sum_mat = sum(eq);
+		  float sum_value = to_host(sum_mat)->data[0];
+
+		  //std::cout << "Error count: " << gpu.m_total_batches_cv - sum_value << std::endl;
+		  error += (512.0f - sum_value)/ (512.0f*gpu.m_total_batches_cv) ;
+
+
+		  cudaFree(a1->data);
+		  cudaFree(a2->data);
+		  cudaFree(out->data);
+		  cudaFree(result->data);
+		  cudaFree(eq->data);
+		  cudaFree(sum_mat->data);
+
+		  gpu.replace_current_cv_batch_with_next();
+	  }
+
+	  std::cout << "Cross validation error: " << error << std::endl;
   }
 
   cudaThreadSynchronize();

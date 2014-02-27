@@ -29,6 +29,8 @@ Matrix *fill_matrix(int rows, int cols, float fill_value);
 Matrix *ones(int rows, int cols);
 Matrix *zeros(int rows, int cols);
 Matrix *empty(int rows, int cols);
+Matrix *arange(int rows, int cols);
+Matrix *arange(int start, int rows, int cols);
 
 Matrix *add(Matrix *A, Matrix *B);
 void add(Matrix *A, Matrix *B, Matrix *out);
@@ -38,7 +40,7 @@ Matrix *mul(Matrix *A, Matrix *B);
 void mul(Matrix *A, Matrix *B, Matrix *out);
 Matrix *div(Matrix *A, Matrix *B);
 void div(Matrix *A, Matrix *B, Matrix *out);
-Matrix *vectorSum(Matrix *v);
+Matrix *sum(Matrix *v);
 
 Matrix *to_host(Matrix *A);
 Matrix *to_host(Matrix *A, int is_row_major);
@@ -55,6 +57,10 @@ Matrix *square(Matrix *A);
 void square(Matrix *A, Matrix *out);
 Matrix *gpuExp(Matrix *A);
 void gpuExp(Matrix *A, Matrix *out);
+Matrix *logistic(Matrix *A);
+void logistic(Matrix *A, Matrix *out);
+Matrix *logisticGrad(Matrix *A);
+void logisticGrad(Matrix *A, Matrix *out);
 Matrix *gpuLog(Matrix *A);
 void gpuLog(Matrix *A, Matrix *out);
 Matrix *gpuSqrt(Matrix *A);

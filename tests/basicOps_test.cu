@@ -286,14 +286,14 @@ int run_basicOps_test(int argc, char *argv[])
   m1 = softmax(gpu.rand(1,10));
   m_host = to_host(m1,1);
   assert(test_matrix(m_host,1,10));
-  float sum = 0;
+  float sum_value = 0;
   for(int i = 0; i < m_host->size; i++)
   {
-	  sum += m_host->data[i];
+	  sum_value += m_host->data[i];
   }
 
-  ASSERT(sum > 0.98, "Softmax row sum equal one");
-  ASSERT(sum < 1.02, "Softmax row sum equal one");
+  ASSERT(sum_value > 0.98, "Softmax row sum equal one");
+  ASSERT(sum_value < 1.02, "Softmax row sum equal one");
 
   m1 = ones(10,10);
   m2 = ones(10,1);
@@ -352,17 +352,71 @@ int run_basicOps_test(int argc, char *argv[])
 	  assert(test_eq(m_host->data[i],0.0f, "Matrix matrix Equal data test"));
   }
 
-  //test vector sum
+  //test sum
   m1 = ones(10,1);
   m2 = ones(1,10);
-  m1 = to_host(vectorSum(m1));
+
+  m1 = to_host(sum(m1));
   assert(test_matrix(m1,1,1));
   ASSERT(m1->data[0] == 10.0f, "Vector sum test");
-  m1 = to_host(vectorSum(m2));
+  m1 = to_host(sum(m2));
   ASSERT(m1->data[0]  == 10.0f, "Vector sum test");
-  m1 = to_host(vectorSum(scalarMul(m2,1.73)));
+  m1 = ones(10,10);
+  m1 = to_host(sum(m1));
+  ASSERT(m1->data[0]  == 100.0f, "Vector sum test");
+  m1 = to_host(sum(scalarMul(m2,1.73)));
   ASSERT(m1->data[0] > 17.29f, "Vector sum test");
   ASSERT(m1->data[0] < 17.31f, "Vector sum test");
+
+  //logistic test
+  m1 = zeros(2,2);
+  m1 = to_host(logistic(m1));
+  assert(test_matrix(m1,2,2));
+  for(int i = 0; i < m1->size; i++)
+  {
+	  ASSERT(m1->data[i] == 0.5f,"Logistic data test.");
+  }
+  m1 = gpu.randn(100,100);
+  m1 = to_host(logistic(m1));
+  assert(test_matrix(m1,100,100));
+  for(int i = 0; i < m1->size; i++)
+  {
+	  ASSERT((m1->data[i] > 0.0f) && (m1->data[i] < 1.0f),"Logistic data test.");
+  }
+
+  //logistic grad test
+  m1 = ones(2,2);
+  m1 = to_host(logisticGrad(m1));
+  assert(test_matrix(m1,2,2));
+  for(int i = 0; i < m1->size; i++)
+  {
+	  ASSERT(m1->data[i] == 0.0f,"Logistic data test.");
+  }
+  m1 = gpu.randn(100,100);
+  m_host = to_host(m1);
+  m1 = to_host(logisticGrad(m1));
+  assert(test_matrix(m1,100,100));
+  for(int i = 0; i < m1->size; i++)
+  {
+	  ASSERT(m_host->data[i]*(1-m_host->data[i]) == m1->data[i],"Logistic data test.");
+  }
+
+  //arange test
+  m1 = arange(10,7);
+  m_host = to_host(m1);
+  assert(test_matrix(m_host,10,7));
+  for(int i = 0; i < m1->size; i++)
+  {
+	  assert(test_eq(m_host->data[i],(float)i, "Arange data test."));
+  }
+
+  m1 = arange(101,10,7);
+  m_host = to_host(m1);
+  assert(test_matrix(m_host,10,7));
+  for(int i = 0; i < m1->size; i++)
+  {
+	  assert(test_eq(m_host->data[i],(float)(i + 101), "Arange data test."));
+  }
 
 
 

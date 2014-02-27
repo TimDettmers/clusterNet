@@ -120,6 +120,15 @@ Matrix *ones(int rows, int cols)
   return fill_matrix(rows, cols, 1.0f);
 }
 
+Matrix *arange(int rows, int cols){	return arange(0, rows, cols); }
+Matrix *arange(int start, int rows, int cols)
+{
+	Matrix *out = empty(rows, cols);
+	int block_size = (out->size/1024) + 1;
+	kArange<<<block_size,1024>>>(out->data, start, out->shape[0], out->shape[1], out->size);
+	return out;
+}
+
 Matrix *empty(int rows, int cols)
 {
   float *gpu_data;
@@ -309,6 +318,34 @@ void gpuExp(Matrix *A, Matrix *out)
 {
   int block_size = (A->size/1024) + 1;
   kExp<<<block_size,1024>>>(A->data, out->data, A->size);
+}
+
+Matrix *logistic(Matrix *A)
+{
+  Matrix *out = zeros(A->shape[0],A->shape[1]);
+  logistic(A, out);
+
+  return out;
+}
+
+void logistic(Matrix *A, Matrix *out)
+{
+  int block_size = (A->size/1024) + 1;
+  kLogistic<<<block_size,1024>>>(A->data, out->data, A->size);
+}
+
+Matrix *logisticGrad(Matrix *A)
+{
+  Matrix *out = zeros(A->shape[0],A->shape[1]);
+  logisticGrad(A, out);
+
+  return out;
+}
+
+void logisticGrad(Matrix *A, Matrix *out)
+{
+  int block_size = (A->size/1024) + 1;
+  kLogisticGrad<<<block_size,1024>>>(A->data, out->data, A->size);
 }
 
 Matrix *gpuLog(Matrix *A)
@@ -524,12 +561,12 @@ void equal(Matrix *A, Matrix *B, Matrix *out)
 	kEqual<<<blocks,THREADS_PER_BLOCKS>>>(A->data, B->data, out->data, A->size);
 }
 
-Matrix *vectorSum(Matrix *v)
+Matrix *sum(Matrix *v)
 {
 
 	Matrix *out = empty(1,1);
 	int blocks = (v->size/THREADS_PER_BLOCKS) + 1;
-	vectorSum<<<blocks,THREADS_PER_BLOCKS>>>(v->data, out->data, v->size);
+	kSum<<<blocks,THREADS_PER_BLOCKS>>>(v->data, out->data, v->size);
 
 	return out;
 }
