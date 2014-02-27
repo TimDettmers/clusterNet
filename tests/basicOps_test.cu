@@ -305,16 +305,31 @@ int run_basicOps_test(int argc, char *argv[])
 	  assert(test_eq(m_host->data[i],0.0f, "Matrix - vector, equal data test"));
   }
 
-  //column major order
   //      0 2    3
   // m1 = 0 0.83 59.1387
   //
   //argmax test
-  m1 = argmax(to_gpu(m1_cpu,1));
+  //col_value = A[(i*cols) + idx];
+  m1 = argmax(to_gpu(m1_cpu));
   m_host = to_host(m1);
   assert(test_matrix(m_host,2,1));
-  ASSERT(m_host->data[0] == 2, "Argmax test");
-  ASSERT(m_host->data[1] == 2, "Argmax test");
+  assert(test_eq(m_host->data[0],2.0f, "Argmax test"));
+  assert(test_eq(m_host->data[1],2.0f, "Argmax test"));
+  m1 = gpu.rand(256,10);
+  m_host = to_host(argmax(m1));
+  int count0 = 0;
+  int count1 = 0;
+  assert(test_matrix(m_host,256,1));
+  for(int i = 0; i < m_host->size; i++)
+  {
+	  if(m_host->data[i] == 0.0f)
+		  count0++;
+
+	  if(m_host->data[i] == 1.0f)
+		  count1++;
+  }
+  ASSERT((count0 > 15) && (count0 < 40), "Argmax value test");
+  ASSERT((count1 > 15) && (count1 < 40), "Argmax value test");
 
   //create t matrix test
   m1 = scalarMul(ones(10,1),4);
@@ -351,6 +366,7 @@ int run_basicOps_test(int argc, char *argv[])
   {
 	  assert(test_eq(m_host->data[i],0.0f, "Matrix matrix Equal data test"));
   }
+
 
   //test sum
   m1 = ones(10,1);

@@ -498,15 +498,7 @@ void subMatrixVector(Matrix *A, Matrix *v, Matrix *out)
 
 void softmax(Matrix *A, Matrix *out)
 {
-    unsigned int cols = A->shape[1],
-                 rows = A->shape[0];
-
-    int shared_mem_size = 32 * sizeof(float) ;
-
-    int w1 = floor(sqrt(rows));
-    int w2 = rows / w1 + (rows % w1 == 0 ? 0 : 1);
-    dim3 gridDim(w1, w2, 1);
-    kSoftMax<<<gridDim, 32, shared_mem_size>>>(A->data, out->data, rows, cols);
+    kSoftMax<<<1, A->shape[0] > THREADS_PER_BLOCKS ? THREADS_PER_BLOCKS : A->shape[0]>>>(A->data, out->data, A->shape[0], A->shape[1]);
 
     cudaThreadSynchronize();
 
@@ -535,13 +527,7 @@ Matrix *argmax(Matrix *A)
 }
 void argmax(Matrix* A, Matrix* out)
 {
-    unsigned int rows = A->shape[0],
-                 cols = A->shape[1];
-
-	int w1 = floor(sqrt(cols));
-	int w2 = cols / w1 + (cols % w1 == 0 ? 0 : 1);
-	dim3 gridDim(w1, w2, 1);
-	kArgMaxRowwise<<<gridDim,32>>>(A->data, out->data, rows, cols);
+	kArgmax<<<1,A->shape[0] > THREADS_PER_BLOCKS ? THREADS_PER_BLOCKS : A->shape[0]>>>(A->data, out->data, A->shape[0], A->shape[1]);
 
 	cudaThreadSynchronize();
 

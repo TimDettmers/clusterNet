@@ -16,30 +16,32 @@ void run_neural_network()
 
   ClusterNet gpu = ClusterNet(12345);
 
-  Matrix *w1 = scalarMul(gpu.rand(784,1000),4*sqrt(6.0f/(784.0+1000.0)));
-  Matrix *w2 = scalarMul(gpu.rand(1000,10),4*sqrt(6.0f/(10.0+1000.0)));
+  Matrix *w1 = scalarMul(gpu.rand(784,1000),0.4*sqrt(6.0f/(784.0+1000.0)));
+  Matrix *w2 = scalarMul(gpu.rand(1000,10),0.4*sqrt(6.0f/(10.0+1000.0)));
   Matrix *grad1 = empty(1000,10);
   Matrix *grad2 = empty(784,1000);
   float error = 0;
+
+  std::cout << "size: " << X->shape[0] << std::endl;
 
   gpu.init_batch_allocator(X, y, 0.2, 128, 512);
 
   clock_t t1,t2;
   t1=clock();
   //code goes here
-  int epochs  = 10;
+  int epochs  = 100;
   gpu.tick();
   float learning_rate = 0.1;
-  size_t free = 0;
-  size_t total = 0;
+  //size_t free = 0;
+  //size_t total = 0;
 
   for(int EPOCH = 1; EPOCH < epochs; EPOCH++)
   {
 
 
 	  std::cout << "EPOCH: " << EPOCH << std::endl;
-	  cudaMemGetInfo(&free, &total);
-	  std::cout << free << std::endl;
+	  //cudaMemGetInfo(&free, &total);
+	  //std::cout << free << std::endl;
 
 	  for(int i = 0; i < gpu.m_total_batches; i++)
 	  {
@@ -51,16 +53,16 @@ void run_neural_network()
 		  //logistic(a2, a2);
 		  Matrix *out = softmax(a2);
 
-		  /*
-	        e1 = (feedforward - t[i])
-		        grad1 = gpu.dot(z1.T,e1)
-		        grad2 = gpu.dot(X[i].T,(gpu.dot(e1,n2.T)* z1*(1-z1)))#grads 6 sec
-		        */
+		  //std::cout << "out" << std::endl;
+		  //std::cout << "-----------------------" << std::endl;
+		  //print_gpu_matrix(out);
+
 
 		  Matrix *z1_T = T(z1);
 		  Matrix *X_T = T(gpu.m_current_batch_X);
 		  Matrix *w2_T = T(w2);
 		  Matrix *t = create_t_matrix(gpu.m_current_batch_y,10);
+
 		  //backprop
 		  Matrix *e1 = sub(out, t);
 		  Matrix *e2 = gpu.dot(e1, w2_T);
@@ -70,10 +72,10 @@ void run_neural_network()
 		  gpu.dot(X_T,e2,grad2);
 
 
-		  scalarMul(grad1,learning_rate,grad1);
-		  scalarMul(grad2,learning_rate,grad2);
-		  add(w2,grad1,w2);
-		  add(w1,grad2,w1);
+		  scalarMul(grad1,learning_rate/(float)gpu.m_current_batch_X->shape[0],grad1);
+		  scalarMul(grad2,learning_rate/(float)gpu.m_current_batch_X->shape[0],grad2);
+		  sub(w2,grad1,w2);
+		  sub(w1,grad2,w1);
 
 
 		  cudaFree(e1->data);
@@ -97,7 +99,8 @@ void run_neural_network()
 	  error = 0;
 	  for(int i = 0; i < gpu.m_total_batches; i++)
 	  {
-		  gpu.allocate_next_cv_batch_async();
+		  gpu.allocate_next_batch_async();
+
 		  Matrix *a1 = gpu.dot(gpu.m_current_batch_X,w1);
 
 		  logistic(a1, a1);
@@ -105,8 +108,15 @@ void run_neural_network()
 
 		  Matrix *out = softmax(a2);
 
+
 		  Matrix *result = argmax(out);
 
+
+		  /*
+		  std::cout << "y" << std::endl;
+		  std::cout << "-----------------------" << std::endl;
+		  print_gpu_matrix(gpu.m_current_batch_y);
+		  */
 		  Matrix *eq = equal(result,gpu.m_current_batch_y);
 		  Matrix *sum_mat = sum(eq);
 		  float sum_value = to_host(sum_mat)->data[0];
@@ -122,16 +132,21 @@ void run_neural_network()
 		  cudaFree(eq->data);
 		  cudaFree(sum_mat->data);
 
-		  gpu.replace_current_cv_batch_with_next();
+		  gpu.replace_current_batch_with_next();
 	  }
 
 
 	  std::cout << "Train error: " << error << std::endl;
 
+
 	  error = 0;
 	  for(int i = 0; i < gpu.m_total_batches_cv; i++)
 	  {
+		  //std::cout << "i: " << i << std::endl;
 		  gpu.allocate_next_cv_batch_async();
+		  //std::cout << "batch size: " << gpu.m_current_batch_cv_X->shape[0] << std::endl;
+		  //std::cout << "batches : " << gpu.m_total_batches_cv << std::endl;
+
 		  Matrix *a1 = gpu.dot(gpu.m_current_batch_cv_X,w1);
 
 		  logistic(a1, a1);
@@ -160,6 +175,9 @@ void run_neural_network()
 	  }
 
 	  std::cout << "Cross validation error: " << error << std::endl;
+
+
+
   }
 
   cudaThreadSynchronize();

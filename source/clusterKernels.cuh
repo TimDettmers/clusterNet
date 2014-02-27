@@ -20,11 +20,11 @@ __global__ void slice_rows(float *A, float *out, int size_out, int rows_A, int s
 __global__ void slice_cols(float *A, float *out, int start, int rows, int size_out);
 __global__ void vStack(float *A, float *B, float *out, int size_out, int rows_a, int rows, int cols);
 __global__ void hStack(float *A, float *B, float *out, int size_out, int size_a);
-__global__ void kSoftMax(float* mat, float* target, unsigned int width, unsigned int height);
+__global__ void kSoftMax(float* A, float* out, unsigned int rows, unsigned int cols);
 __device__ void reduceToMax(float* sdata, unsigned int tid);
 __device__ void reduceToSumLocal(float* sdata, unsigned int tid);
 __global__ void kSubMatrixVector(float *A, float *v, float *out, int rows, int size);
-__global__ void kArgMaxRowwise(float* A, float* out, unsigned int height, unsigned int width);
+__global__ void kArgmax(float* A, float* out, unsigned int height, unsigned int width);
 __global__ void kCreate_t_matrix(float *labels, float *out, int rows, int size);
 __global__ void kEqual(float *A, float *B, float *out, int size);
 __global__ void kSum(float *v, float *out, int size);

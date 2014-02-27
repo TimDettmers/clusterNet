@@ -134,22 +134,24 @@ int test_matrix(Matrix *A, int rows, int cols)
 
 void print_matrix(Matrix *A)
 {
-  for(int i = 0; i< A->size; i++)
-  {
-    printf("%f\n",A->data[i]);
-  }
+	for(int row = 0; row< A->shape[0]; row++)
+	  {
+		  printf("[");
+		  for(int col =0; col < A->shape[1]; col++)
+		  {
+			  printf("%f ",A->data[(row*A->shape[1])+col]);
+		  }
+		  printf("]\n");
+	  }
 }
 
 void print_gpu_matrix(Matrix *A)
 {
-  float *data = (float*)malloc(A->bytes);
-  cudaMemcpy(data,A->data,A->bytes,cudaMemcpyDefault);
-  for(int i = 0; i< A->size; i++)
-  {
-    printf("%f\n",data[i]);
-  }
-  cudaFree(data);
-  free(data);
+  Matrix * m = to_host(A);
+  print_matrix(m);
+  free(m->data);
+  free(m);
+
 }
 
 

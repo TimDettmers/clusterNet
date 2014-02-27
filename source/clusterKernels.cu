@@ -318,9 +318,52 @@ __device__ void reduceToSumLocal(float* sdata, unsigned int tid)
   }
 }
 
-//taken from cudamat
-__global__ void kSoftMax(float* mat, float* target, unsigned int rows, unsigned int cols)
+__global__ void kSoftMax(float* A, float* out, unsigned int rows, unsigned int cols)
 {
+
+	const unsigned int numThreads = blockDim.x * gridDim.x;
+	const int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
+	float col_value = 0.0f;
+
+	__shared__ float max_values[THREADS_PER_BLOCKS];
+	__shared__ float row_sums[THREADS_PER_BLOCKS];
+
+	//fill with min values
+
+
+
+	  for (unsigned int row = idx; row < rows; row += numThreads)
+	  {
+			max_values[idx] = -FLT_MAX;
+			row_sums[idx] = 0.0f;
+
+			__syncthreads();
+
+		     //calc max value of the row
+			for (unsigned int i = 0; i < cols; i++)
+			{
+				col_value = A[(i*rows) + row];
+				if(col_value > max_values[idx])
+				{
+					max_values[idx] = col_value;
+				}
+			}
+
+			//calc the row sum
+			for (unsigned int i = 0; i < cols; i++)
+			{
+				row_sums[idx] += __expf(A[(i*rows) + row] - max_values[idx]);
+			}
+
+			//calc the value of each element in the row
+			for (unsigned int i = 0; i < cols; i++)
+			{
+				out[(i*rows) + row] = __expf(A[(i*rows) + row] - max_values[idx])/row_sums[idx];
+			}
+	  }
+
+
+	  /*
   extern __shared__ float max_vals[] ;
   float cur_max = -FLT_MAX;
   float val = 0;
@@ -351,7 +394,8 @@ __global__ void kSoftMax(float* mat, float* target, unsigned int rows, unsigned 
     for (unsigned int i = threadIdx.x; i < cols; i += blockDim.x) {
       cur_target[i] = __expf(cur_data[i]-cur_max) / norm ;
     }
-  }
+    */
+
 }
 
 //for column major data
@@ -369,38 +413,25 @@ __global__ void kSubMatrixVector(float *A, float *v, float *out, int rows, int s
   }
 }
 
-//cudamat kernel for column major data
-__global__ void kArgMaxRowwise(float* A, float* out, unsigned int rows, unsigned int cols)
+__global__ void kArgmax(float* A, float* out, unsigned int rows, unsigned int cols)
 {
-  __shared__ float max_vals[32];
-  __shared__ unsigned int max_val_args[32];
-  float cur_max = -FLT_MAX;
-  unsigned int cur_argmax = 0;
-  float val = 0;
-  const int column = gridDim.x * blockIdx.y + blockIdx.x;
-  if (column < rows) {
-    float *cur_data = &A[column * cols] ;
-    for (unsigned int i = threadIdx.x; i < cols; i += blockDim.x) {
-      val = cur_data[i];
-      if (val > cur_max) {
-        cur_max = val;
-        cur_argmax = i;
-      }
-    }
-    max_vals[threadIdx.x] = cur_max;
-    max_val_args[threadIdx.x] = cur_argmax;
-    __syncthreads();
-    if (threadIdx.x == 0) {
-      cur_max = -FLT_MAX;
-      cur_argmax = 0;
-      for (unsigned int i = 0; i < blockDim.x; i++)
-        if (max_vals[i] > cur_max) {
-          cur_max = max_vals[i];
-          cur_argmax = max_val_args[i];
-        }
-      out[column] = cur_argmax;
-    }
-  }
+	  const int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
+	  float max_value = -FLT_MAX;
+	  float max_i = 0;
+	  float col_value = 0.0f;
+
+	  for (unsigned int i = 0; i < cols; i++)
+	  {
+		  col_value = A[(i*rows) + idx];
+		  if(col_value > max_value)
+		  {
+			  max_value = col_value;
+			  max_i = i;
+		  }
+
+	  }
+
+	  out[idx] = max_i;
 }
 
 __global__ void kCreate_t_matrix(float *labels, float *out, int rows, int size)

@@ -205,6 +205,8 @@ int run_clusterNet_test(int argc, char *argv[])
 	  gpu.replace_current_batch_with_next();
   }
 
+  assert(test_eq(value,6272000,"Batch test"));
+
   for(int batchno = 0; batchno < gpu.m_total_batches_cv; batchno++)
   {
 	  m_host = to_host(gpu.m_current_batch_cv_X);
@@ -219,7 +221,7 @@ int run_clusterNet_test(int argc, char *argv[])
 	  gpu.replace_current_cv_batch_with_next();
   }
 
-
+  assert(test_eq(value,7840000,"Batch test"));
   return 0;
 }
 

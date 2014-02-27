@@ -370,8 +370,7 @@ void ClusterNet::allocate_next_cv_batch_async()
 	if((m_batch_size_cv * (m_next_batch_number_cv + 1)) > (m_full_X->shape[0] - m_cv_beginning))
 	{
 		//the next batch is smaller than the given standard batch size
-
-		int partial_batch_size = (m_full_X->shape[0] - m_batch_size_cv) % m_batch_size_cv;
+		int partial_batch_size = (m_full_X->shape[0] - m_cv_beginning) % m_batch_size_cv;
 		copy_range_bytes_X = partial_batch_size*m_full_X->shape[1]*sizeof(float);
 		copy_range_bytes_y = partial_batch_size*m_full_y->shape[1]*sizeof(float);
 		cudaFree(m_next_batch_cv_X->data);
@@ -388,6 +387,7 @@ void ClusterNet::allocate_next_cv_batch_async()
 
 void ClusterNet::replace_current_batch_with_next()
 {
+
 	cudaStreamSynchronize(m_streamNext_batch_X);
 	Matrix *X_T = to_col_major(m_next_batch_X);
 	m_current_batch_X = X_T;
@@ -395,7 +395,6 @@ void ClusterNet::replace_current_batch_with_next()
 	Matrix *y_T = to_col_major(m_next_batch_y);
 	m_current_batch_y = y_T;
 	m_next_batch_number += 1;
-
 
 	if(m_next_batch_number > m_total_batches)
 	{
@@ -418,6 +417,7 @@ void ClusterNet::replace_current_batch_with_next()
 
 void ClusterNet::replace_current_cv_batch_with_next()
 {
+	//std::cout << "pre allocate" << std::endl;
 	cudaStreamSynchronize(m_streamNext_batch_cv_X);
 	Matrix *X_T = to_col_major(m_next_batch_cv_X);
 	m_current_batch_cv_X = X_T;
@@ -425,10 +425,12 @@ void ClusterNet::replace_current_cv_batch_with_next()
 	Matrix *y_T = to_col_major(m_next_batch_cv_y);
 	m_current_batch_cv_y = y_T;
 	m_next_batch_number_cv += 1;
+	//std::cout << "post allocate" << std::endl;
 
 
 	if(m_next_batch_number_cv > m_total_batches_cv)
 	{
+		//std::cout << "reset size" << std::endl;
 		//reset to the intial state
 		m_next_batch_number_cv = 0;
 		if(m_current_batch_cv_X->shape[0] != m_batch_size_cv)
