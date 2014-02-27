@@ -388,12 +388,18 @@ void ClusterNet::allocate_next_cv_batch_async()
 void ClusterNet::replace_current_batch_with_next()
 {
 
+	if(m_next_batch_X->shape[0] != m_batch_size)
+	{
+		cudaFree(m_current_batch_X->data);
+		cudaFree(m_current_batch_y->data);
+		m_current_batch_X = empty(m_next_batch_X->shape[0],m_next_batch_X->shape[1]);
+		m_current_batch_y = empty(m_next_batch_y->shape[0],m_next_batch_y->shape[1]);
+	}
+
 	cudaStreamSynchronize(m_streamNext_batch_X);
-	Matrix *X_T = to_col_major(m_next_batch_X);
-	m_current_batch_X = X_T;
+	to_col_major(m_next_batch_X, m_current_batch_X);
 	cudaStreamSynchronize(m_streamNext_batch_y);
-	Matrix *y_T = to_col_major(m_next_batch_y);
-	m_current_batch_y = y_T;
+	to_col_major(m_next_batch_y, m_current_batch_y);
 	m_next_batch_number += 1;
 
 	if(m_next_batch_number > m_total_batches)
@@ -417,16 +423,20 @@ void ClusterNet::replace_current_batch_with_next()
 
 void ClusterNet::replace_current_cv_batch_with_next()
 {
-	//std::cout << "pre allocate" << std::endl;
-	cudaStreamSynchronize(m_streamNext_batch_cv_X);
-	Matrix *X_T = to_col_major(m_next_batch_cv_X);
-	m_current_batch_cv_X = X_T;
-	cudaStreamSynchronize(m_streamNext_batch_cv_y);
-	Matrix *y_T = to_col_major(m_next_batch_cv_y);
-	m_current_batch_cv_y = y_T;
-	m_next_batch_number_cv += 1;
-	//std::cout << "post allocate" << std::endl;
 
+	if(m_next_batch_cv_X->shape[0] != m_batch_size_cv)
+	{
+		cudaFree(m_current_batch_cv_X->data);
+		cudaFree(m_current_batch_cv_y->data);
+		m_current_batch_cv_X = empty(m_next_batch_cv_X->shape[0],m_next_batch_cv_X->shape[1]);
+		m_current_batch_cv_y = empty(m_next_batch_cv_y->shape[0],m_next_batch_cv_y->shape[1]);
+	}
+
+	cudaStreamSynchronize(m_streamNext_batch_cv_X);
+	to_col_major(m_next_batch_cv_X,m_current_batch_cv_X);
+	cudaStreamSynchronize(m_streamNext_batch_cv_y);
+	to_col_major(m_next_batch_cv_y,m_current_batch_cv_y);
+	m_next_batch_number_cv += 1;
 
 	if(m_next_batch_number_cv > m_total_batches_cv)
 	{

@@ -69,6 +69,13 @@ Matrix *to_col_major(Matrix *A)
   return out;
 }
 
+void to_col_major(Matrix *A, Matrix *out)
+{
+  T(A, out, A->shape[1],A->shape[0]);
+
+  cudaDeviceSynchronize();
+}
+
 Matrix *to_row_major(Matrix *A)
 {
   Matrix *out = empty(A->shape[0],A->shape[1]);

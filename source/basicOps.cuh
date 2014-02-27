@@ -48,6 +48,7 @@ Matrix *to_gpu(Matrix *A);
 Matrix *to_gpu(Matrix *A, int is_col_major);
 Matrix *T(Matrix *A);
 Matrix *to_col_major(Matrix *A);
+void to_col_major(Matrix *A, Matrix *out);
 Matrix *to_row_major(Matrix *A);
 
 Matrix *scalarMul(Matrix *A, float a);

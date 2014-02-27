@@ -16,8 +16,8 @@ void run_neural_network()
 
   ClusterNet gpu = ClusterNet(12345);
 
-  Matrix *w1 = scalarMul(gpu.rand(784,1000),0.4*sqrt(6.0f/(784.0+1000.0)));
-  Matrix *w2 = scalarMul(gpu.rand(1000,10),0.4*sqrt(6.0f/(10.0+1000.0)));
+  Matrix *w1 = scalarMul(gpu.rand(784,1000),0.1*sqrt(6.0f/(784.0+1000.0)));
+  Matrix *w2 = scalarMul(gpu.rand(1000,10),0.1*sqrt(6.0f/(10.0+1000.0)));
   Matrix *grad1 = empty(1000,10);
   Matrix *grad2 = empty(784,1000);
   float error = 0;
@@ -37,7 +37,6 @@ void run_neural_network()
 
   for(int EPOCH = 1; EPOCH < epochs; EPOCH++)
   {
-
 
 	  std::cout << "EPOCH: " << EPOCH << std::endl;
 	  //cudaMemGetInfo(&free, &total);
