@@ -12,6 +12,7 @@ __global__ void kLog(float *A, float *out, int size);
 __global__ void kSqrt(float *A, float *out, int size);
 __global__ void kSquare(float *A, float *out, int size);
 __global__ void kScalarMul(float *A, float scalar, float *out, int size);
+__global__ void kScalarAdd(float *A, float scalar, float *out, int size);
 __global__ void kTranspose(float *A, float *out, int width, int height); 
 __global__ void setup_kernel(curandState *state, int seed);
 __global__ void generate_uniform_kernel(curandState *state, int size, float *out);
@@ -32,4 +33,6 @@ __global__ void kLogistic(float *A, float *out, int size);
 __global__ void kLogisticGrad(float *A, float *out, int size);
 __global__ void kArange(float *out, int start, int rows, int cols, int size);
 __global__ void kDropout(float *A, float *rdm, float dropout, int size);
+__global__ void kRMSprop(float *RMS, float *grad, float RMS_multiplier, float learning_rate, int batch_size, int size);
+__global__ void kRMSprop_with_nesterov_weight_update(float *RMS, float *grad, float *w, float *m, float RMS_multiplier, float learning_rate, int batch_size, int size);
 #endif

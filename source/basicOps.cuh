@@ -6,7 +6,7 @@
 #define COPY_BLOCK_SIZE 16
 
 #define RDM_NUMBERS_PER_THREAD (512)
-#define THREADS_PER_BLOCKS (1024)
+#define THREADS_PER_BLOCKS (512)
 
 #define DOT_BLOCKS (128)
 #define TILE_SIZE (32)
@@ -54,7 +54,11 @@ Matrix *to_row_major(Matrix *A);
 
 Matrix *scalarMul(Matrix *A, float a);
 void scalarMul(Matrix *A, float a, Matrix *out);
+Matrix *scalarAdd(Matrix *A, float a);
+void scalarAdd(Matrix *A, float a, Matrix *out);
 void dropout(Matrix *A, Matrix *out, float dropout_rate);
+void RMSprop(Matrix *RMS, Matrix *grad, float RMS_multiplier, float learning_rate, int batch_size);
+void RMSprop_with_nesterov_weight_update(Matrix *RMS, Matrix *grad, Matrix *w, Matrix *m, float RMS_multiplier, float learning_rate, int batch_size);
 
 Matrix *square(Matrix *A);
 void square(Matrix *A, Matrix *out);

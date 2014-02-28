@@ -1,7 +1,6 @@
 #include <basicOps.cuh>
 #include <curand.h>
 #include <curand_kernel.h>
-#include <stdio.h>
 #include <float.h>
 const int NUM_THREADS = 32;
 
@@ -98,7 +97,7 @@ __global__ void kDiv(float *A, float *B, float *out, int size)
   const int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
 
   for (unsigned int i = idx;i < size; i += numThreads)
-       out[i] = A[i] / B[i];
+       out[i] = fdividef(A[i],B[i]);
 }
 
 __global__ void kExp(float *A, float *out, int size)
@@ -107,7 +106,7 @@ __global__ void kExp(float *A, float *out, int size)
   const int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
 
   for (unsigned int i = idx;i < size; i += numThreads)
-       out[i] = __expf(A[i]);
+       out[i] = expf(A[i]);
 }
 
 __global__ void kLogistic(float *A, float *out, int size)
@@ -116,7 +115,7 @@ __global__ void kLogistic(float *A, float *out, int size)
   const int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
 
   for (unsigned int i = idx;i < size; i += numThreads)
-       out[i] = 1.0f / (1.0 + __expf(-A[i]));
+       out[i] = 1.0f / (1.0 + expf(-A[i]));
 
 }
 
@@ -136,7 +135,7 @@ __global__ void kSqrt(float *A, float *out, int size)
   const int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
 
   for (unsigned int i = idx;i < size; i += numThreads)
-       out[i] = sqrt(A[i]);
+       out[i] = sqrtf(A[i]);
 }
 
 __global__ void kLog(float *A, float *out, int size)
@@ -145,7 +144,7 @@ __global__ void kLog(float *A, float *out, int size)
   const int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
 
   for (unsigned int i = idx;i < size; i += numThreads)
-       out[i] = __logf(A[i]);
+       out[i] = logf(A[i]);
 }
 
 __global__ void kSquare(float *A, float *out, int size)
@@ -154,7 +153,7 @@ __global__ void kSquare(float *A, float *out, int size)
   const int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
 
   for (unsigned int i = idx;i < size; i += numThreads)
-       out[i] = __powf(A[i], 2);
+       out[i] = powf(A[i], 2.0f);
 }
 
 __global__ void kScalarMul(float *A, float scalar, float *out, int size)
@@ -164,6 +163,15 @@ __global__ void kScalarMul(float *A, float scalar, float *out, int size)
 
   for (unsigned int i = idx;i < size; i += numThreads)
        out[i] = scalar*A[i];
+}
+
+__global__ void kScalarAdd(float *A, float scalar, float *out, int size)
+{
+  const unsigned int numThreads = blockDim.x * gridDim.x;
+  const int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
+
+  for (unsigned int i = idx;i < size; i += numThreads)
+       out[i] = A[i]+scalar;
 }
 
  
@@ -497,3 +505,48 @@ __global__ void kDropout(float *A, float *rdm, float dropout, int size)
 		  rdm[i] = rdm[i] > dropout ? A[i] : 0.0f;
 
 }
+
+__global__ void kRMSprop(float *RMS, float *grad, float RMS_multiplier, float learning_rate, int batch_size, int size)
+{
+	  const unsigned int numThreads = blockDim.x * gridDim.x;
+	  const int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
+	  float grad_value = 0.0f;
+	  float RMS_value = 0.0f;
+	  float rms_reciprocal = 1.0f - RMS_multiplier;
+
+	  for (unsigned int i = idx;i < size; i += numThreads)
+	  {
+		  grad_value = fdividef(grad[i],(float)batch_size);
+		  RMS_value = (RMS_multiplier*RMS[i]) + (powf(grad_value,2.0f)*rms_reciprocal);
+
+		  grad[i] = learning_rate*fdividef(grad_value,(sqrtf(RMS_value)+1.0e-08f));
+		  RMS[i] = RMS_value;
+	  }
+
+}
+
+__global__ void kRMSprop_with_nesterov_weight_update(float *RMS, float *grad, float *w, float *m, float RMS_multiplier, float learning_rate, int batch_size, int size)
+{
+	  const unsigned int numThreads = blockDim.x * gridDim.x;
+	  const int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
+	  float grad_value = 0.0f;
+	  float RMS_value = 0.0f;
+	  float rms_reciprocal = 1.0f - RMS_multiplier;
+	  float weight_value = 0.0f;
+	  float momentum_matrix_value = 0.0f;
+
+	  for (unsigned int i = idx;i < size; i += numThreads)
+	  {
+		  grad_value = fdividef(grad[i],(float)batch_size);
+		  RMS_value = (RMS_multiplier*RMS[i]) + (powf(grad_value,2.0f)*rms_reciprocal);
+		  grad_value = learning_rate*fdividef(grad_value,(sqrtf(RMS_value)+1.0e-08f));
+		  momentum_matrix_value = m[i];
+		  weight_value = w[i]-momentum_matrix_value;
+		  momentum_matrix_value -= grad_value;
+
+		  RMS[i] = RMS_value;
+		  m[i] = momentum_matrix_value;
+		  w[i] = weight_value + momentum_matrix_value;
+	  }
+}
+

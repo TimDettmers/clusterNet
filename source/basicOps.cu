@@ -100,8 +100,8 @@ Matrix *slice_rows(Matrix *A, int start, int end)
   //align memory in contiguous array
 
   Matrix *out = empty((end - start) + 1, A->cols);
-  int block_size = (out->size/1024) + 1;
-  slice_rows<<<block_size,1024>>>(A->data, out->data, out->size, A->rows, start, end);
+  int block_size = (out->size/THREADS_PER_BLOCKS) + 1;
+  slice_rows<<<block_size,THREADS_PER_BLOCKS>>>(A->data, out->data, out->size, A->rows, start, end);
 
   return out;
 }
@@ -109,8 +109,8 @@ Matrix *slice_rows(Matrix *A, int start, int end)
 Matrix *slice_cols(Matrix *A, int start, int end)
 {
   Matrix *out = empty(A->rows, end - start + 1);
-  int block_size = (out->size/1024) + 1;
-  slice_cols<<<block_size,1024>>>(A->data, out->data, start, A->rows, out->size);
+  int block_size = (out->size/THREADS_PER_BLOCKS) + 1;
+  slice_cols<<<block_size,THREADS_PER_BLOCKS>>>(A->data, out->data, start, A->rows, out->size);
 
   return out;
 }
@@ -129,8 +129,8 @@ Matrix *arange(int rows, int cols){	return arange(0, rows, cols); }
 Matrix *arange(int start, int rows, int cols)
 {
 	Matrix *out = empty(rows, cols);
-	int block_size = (out->size/1024) + 1;
-	kArange<<<block_size,1024>>>(out->data, start, out->rows, out->cols, out->size);
+	int block_size = (out->size/THREADS_PER_BLOCKS) + 1;
+	kArange<<<block_size,THREADS_PER_BLOCKS>>>(out->data, start, out->rows, out->cols, out->size);
 	return out;
 }
 
@@ -162,8 +162,8 @@ Matrix *fill_matrix(int rows, int cols, float fill_value)
  
   Matrix *out = empty(rows, cols);
   
-  int block_size = (out->size/1024) + 1;
-  kFill_with<<<block_size,1024>>>(out->data, fill_value, out->size);
+  int block_size = (out->size/THREADS_PER_BLOCKS) + 1;
+  kFill_with<<<block_size,THREADS_PER_BLOCKS>>>(out->data, fill_value, out->size);
  
   return out;
 }
@@ -179,8 +179,8 @@ Matrix *add(Matrix *A, Matrix *B)
 
 void add(Matrix *A, Matrix *B, Matrix *out)
 {
-  int block_size = (A->size/1024) + 1;
-  kAdd<<<block_size,1024>>>(A->data, B->data, out->data, A->size);
+  int block_size = (A->size/THREADS_PER_BLOCKS) + 1;
+  kAdd<<<block_size,THREADS_PER_BLOCKS>>>(A->data, B->data, out->data, A->size);
 }
 
 Matrix *sub(Matrix *A, Matrix *B)
@@ -258,8 +258,8 @@ void hStack(Matrix *A, Matrix *B, Matrix *out)
 
 void sub(Matrix *A, Matrix *B, Matrix *out)
 {
-  int block_size = (A->size/1024) + 1;
-  kSub<<<block_size,1024>>>(A->data, B->data, out->data, A->size);
+  int block_size = (A->size/THREADS_PER_BLOCKS) + 1;
+  kSub<<<block_size,THREADS_PER_BLOCKS>>>(A->data, B->data, out->data, A->size);
 }
 
 Matrix *mul(Matrix *A, Matrix *B)
@@ -273,8 +273,8 @@ Matrix *mul(Matrix *A, Matrix *B)
 
 void mul(Matrix *A, Matrix *B, Matrix *out)
 {
-  int block_size = (A->size/1024) + 1;
-  kMul<<<block_size,1024>>>(A->data, B->data, out->data, A->size);
+  int block_size = (A->size/THREADS_PER_BLOCKS) + 1;
+  kMul<<<block_size,THREADS_PER_BLOCKS>>>(A->data, B->data, out->data, A->size);
 }
 
 Matrix *div(Matrix *A, Matrix *B)
@@ -289,8 +289,8 @@ Matrix *div(Matrix *A, Matrix *B)
 
 void div(Matrix *A, Matrix *B, Matrix *out)
 {
-  int block_size = (A->size/1024) + 1;
-  kDiv<<<block_size,1024>>>(A->data, B->data, out->data, A->size);
+  int block_size = (A->size/THREADS_PER_BLOCKS) + 1;
+  kDiv<<<block_size,THREADS_PER_BLOCKS>>>(A->data, B->data, out->data, A->size);
 }
 
 
@@ -307,8 +307,22 @@ Matrix *scalarMul(Matrix *A, float a)
 
 void scalarMul(Matrix *A, float a, Matrix *out)
 {
-  int block_size = (A->size/1024) + 1;
-  kScalarMul<<<block_size,1024>>>(A->data, a, out->data, A->size);
+  int block_size = (A->size/THREADS_PER_BLOCKS) + 1;
+  kScalarMul<<<block_size,THREADS_PER_BLOCKS>>>(A->data, a, out->data, A->size);
+}
+
+Matrix *scalarAdd(Matrix *A, float a)
+{
+  Matrix *out = zeros(A->rows,A->cols);
+  scalarAdd(A, a, out);
+
+  return out;
+}
+
+void scalarAdd(Matrix *A, float a, Matrix *out)
+{
+  int block_size = (A->size/THREADS_PER_BLOCKS) + 1;
+  kScalarAdd<<<block_size,THREADS_PER_BLOCKS>>>(A->data, a, out->data, A->size);
 }
 
 Matrix *gpuExp(Matrix *A)
@@ -321,8 +335,8 @@ Matrix *gpuExp(Matrix *A)
 
 void gpuExp(Matrix *A, Matrix *out)
 {
-  int block_size = (A->size/1024) + 1;
-  kExp<<<block_size,1024>>>(A->data, out->data, A->size);
+  int block_size = (A->size/THREADS_PER_BLOCKS) + 1;
+  kExp<<<block_size,THREADS_PER_BLOCKS>>>(A->data, out->data, A->size);
 }
 
 Matrix *logistic(Matrix *A)
@@ -335,8 +349,8 @@ Matrix *logistic(Matrix *A)
 
 void logistic(Matrix *A, Matrix *out)
 {
-  int block_size = (A->size/1024) + 1;
-  kLogistic<<<block_size,1024>>>(A->data, out->data, A->size);
+  int block_size = (A->size/THREADS_PER_BLOCKS) + 1;
+  kLogistic<<<block_size,THREADS_PER_BLOCKS>>>(A->data, out->data, A->size);
 }
 
 Matrix *logisticGrad(Matrix *A)
@@ -349,8 +363,8 @@ Matrix *logisticGrad(Matrix *A)
 
 void logisticGrad(Matrix *A, Matrix *out)
 {
-  int block_size = (A->size/1024) + 1;
-  kLogisticGrad<<<block_size,1024>>>(A->data, out->data, A->size);
+  int block_size = (A->size/THREADS_PER_BLOCKS) + 1;
+  kLogisticGrad<<<block_size,THREADS_PER_BLOCKS>>>(A->data, out->data, A->size);
 }
 
 Matrix *gpuLog(Matrix *A)
@@ -363,8 +377,8 @@ Matrix *gpuLog(Matrix *A)
 
 void gpuLog(Matrix *A, Matrix *out)
 {
-  int block_size = (A->size/1024) + 1;
-  kLog<<<block_size,1024>>>(A->data, out->data, A->size);
+  int block_size = (A->size/THREADS_PER_BLOCKS) + 1;
+  kLog<<<block_size,THREADS_PER_BLOCKS>>>(A->data, out->data, A->size);
 }
 
 Matrix *gpuSqrt(Matrix *A)
@@ -377,8 +391,8 @@ Matrix *gpuSqrt(Matrix *A)
 
 void gpuSqrt(Matrix *A, Matrix *out)
 {
-  int block_size = (A->size/1024) + 1;
-  kSqrt<<<block_size,1024>>>(A->data, out->data, A->size);
+  int block_size = (A->size/THREADS_PER_BLOCKS) + 1;
+  kSqrt<<<block_size,THREADS_PER_BLOCKS>>>(A->data, out->data, A->size);
 }
 
 Matrix *square(Matrix *A)
@@ -391,8 +405,8 @@ Matrix *square(Matrix *A)
 
 void square(Matrix *A, Matrix *out)
 {
-  int block_size = (A->size/1024) + 1;
-  kSquare<<<block_size,1024>>>(A->data, out->data, A->size);
+  int block_size = (A->size/THREADS_PER_BLOCKS) + 1;
+  kSquare<<<block_size,THREADS_PER_BLOCKS>>>(A->data, out->data, A->size);
 }
 
 int blnFaultySizes(Matrix *A, Matrix *B, Matrix *C)
@@ -568,5 +582,17 @@ void dropout(Matrix *A, Matrix *out, float dropout_rate)
 	kDropout<<<blocks, THREADS_PER_BLOCKS>>>(A->data, out->data, dropout_rate, out->size);
 }
 
+void RMSprop(Matrix *RMS, Matrix *grad, float RMS_multiplier, float learning_rate, int batch_size)
+{
 
+	int blocks = (RMS->size/THREADS_PER_BLOCKS) + 1;
+	kRMSprop<<<blocks,THREADS_PER_BLOCKS>>>(RMS->data, grad->data, RMS_multiplier, learning_rate, batch_size, RMS->size);
+}
+
+void RMSprop_with_nesterov_weight_update(Matrix *RMS, Matrix *grad, Matrix *w, Matrix *m, float RMS_multiplier, float learning_rate, int batch_size)
+{
+
+	int blocks = (RMS->size/THREADS_PER_BLOCKS) + 1;
+	kRMSprop_with_nesterov_weight_update<<<blocks,THREADS_PER_BLOCKS>>>(RMS->data, grad->data, w->data, m->data, RMS_multiplier, learning_rate, batch_size, RMS->size);
+}
 
