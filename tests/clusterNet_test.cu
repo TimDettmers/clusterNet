@@ -204,8 +204,6 @@ int run_clusterNet_test(int argc, char *argv[])
 
 	  for(int i = 0; i <  gpu.m_current_batch_X->rows*784; i++)
 	  {
-		  //if(test_eq(m_host->data[i],(float)value,i,i,"Batch test") == 0)
-		  //	  print_matrix(m_host);
 		  assert(test_eq(m_host->data[i],(float)value,i,i,"Batch test"));
 		  value++;
 	  }
@@ -243,7 +241,7 @@ int run_clusterNet_test(int argc, char *argv[])
 	  gpu.replace_current_cv_batch_with_next();
   }
 
-  /*
+
    gpu = ClusterNet(12326557);
    assert(test_eq(value,7840000,"Batch test"));
    assert(test_eq(value_y,10000,"Batch test"));
@@ -257,7 +255,7 @@ int run_clusterNet_test(int argc, char *argv[])
    assert(test_matrix(gpu.m_current_batch_cv_y,512,10));
    value = 0;
    value_y = 0;
-   for(int batchno = 0; batchno < gpu.m_total_batches; batchno++)
+   for(int batchno = 0; batchno < gpu.TOTAL_BATCHES; batchno++)
    {
  	  m_host = to_host(gpu.m_current_batch_X);
  	  m_host2 = to_host(gpu.m_current_batch_y);
@@ -281,18 +279,11 @@ int run_clusterNet_test(int argc, char *argv[])
    assert(test_eq(value,43904000,"Batch test"));
    assert(test_eq(value_y,560000,"Batch test"));
 
-   std::cout << "begin CV" << std::endl;
-   for(int batchno = 0; batchno < gpu.m_total_batches_cv; batchno++)
+   for(int batchno = 0; batchno < gpu.TOTAL_BATCHES_CV; batchno++)
    {
  	  m_host = to_host(gpu.m_current_batch_cv_X);
  	  m_host2 = to_host(gpu.m_current_batch_cv_y);
- 	  std::cout << "pre allocate" << std::endl;
  	  gpu.allocate_next_cv_batch_async();
- 	  std::cout << "post allocate" << std::endl;
-
- 	  std::cout << "batchno: " << batchno << std::endl;
- 	  std::cout << "bachtsize X: " << gpu.m_current_batch_cv_X->rows << std::endl;
- 	  std::cout << "bachtsize y: " << gpu.m_current_batch_cv_y->rows << std::endl;
 
  	  for(int i = 0; i < gpu.m_current_batch_cv_X->rows*784; i++)
  	  {
@@ -311,7 +302,7 @@ int run_clusterNet_test(int argc, char *argv[])
 
    assert(test_eq(value,54880000,"Batch test"));
    assert(test_eq(value_y,700000,"Batch test"));
-   */
+
   return 0;
 }
 

@@ -402,20 +402,15 @@ void ClusterNet::replace_current_batch_with_next()
 	to_col_major(m_next_batch_y, m_current_batch_y);
 	m_next_batch_number += 1;
 
-	if(m_next_batch_number > TOTAL_BATCHES)
+	if(m_next_batch_number == TOTAL_BATCHES)
 	{
 		//reset to the intial state
 		m_next_batch_number = 0;
 		if(m_current_batch_X->rows != m_batch_size)
 		{
-			cudaFree(m_current_batch_X->data);
 			cudaFree(m_next_batch_X->data);
-			cudaFree(m_current_batch_y->data);
 			cudaFree(m_next_batch_y->data);
-			m_current_batch_X = empty(m_batch_size,m_full_X->cols);
 			m_next_batch_X = empty(m_batch_size,m_full_X->cols);
-
-			m_current_batch_y = empty(m_batch_size,m_full_y->cols);
 			m_next_batch_y = empty(m_batch_size,m_full_y->cols);
 		}
 	}
@@ -438,21 +433,16 @@ void ClusterNet::replace_current_cv_batch_with_next()
 	to_col_major(m_next_batch_cv_y,m_current_batch_cv_y);
 	m_next_batch_number_cv += 1;
 
-	if(m_next_batch_number_cv > TOTAL_BATCHES_CV)
+	if(m_next_batch_number_cv == TOTAL_BATCHES_CV)
 	{
 		//std::cout << "reset size" << std::endl;
 		//reset to the intial state
 		m_next_batch_number_cv = 0;
 		if(m_current_batch_cv_X->rows != m_batch_size_cv)
 		{
-			cudaFree(m_current_batch_cv_X->data);
 			cudaFree(m_next_batch_cv_X->data);
-			cudaFree(m_current_batch_cv_y->data);
 			cudaFree(m_next_batch_cv_y->data);
-			m_current_batch_cv_X = empty(m_batch_size_cv,m_full_X->cols);
 			m_next_batch_cv_X = empty(m_batch_size_cv,m_full_X->cols);
-
-			m_current_batch_cv_y = empty(m_batch_size_cv,m_full_y->cols);
 			m_next_batch_cv_y = empty(m_batch_size_cv,m_full_y->cols);
 		}
 	}
@@ -465,6 +455,7 @@ void ClusterNet::finish_batch_allocator()
 	cudaStreamDestroy(m_streamNext_batch_cv_X);
 	cudaStreamDestroy(m_streamNext_batch_cv_y);
 }
+
 
 
 

@@ -72,15 +72,13 @@ Matrix *to_col_major(Matrix *A)
 void to_col_major(Matrix *A, Matrix *out)
 {
   T(A, out, A->cols,A->rows);
-
-  cudaDeviceSynchronize();
 }
 
 Matrix *to_row_major(Matrix *A)
 {
   Matrix *out = empty(A->rows,A->cols);
   T(A, out, A->rows,A->cols);
-  //cudaFree(A->data);
+
   return out;
 }
 
