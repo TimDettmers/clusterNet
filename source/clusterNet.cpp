@@ -388,7 +388,7 @@ void ClusterNet::allocate_next_cv_batch_async()
 void ClusterNet::replace_current_batch_with_next()
 {
 
-	if(m_next_batch_X->rows != m_batch_size)
+	if(m_next_batch_X->rows != m_current_batch_cv_X->rows)
 	{
 		cudaFree(m_current_batch_X->data);
 		cudaFree(m_current_batch_y->data);
@@ -419,7 +419,7 @@ void ClusterNet::replace_current_batch_with_next()
 void ClusterNet::replace_current_cv_batch_with_next()
 {
 
-	if(m_next_batch_cv_X->rows != m_batch_size_cv)
+	if(m_next_batch_cv_X->rows != m_current_batch_cv_X->rows)
 	{
 		cudaFree(m_current_batch_cv_X->data);
 		cudaFree(m_current_batch_cv_y->data);

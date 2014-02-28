@@ -16,8 +16,8 @@ void run_neural_network()
 
   ClusterNet gpu = ClusterNet(12345);
 
-  Matrix *w1 = scalarMul(gpu.rand(784,1000),0.1*sqrt(6.0f/(784.0+1000.0)));
-  Matrix *w2 = scalarMul(gpu.rand(1000,10),0.1*sqrt(6.0f/(10.0+1000.0)));
+  Matrix *w1 = scalarMul(gpu.rand(784,1000),0.4*sqrt(6.0f/(784.0+1000.0)));
+  Matrix *w2 = scalarMul(gpu.rand(1000,10),0.4*sqrt(6.0f/(10.0+1000.0)));
   Matrix *grad1 = empty(1000,10);
   Matrix *grad2 = empty(784,1000);
   float error = 0;
@@ -46,12 +46,15 @@ void run_neural_network()
 	  {
 		  gpu.allocate_next_batch_async();
 
+		  //std::cout << "m_current_batch_X.rows: " << gpu.m_current_batch_X->rows << std::endl;
+		  //std::cout << "m_current_batch_X.cols: " << gpu.m_current_batch_X->cols << std::endl;
 		  Matrix *z1 = gpu.dot(gpu.m_current_batch_X,w1);
 		  logistic(z1, z1);
 		  Matrix *a2 = gpu.dot(z1,w2);
 		  //logistic(a2, a2);
 		  Matrix *out = softmax(a2);
 
+		  //std::cout << "batch: " << i << std::endl;
 		  //std::cout << "out" << std::endl;
 		  //std::cout << "-----------------------" << std::endl;
 		  //print_gpu_matrix(out);
