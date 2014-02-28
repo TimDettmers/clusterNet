@@ -54,6 +54,7 @@ Matrix *to_row_major(Matrix *A);
 
 Matrix *scalarMul(Matrix *A, float a);
 void scalarMul(Matrix *A, float a, Matrix *out);
+void dropout(Matrix *A, Matrix *out, float dropout_rate);
 
 Matrix *square(Matrix *A);
 void square(Matrix *A, Matrix *out);

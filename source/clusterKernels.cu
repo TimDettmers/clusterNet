@@ -487,3 +487,13 @@ __global__ void kArange(float *out, int start, int rows, int cols, int size)
 		  out[i] = (float)(offset + (i/rows) + start);
 	  }
 }
+
+__global__ void kDropout(float *A, float *rdm, float dropout, int size)
+{
+	  const unsigned int numThreads = blockDim.x * gridDim.x;
+	  const int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
+
+	  for (unsigned int i = idx;i < size; i += numThreads)
+		  rdm[i] = rdm[i] > dropout ? A[i] : 0.0f;
+
+}

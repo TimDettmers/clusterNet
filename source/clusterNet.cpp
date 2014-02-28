@@ -29,7 +29,7 @@ void ClusterNet::init(int seed)
 	 *
 	 *
 	 * */
-	curandCreateGenerator(&m_generator, CURAND_RNG_PSEUDO_XORWOW);
+	curandCreateGenerator(&m_generator, CURAND_RNG_PSEUDO_DEFAULT);
 	curandSetPseudoRandomGeneratorSeed(m_generator, seed);
 	curandSetGeneratorOffset(m_generator, 100);
 	cublasCreate(&m_handle);
@@ -469,6 +469,12 @@ void ClusterNet::finish_batch_allocator()
 }
 
 
+Matrix *ClusterNet::dropout(Matrix *A, float dropout_rate)
+{
+	Matrix *out = rand(A->rows, A->cols);
+	::dropout(A, out, dropout_rate);
+	return out;
+}
 
 
 

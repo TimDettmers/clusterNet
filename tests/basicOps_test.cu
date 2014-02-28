@@ -328,8 +328,8 @@ int run_basicOps_test(int argc, char *argv[])
 	  if(m_host->data[i] == 1.0f)
 		  count1++;
   }
-  ASSERT((count0 > 15) && (count0 < 40), "Argmax value test");
-  ASSERT((count1 > 15) && (count1 < 40), "Argmax value test");
+  ASSERT((count0 > 10) && (count0 < 40), "Argmax value test");
+  ASSERT((count1 > 10) && (count1 < 40), "Argmax value test");
 
   //create t matrix test
   m1 = scalarMul(ones(10,1),4);

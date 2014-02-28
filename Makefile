@@ -2,7 +2,6 @@ CC = nvcc
 MPI_DIR=/usr/mpi/openmpi-1.7.4
 TOP := $(dir $(CURDIR)/$(word $(words $(MAKEFILE_LIST)),$(MAKEFILE_LIST)))
 TESTS := tests/testSuite.cu $(wildcard tests/*_test.cu) 
-BUILD := $(subst .cu,.out,$(subst tests/, build/, $(wildcard tests/*_test.cu)))
 NODES=tim@10.0.0.2
 HOSTFILE=/home/tim/cluster
 SCR := $(wildcard source/*.cu) $(wildcard source/*.cpp)

@@ -31,4 +31,5 @@ __global__ void kSum(float *v, float *out, int size);
 __global__ void kLogistic(float *A, float *out, int size);
 __global__ void kLogisticGrad(float *A, float *out, int size);
 __global__ void kArange(float *out, int start, int rows, int cols, int size);
+__global__ void kDropout(float *A, float *rdm, float dropout, int size);
 #endif

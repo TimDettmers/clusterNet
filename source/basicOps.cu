@@ -562,4 +562,11 @@ Matrix *sum(Matrix *v)
 	return out;
 }
 
+void dropout(Matrix *A, Matrix *out, float dropout_rate)
+{
+	int blocks = (A->size/THREADS_PER_BLOCKS) + 1;
+	kDropout<<<blocks, THREADS_PER_BLOCKS>>>(A->data, out->data, dropout_rate, out->size);
+}
+
+
 

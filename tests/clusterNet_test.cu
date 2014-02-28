@@ -313,7 +313,41 @@ int run_clusterNet_test(int argc, char *argv[])
 		assert(test_eq(value_y,700000,"Batch test"));
 	  }
 
+
+
+	   //dropout test
+	   m1 = gpu.rand(1000,1000);
+	   m_host = to_host(gpu.dropout(m1,0.5));
+	   int count = 0;
+	   for(int i = 0; i < m1->size; i++)
+	   {
+		   if(m_host->data[i] == 0.0f)
+		   count++;
+	   }
+	   ASSERT((count >= 499000) && (count < 501000),"dropout test");
+	   m1 = gpu.rand(1000,1000);
+	   m_host = to_host(gpu.dropout(m1,0.2));
+	   count = 0;
+	   for(int i = 0; i < m1->size; i++)
+	   {
+		   if(m_host->data[i] == 0.0f)
+		   count++;
+	   }
+	   ASSERT((count >= 199000) && (count < 201000),"dropout test");
+	   m1 = gpu.rand(1000,1000);
+	   m_host = to_host(gpu.dropout(m1,0.73));
+	   count = 0;
+	   for(int i = 0; i < m1->size; i++)
+	   {
+		   if(m_host->data[i] == 0.0f)
+		   count++;
+	   }
+	   ASSERT((count >= 729000) && (count < 731000),"dropout test");
+
+
+
   return 0;
 }
+
 
 

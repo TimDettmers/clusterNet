@@ -33,6 +33,7 @@ public:
 	 Matrix *randn(int rows, int cols);
 	 Matrix *randn(int rows, int cols, float mean, float std);
 	 void randn(int rows, int cols, float mean, float std, Matrix *out);
+	 Matrix *dropout(Matrix *A, float dropout_rate);
 
 	 void tick(std::string name);
 	 void tick();
@@ -41,6 +42,7 @@ public:
 
 	 void benchmark_dot();
 	 void shutdown_MPI();
+
 
 	 void finish_batch_allocator();
 	 void init_batch_allocator(Matrix *X, Matrix *y, float cross_validation_size, int batch_size, int cv_batch_size);
