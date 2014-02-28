@@ -17,7 +17,19 @@ ClusterNet::ClusterNet(int seed){ init(seed);}
 ClusterNet::ClusterNet(int argc, char* argv[], int seed){ init(seed); init_MPI(argc, argv); }
 void ClusterNet::init(int seed)
 {
-	curandCreateGenerator(&m_generator, CURAND_RNG_PSEUDO_DEFAULT);
+	/*
+	 * times for 1bn rand numbers
+	- CURAND_RNG_PSEUDO_DEFAULT 135/144 ms
+	 * - CURAND_RNG_PSEUDO_XORWOW 135/144 ms
+	 * - CURAND_RNG_PSEUDO_MRG32K3A 270/310 ms
+	 * - CURAND_RNG_PSEUDO_MTGP32 230/235 ms
+	 * - CURAND_RNG_PSEUDO_PHILOX4_32_10 130/135 ms //different numbers with same seed?
+	 * - CURAND_RNG_QUASI_DEFAULT 140/156 ms
+	 * - CURAND_RNG_QUASI_SOBOL32 140/156 ms //correlated adjacent values
+	 *
+	 *
+	 * */
+	curandCreateGenerator(&m_generator, CURAND_RNG_PSEUDO_XORWOW);
 	curandSetPseudoRandomGeneratorSeed(m_generator, seed);
 	curandSetGeneratorOffset(m_generator, 100);
 	cublasCreate(&m_handle);
