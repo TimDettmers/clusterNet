@@ -21,14 +21,14 @@ int run_clusterNet_test(int argc, char *argv[])
   float m2_data[6] = {17,0,3,4,0,0};
   size_t m1_bytes = 2*3*sizeof(float);
   Matrix *m1_cpu = (Matrix*)malloc(sizeof(Matrix));
-  m1_cpu->shape[0] = 2;
-  m1_cpu->shape[1] = 3;
+  m1_cpu->rows = 2;
+  m1_cpu->cols = 3;
   m1_cpu->bytes = m1_bytes;
   m1_cpu->size = 6;
   m1_cpu->data = m1_data;
   Matrix *m2_cpu = (Matrix*)malloc(sizeof(Matrix));
-  m2_cpu->shape[0] = 3;
-  m2_cpu->shape[1] = 2;
+  m2_cpu->rows = 3;
+  m2_cpu->cols = 2;
   m2_cpu->bytes = m1_bytes;
   m2_cpu->size = 6;
   m2_cpu->data = m2_data;
@@ -77,8 +77,8 @@ int run_clusterNet_test(int argc, char *argv[])
   //there should be more than 47% which is > 0.5
   assert(upper > (r1->size)*0.47f);
   assert(lower > (r1->size)*0.47f);
-  assert(m_host->shape[0]==100);
-  assert(m_host->shape[1]==100);
+  assert(m_host->rows==100);
+  assert(m_host->cols==100);
   assert(m_host->size==100*100);
   assert(m_host->bytes==r1->size*sizeof(float));
 
@@ -133,8 +133,8 @@ int run_clusterNet_test(int argc, char *argv[])
   assert((middle > r1->size*0.65) && (middle < r1->size*0.70));
   //if there are more than 1% zeros then there is something fishy
   assert(zeros < r1->size*0.01); 
-  assert(m_host->shape[0]==100);
-  assert(m_host->shape[1]==100);
+  assert(m_host->rows==100);
+  assert(m_host->cols==100);
   assert(m_host->size==100*100);
   assert(m_host->bytes==r1->size*sizeof(float));
 
@@ -190,38 +190,128 @@ int run_clusterNet_test(int argc, char *argv[])
   assert(test_matrix(gpu.m_current_batch_y,128,1));
   assert(test_matrix(gpu.m_current_batch_cv_X,256,784));
   assert(test_matrix(gpu.m_current_batch_cv_y,256,1));
+  Matrix *m_host2;
   int value = 0;
-  for(int batchno = 0; batchno < gpu.m_total_batches; batchno++)
+  int value_y = 0;
+  for(int batchno = 0; batchno < gpu.TOTAL_BATCHES; batchno++)
   {
 	  m_host = to_host(gpu.m_current_batch_X);
+	  m_host2 = to_host(gpu.m_current_batch_y);
 	  gpu.allocate_next_batch_async();
 
-	  for(int i = 0; i < gpu.m_current_batch_X->shape[0]*784; i++)
+
+ 	  //std::cout << "bachtsize X: " << gpu.CURRENT_BATCHSIZE << std::endl;
+
+	  for(int i = 0; i <  gpu.m_current_batch_X->rows*784; i++)
 	  {
-		  assert(test_eq(m_host->data[i],(float)value,"Batch test"));
+		  //if(test_eq(m_host->data[i],(float)value,i,i,"Batch test") == 0)
+		  //	  print_matrix(m_host);
+		  assert(test_eq(m_host->data[i],(float)value,i,i,"Batch test"));
 		  value++;
+	  }
+
+	  for(int i = 0; i <  gpu.m_current_batch_X->rows; i++)
+	  {
+		  assert(test_eq(m_host2->data[i],(float)value_y,i,i,"Batch test"));
+		  value_y++;
 	  }
 
 	  gpu.replace_current_batch_with_next();
   }
 
-  assert(test_eq(value,6272000,"Batch test"));
+  assert(test_eq(value,6272000,"Batch test train 128"));
+  assert(test_eq(value_y,8000,"Batch test train 128"));
 
-  for(int batchno = 0; batchno < gpu.m_total_batches_cv; batchno++)
+  for(int batchno = 0; batchno < gpu.TOTAL_BATCHES_CV; batchno++)
   {
 	  m_host = to_host(gpu.m_current_batch_cv_X);
+	  m_host2 = to_host(gpu.m_current_batch_cv_y);
 	  gpu.allocate_next_cv_batch_async();
 
-	  for(int i = 0; i < gpu.m_current_batch_cv_X->shape[0]*784; i++)
+	  for(int i = 0; i <  gpu.m_current_batch_cv_X->rows*784; i++)
 	  {
 		  assert(test_eq(m_host->data[i],(float)value,"Batch test"));
 		  value++;
 	  }
 
+	  for(int i = 0; i <  gpu.m_current_batch_cv_X->rows; i++)
+	  {
+		  assert(test_eq(m_host2->data[i],(float)value_y,"Batch test"));
+		  value_y++;
+	  }
+
 	  gpu.replace_current_cv_batch_with_next();
   }
 
-  assert(test_eq(value,7840000,"Batch test"));
+  /*
+   gpu = ClusterNet(12326557);
+   assert(test_eq(value,7840000,"Batch test"));
+   assert(test_eq(value_y,10000,"Batch test"));
+
+   m1 = to_host(arange(70000,784));
+   m2 = to_host(arange(70000,10));
+   gpu.init_batch_allocator(m1,m2,0.20,128,512);
+   assert(test_matrix(gpu.m_current_batch_X,128,784));
+   assert(test_matrix(gpu.m_current_batch_y,128,10));
+   assert(test_matrix(gpu.m_current_batch_cv_X,512,784));
+   assert(test_matrix(gpu.m_current_batch_cv_y,512,10));
+   value = 0;
+   value_y = 0;
+   for(int batchno = 0; batchno < gpu.m_total_batches; batchno++)
+   {
+ 	  m_host = to_host(gpu.m_current_batch_X);
+ 	  m_host2 = to_host(gpu.m_current_batch_y);
+ 	  gpu.allocate_next_batch_async();
+
+ 	  for(int i = 0; i < gpu.m_current_batch_X->rows*784; i++)
+ 	  {
+ 		  assert(test_eq(m_host->data[i],(float)value,"Batch test"));
+ 		  value++;
+ 	  }
+
+ 	  for(int i = 0; i < gpu.m_current_batch_X->rows*10; i++)
+ 	  {
+ 		  assert(test_eq(m_host2->data[i],(float)value_y,"Batch test"));
+ 		  value_y++;
+ 	  }
+
+ 	  gpu.replace_current_batch_with_next();
+   }
+
+   assert(test_eq(value,43904000,"Batch test"));
+   assert(test_eq(value_y,560000,"Batch test"));
+
+   std::cout << "begin CV" << std::endl;
+   for(int batchno = 0; batchno < gpu.m_total_batches_cv; batchno++)
+   {
+ 	  m_host = to_host(gpu.m_current_batch_cv_X);
+ 	  m_host2 = to_host(gpu.m_current_batch_cv_y);
+ 	  std::cout << "pre allocate" << std::endl;
+ 	  gpu.allocate_next_cv_batch_async();
+ 	  std::cout << "post allocate" << std::endl;
+
+ 	  std::cout << "batchno: " << batchno << std::endl;
+ 	  std::cout << "bachtsize X: " << gpu.m_current_batch_cv_X->rows << std::endl;
+ 	  std::cout << "bachtsize y: " << gpu.m_current_batch_cv_y->rows << std::endl;
+
+ 	  for(int i = 0; i < gpu.m_current_batch_cv_X->rows*784; i++)
+ 	  {
+ 		  assert(test_eq(m_host->data[i],(float)value,"Batch test"));
+ 		  value++;
+ 	  }
+
+ 	  for(int i = 0; i < gpu.m_current_batch_cv_X->rows*10; i++)
+ 	  {
+ 		  assert(test_eq(m_host2->data[i],(float)value_y,"Batch test"));
+ 		  value_y++;
+ 	  }
+
+ 	  gpu.replace_current_cv_batch_with_next();
+   }
+
+   assert(test_eq(value,54880000,"Batch test"));
+   assert(test_eq(value_y,700000,"Batch test"));
+   */
   return 0;
 }
 

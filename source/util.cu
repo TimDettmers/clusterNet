@@ -41,8 +41,8 @@ Matrix *read_csv (char* filename)
   memcpy(data,&X[0], columns*rows*sizeof(float));
 
   Matrix *out = (Matrix*)malloc(sizeof(Matrix));
-  out->shape[0] = rows;
-  out->shape[1] = columns;
+  out->rows = rows;
+  out->cols = columns;
   out->bytes = columns*rows*sizeof(float);
   out->size = columns*rows;
   out->data = data;
@@ -116,15 +116,15 @@ int test_eq(int i1, int i2, int idx1, int idx2, char* message)
 
 int test_matrix(Matrix *A, int rows, int cols)
 {
-  if((A->shape[0] == rows) &&
-     (A->shape[1] == cols) &&
+  if((A->rows == rows) &&
+     (A->cols == cols) &&
      (A->size == cols*rows) &&
      (A->bytes == cols*rows*sizeof(float)))
       {return 1;}
   else
   {
-    test_eq(A->shape[0],rows,"Matrix rows");
-    test_eq(A->shape[1],cols,"Matrix cols");
+    test_eq(A->rows,rows,"Matrix rows");
+    test_eq(A->cols,cols,"Matrix cols");
     test_eq(A->size,cols*rows,"Matrix size");
     test_eq((int)(A->bytes),(int)(cols*rows*sizeof(float)),"Matrix bytes");
   }
@@ -134,12 +134,12 @@ int test_matrix(Matrix *A, int rows, int cols)
 
 void print_matrix(Matrix *A)
 {
-	for(int row = 0; row< A->shape[0]; row++)
+	for(int row = 0; row< A->rows; row++)
 	  {
 		  printf("[");
-		  for(int col =0; col < A->shape[1]; col++)
+		  for(int col =0; col < A->cols; col++)
 		  {
-			  printf("%f ",A->data[(row*A->shape[1])+col]);
+			  printf("%f ",A->data[(row*A->cols)+col]);
 		  }
 		  printf("]\n");
 	  }

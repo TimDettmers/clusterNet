@@ -25,8 +25,8 @@ int run_basicOps_test(int argc, char *argv[])
   float m1_data[6] = {0,2,3,0,0.83,59.1387};
   size_t m1_bytes = 2*3*sizeof(float);
   Matrix *m1_cpu = (Matrix*)malloc(sizeof(Matrix));
-  m1_cpu->shape[0] = 2;
-  m1_cpu->shape[1] = 3;
+  m1_cpu->rows = 2;
+  m1_cpu->cols = 3;
   m1_cpu->bytes = m1_bytes;
   m1_cpu->size = 6;
   m1_cpu->data = m1_data;
@@ -59,8 +59,8 @@ int run_basicOps_test(int argc, char *argv[])
   //test to_host
   //data is converted to column major and then back to row major
   Matrix *m_host = to_host(to_gpu(m1_cpu));
-  assert(m_host->shape[0]==m1->shape[0]);
-  assert(m_host->shape[1]==m1->shape[1]);
+  assert(m_host->rows==m1->rows);
+  assert(m_host->cols==m1->cols);
   assert(m_host->size==m1->size);
   assert(m_host->bytes==m1->bytes);
   for(int i = 0; i< 5; i++)
@@ -228,8 +228,8 @@ int run_basicOps_test(int argc, char *argv[])
   float m2_data[6] = {0,0,2,0.83,3,59.1387};
   size_t m2_bytes = 2*3*sizeof(float);
   Matrix *m2_cpu = (Matrix*)malloc(sizeof(Matrix));
-  m2_cpu->shape[0] = 2;
-  m2_cpu->shape[1] = 3;
+  m2_cpu->rows = 2;
+  m2_cpu->cols = 3;
   m2_cpu->bytes = m2_bytes;
   m2_cpu->size = 6;
   m2_cpu->data = m2_data;
@@ -338,7 +338,7 @@ int run_basicOps_test(int argc, char *argv[])
   assert(test_matrix(m_host,10,7));
   for(int i = 0; i < m_host->size; i++)
   {
-	  if((i % m1->shape[1]) == 4)
+	  if((i % m1->cols) == 4)
 	  {
 		  assert(test_eq(m_host->data[i],1.0f, "Create t matrix data"));
 	  }

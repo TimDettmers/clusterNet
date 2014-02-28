@@ -20,8 +20,8 @@ public:
 	 Matrix *m_current_batch_y;
 	 Matrix *m_current_batch_cv_X;
 	 Matrix *m_current_batch_cv_y;
-	 int m_total_batches;
-	 int m_total_batches_cv;
+	 int TOTAL_BATCHES;
+	 int TOTAL_BATCHES_CV;
 
 	 Matrix *dot(Matrix *A, Matrix *B);
 	 void dot(Matrix *A, Matrix *B, Matrix *out);

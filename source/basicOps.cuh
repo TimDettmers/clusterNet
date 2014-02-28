@@ -19,7 +19,8 @@
 
 typedef struct Matrix
 {
-  int shape[2];
+  int rows;
+  int cols;
   size_t bytes;
   int size;
   float *data;

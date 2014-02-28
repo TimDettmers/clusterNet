@@ -10,8 +10,8 @@ Matrix *to_gpu(Matrix *A, int is_col_major)
   cudaMalloc((void**)&gpu_data,A->bytes);
   cudaMemcpy(gpu_data,A->data,A->bytes,cudaMemcpyDefault);
   Matrix *out = (Matrix*)malloc(sizeof(Matrix));
-  out->shape[0] = A->shape[0];
-  out->shape[1] = A->shape[1];
+  out->rows = A->rows;
+  out->cols = A->cols;
   out->bytes = A->bytes;
   out->size = A->size;
   out->data = gpu_data;
@@ -32,8 +32,8 @@ Matrix *to_host(Matrix *A, int is_row_major)
   cpu_data = (float*)malloc(row_major->bytes);
   cudaMemcpy(cpu_data,row_major->data,row_major->bytes,cudaMemcpyDefault);
   Matrix *out = (Matrix*)malloc(sizeof(Matrix));
-  out->shape[0] = row_major->shape[0];
-  out->shape[1] = row_major->shape[1];
+  out->rows = row_major->rows;
+  out->cols = row_major->cols;
   out->bytes = row_major->bytes;
   out->size = row_major->size;
   out->data = cpu_data;
@@ -63,34 +63,34 @@ static inline void T(Matrix *A, Matrix *out, int rows, int cols)
 
 Matrix *to_col_major(Matrix *A)
 {
-  Matrix *out = empty(A->shape[0],A->shape[1]);
-  T(A, out, A->shape[1],A->shape[0]);
+  Matrix *out = empty(A->rows,A->cols);
+  T(A, out, A->cols,A->rows);
   //cudaFree(A->data);
   return out;
 }
 
 void to_col_major(Matrix *A, Matrix *out)
 {
-  T(A, out, A->shape[1],A->shape[0]);
+  T(A, out, A->cols,A->rows);
 
   cudaDeviceSynchronize();
 }
 
 Matrix *to_row_major(Matrix *A)
 {
-  Matrix *out = empty(A->shape[0],A->shape[1]);
-  T(A, out, A->shape[0],A->shape[1]);
+  Matrix *out = empty(A->rows,A->cols);
+  T(A, out, A->rows,A->cols);
   //cudaFree(A->data);
   return out;
 }
 
 Matrix *T(Matrix *A)
 {
-  Matrix *out = empty(A->shape[1],A->shape[0]);
-  T(A, out, A->shape[0],A->shape[1]);
+  Matrix *out = empty(A->cols,A->rows);
+  T(A, out, A->rows,A->cols);
 
-  out->shape[0] = A->shape[1];
-  out->shape[1] = A->shape[0];
+  out->rows = A->cols;
+  out->cols = A->rows;
   return out;
 }
 
@@ -101,18 +101,18 @@ Matrix *slice_rows(Matrix *A, int start, int end)
 {
   //align memory in contiguous array
 
-  Matrix *out = empty((end - start) + 1, A->shape[1]);
+  Matrix *out = empty((end - start) + 1, A->cols);
   int block_size = (out->size/1024) + 1;
-  slice_rows<<<block_size,1024>>>(A->data, out->data, out->size, A->shape[0], start, end);
+  slice_rows<<<block_size,1024>>>(A->data, out->data, out->size, A->rows, start, end);
 
   return out;
 }
 
 Matrix *slice_cols(Matrix *A, int start, int end)
 {
-  Matrix *out = empty(A->shape[0], end - start + 1);
+  Matrix *out = empty(A->rows, end - start + 1);
   int block_size = (out->size/1024) + 1;
-  slice_cols<<<block_size,1024>>>(A->data, out->data, start, A->shape[0], out->size);
+  slice_cols<<<block_size,1024>>>(A->data, out->data, start, A->rows, out->size);
 
   return out;
 }
@@ -132,7 +132,7 @@ Matrix *arange(int start, int rows, int cols)
 {
 	Matrix *out = empty(rows, cols);
 	int block_size = (out->size/1024) + 1;
-	kArange<<<block_size,1024>>>(out->data, start, out->shape[0], out->shape[1], out->size);
+	kArange<<<block_size,1024>>>(out->data, start, out->rows, out->cols, out->size);
 	return out;
 }
 
@@ -144,8 +144,8 @@ Matrix *empty(int rows, int cols)
   cudaMalloc((void**)&gpu_data, bytes);
   
   Matrix *out = (Matrix*)malloc(sizeof(Matrix));
-  out->shape[0] = rows;
-  out->shape[1] = cols;
+  out->rows = rows;
+  out->cols = cols;
   out->bytes = bytes;
   out->size = size;
   out->data = gpu_data;
@@ -172,7 +172,7 @@ Matrix *fill_matrix(int rows, int cols, float fill_value)
 
 Matrix *add(Matrix *A, Matrix *B)
 {
-  Matrix *out = zeros(A->shape[0],A->shape[1]);
+  Matrix *out = zeros(A->rows,A->cols);
   add(A, B, out);
   checkMatrixOperation(A, B, out, 0);
 
@@ -187,7 +187,7 @@ void add(Matrix *A, Matrix *B, Matrix *out)
 
 Matrix *sub(Matrix *A, Matrix *B)
 {
-  Matrix *out = zeros(A->shape[0],A->shape[1]);
+  Matrix *out = zeros(A->rows,A->cols);
   sub(A, B, out);
   checkMatrixOperation(A, B, out, 0);
 
@@ -198,9 +198,9 @@ Matrix *vStack(Matrix *A, Matrix *B)
 {
 
   Matrix *out;
-  if(A->shape[1] == B->shape[1])
+  if(A->cols == B->cols)
   {
-	  out = empty(A->shape[0] + B->shape[0],A->shape[1]);
+	  out = empty(A->rows + B->rows,A->cols);
   }
   else
   {
@@ -209,30 +209,30 @@ Matrix *vStack(Matrix *A, Matrix *B)
 	  assert(0);
   }
   int block_size = (out->size/512) + 1;
-  vStack<<<block_size,512>>>(A->data, B->data, out->data, out->size, A->shape[0], A->shape[0] + B->shape[0],A->shape[1]);
+  vStack<<<block_size,512>>>(A->data, B->data, out->data, out->size, A->rows, A->rows + B->rows,A->cols);
 
   return out;
 }
 
 void vStack(Matrix *A, Matrix *B, Matrix *out)
 {
-  if(A->shape[1] != B->shape[1])
+  if(A->cols != B->cols)
   {
 	  printf("Wrong merge sizes!");
 	  assert(0);
   }
 
   int block_size = (out->size/512) + 1;
-  vStack<<<block_size,512>>>(A->data, B->data, out->data, out->size, A->shape[0], A->shape[0] + B->shape[0],A->shape[1]);
+  vStack<<<block_size,512>>>(A->data, B->data, out->data, out->size, A->rows, A->rows + B->rows,A->cols);
 }
 
 Matrix *hStack(Matrix *A, Matrix *B)
 {
 
   Matrix *out;
-  if(A->shape[0] == B->shape[0])
+  if(A->rows == B->rows)
   {
-	  out = empty(A->shape[0],A->shape[1] + B->shape[1]);
+	  out = empty(A->rows,A->cols + B->cols);
   }
   else
   {
@@ -248,7 +248,7 @@ Matrix *hStack(Matrix *A, Matrix *B)
 
 void hStack(Matrix *A, Matrix *B, Matrix *out)
 {
-  if(A->shape[0] != B->shape[0])
+  if(A->rows != B->rows)
   {
 	  printf("Wrong merge sizes!");
 	  assert(0);
@@ -266,7 +266,7 @@ void sub(Matrix *A, Matrix *B, Matrix *out)
 
 Matrix *mul(Matrix *A, Matrix *B)
 {
-  Matrix *out = zeros(A->shape[0],A->shape[1]);
+  Matrix *out = zeros(A->rows,A->cols);
   mul(A, B, out);
   checkMatrixOperation(A, B, out, 0);
 
@@ -281,7 +281,7 @@ void mul(Matrix *A, Matrix *B, Matrix *out)
 
 Matrix *div(Matrix *A, Matrix *B)
 {
-  Matrix *out = zeros(A->shape[0],A->shape[1]);
+  Matrix *out = zeros(A->rows,A->cols);
   
   div(A, B, out);
   checkMatrixOperation(A, B, out, 0);
@@ -301,7 +301,7 @@ void div(Matrix *A, Matrix *B, Matrix *out)
 
 Matrix *scalarMul(Matrix *A, float a)
 {
-  Matrix *out = zeros(A->shape[0],A->shape[1]);
+  Matrix *out = zeros(A->rows,A->cols);
   scalarMul(A, a, out);
 
   return out;
@@ -315,7 +315,7 @@ void scalarMul(Matrix *A, float a, Matrix *out)
 
 Matrix *gpuExp(Matrix *A)
 {
-  Matrix *out = zeros(A->shape[0],A->shape[1]);
+  Matrix *out = zeros(A->rows,A->cols);
   gpuExp(A, out);
 
   return out;
@@ -329,7 +329,7 @@ void gpuExp(Matrix *A, Matrix *out)
 
 Matrix *logistic(Matrix *A)
 {
-  Matrix *out = zeros(A->shape[0],A->shape[1]);
+  Matrix *out = zeros(A->rows,A->cols);
   logistic(A, out);
 
   return out;
@@ -343,7 +343,7 @@ void logistic(Matrix *A, Matrix *out)
 
 Matrix *logisticGrad(Matrix *A)
 {
-  Matrix *out = zeros(A->shape[0],A->shape[1]);
+  Matrix *out = zeros(A->rows,A->cols);
   logisticGrad(A, out);
 
   return out;
@@ -357,7 +357,7 @@ void logisticGrad(Matrix *A, Matrix *out)
 
 Matrix *gpuLog(Matrix *A)
 {
-  Matrix *out = zeros(A->shape[0],A->shape[1]);
+  Matrix *out = zeros(A->rows,A->cols);
   gpuLog(A, out);
 
   return out;
@@ -371,7 +371,7 @@ void gpuLog(Matrix *A, Matrix *out)
 
 Matrix *gpuSqrt(Matrix *A)
 {
-  Matrix *out = zeros(A->shape[0],A->shape[1]);
+  Matrix *out = zeros(A->rows,A->cols);
   gpuSqrt(A, out);
 
   return out;
@@ -385,7 +385,7 @@ void gpuSqrt(Matrix *A, Matrix *out)
 
 Matrix *square(Matrix *A)
 {
-  Matrix *out = zeros(A->shape[0],A->shape[1]);
+  Matrix *out = zeros(A->rows,A->cols);
   square(A, out);
 
   return out;
@@ -399,10 +399,10 @@ void square(Matrix *A, Matrix *out)
 
 int blnFaultySizes(Matrix *A, Matrix *B, Matrix *C)
 {
-  if((A->shape[0] == B->shape[0]) &&
-     (A->shape[1] == B->shape[1]) &&
-     (C->shape[0] == A->shape[0]) &&
-     (C->shape[1] == A->shape[1]))
+  if((A->rows == B->rows) &&
+     (A->cols == B->cols) &&
+     (C->rows == A->rows) &&
+     (C->cols == A->cols))
   {
     return 0;
   }
@@ -414,9 +414,9 @@ int blnFaultySizes(Matrix *A, Matrix *B, Matrix *C)
 
 int blnFaultyMatrixProductSizes(Matrix *A, Matrix *B, Matrix *C)
 {
-   if((A->shape[1] == B->shape[0]) &&
-      (A->shape[0] == C->shape[0]) &&
-      (B->shape[1] == C->shape[1]))
+   if((A->cols == B->rows) &&
+      (A->rows == C->rows) &&
+      (B->cols == C->cols))
   {
     return 0;
   }
@@ -429,33 +429,33 @@ int blnFaultyMatrixProductSizes(Matrix *A, Matrix *B, Matrix *C)
 void printFaultySizeError(Matrix *A, Matrix *B, Matrix *C)
 {
   printf("Error: Faulty Matrix *sizes:\n");
-  if(A->shape[0] != B->shape[0] || A->shape[1] != B->shape[1])
+  if(A->rows != B->rows || A->cols != B->cols)
   {
     printf("Matrix *A is of size %ix%i while Matrix *B is of size %ix%i.\n",
-           A->shape[0],A->shape[1],B->shape[0],B->shape[1]);
+           A->rows,A->cols,B->rows,B->cols);
     assert(0);
   }
-  else if((A->shape[0] == B->shape[0])  && (A->shape[1] == B->shape[1]) &&          
-  	  ((C->shape[0] != A->shape[0]) || (C->shape[1] != A->shape[1])))
+  else if((A->rows == B->rows)  && (A->cols == B->cols) &&          
+  	  ((C->rows != A->rows) || (C->cols != A->cols)))
   {
     printf("Output Matrix *is of size %ix%i while the other matrices are of size %ix%i.\n",
-           C->shape[0],C->shape[1],B->shape[0],B->shape[1]);
+           C->rows,C->cols,B->rows,B->cols);
     assert(0);
   }
 }
 void printFaultyMatrixProductSizeError(Matrix *A, Matrix *B, Matrix *C)
 {
     printf("Error: Faulty Matrix *sizes:\n");  
-  if(A->shape[1] != B->shape[0])
+  if(A->cols != B->rows)
   {
     printf("Matrix *A is of size %ix%i while Matrix *B is of size %ix%i.\n",
-           A->shape[0],A->shape[1],B->shape[0],B->shape[1]);
+           A->rows,A->cols,B->rows,B->cols);
   }
-  else if((A->shape[1] == B->shape[0])  &&          
-  	  ((C->shape[0] != A->shape[0]) || (C->shape[1] != B->shape[1])))
+  else if((A->cols == B->rows)  &&          
+  	  ((C->rows != A->rows) || (C->cols != B->cols)))
   {
     printf("Output Matrix *is of size %ix%i while Matrix *A and B have sizes %ix%i and %ix%i.\n",
-           C->shape[0],C->shape[1],A->shape[0],A->shape[1], B->shape[0],B->shape[1]);
+           C->rows,C->cols,A->rows,A->cols, B->rows,B->cols);
   }
 }
 
@@ -484,14 +484,14 @@ int checkMatrixOperation(Matrix *A, Matrix *B, Matrix *C, int blnMatrixProduct)
 
 Matrix *softmax(Matrix *A)
 {
-	Matrix *out = empty(A->shape[0],A->shape[1]);
+	Matrix *out = empty(A->rows,A->cols);
 	softmax(A, out);
 	return out;
 }
 
 Matrix *subMatrixVector(Matrix *A, Matrix *v)
 {
-	Matrix *out = empty(A->shape[0],A->shape[1]);
+	Matrix *out = empty(A->rows,A->cols);
 	subMatrixVector(A, v, out);
 
 	return out;
@@ -500,12 +500,12 @@ Matrix *subMatrixVector(Matrix *A, Matrix *v)
 void subMatrixVector(Matrix *A, Matrix *v, Matrix *out)
 {
 	int blocks = (A->size/THREADS_PER_BLOCKS) + 1;
-	kSubMatrixVector<<<blocks,THREADS_PER_BLOCKS>>>(A->data, v->data, out->data, A->shape[0], A->size);
+	kSubMatrixVector<<<blocks,THREADS_PER_BLOCKS>>>(A->data, v->data, out->data, A->rows, A->size);
 }
 
 void softmax(Matrix *A, Matrix *out)
 {
-    kSoftMax<<<1, A->shape[0] > THREADS_PER_BLOCKS ? THREADS_PER_BLOCKS : A->shape[0]>>>(A->data, out->data, A->shape[0], A->shape[1]);
+    kSoftMax<<<1, A->rows > THREADS_PER_BLOCKS ? THREADS_PER_BLOCKS : A->rows>>>(A->data, out->data, A->rows, A->cols);
 
     cudaThreadSynchronize();
 
@@ -514,7 +514,7 @@ void softmax(Matrix *A, Matrix *out)
 
 Matrix *create_t_matrix(Matrix *labels, int max_label)
 {
-	Matrix *out = zeros(labels->shape[0], max_label);
+	Matrix *out = zeros(labels->rows, max_label);
 	create_t_matrix(labels, out);
 	return out;
 }
@@ -522,19 +522,19 @@ Matrix *create_t_matrix(Matrix *labels, int max_label)
 void create_t_matrix(Matrix *labels, Matrix *out)
 {
 	int blocks = (labels->size/THREADS_PER_BLOCKS) + 1;
-	kCreate_t_matrix<<<blocks,THREADS_PER_BLOCKS>>>(labels->data, out->data, out->shape[0], labels->size);
+	kCreate_t_matrix<<<blocks,THREADS_PER_BLOCKS>>>(labels->data, out->data, out->rows, labels->size);
 }
 
 Matrix *argmax(Matrix *A)
 {
 	//note: column major argmax
-	Matrix *out = empty(A->shape[0],1);
+	Matrix *out = empty(A->rows,1);
 	argmax(A, out);
 	return out;
 }
 void argmax(Matrix* A, Matrix* out)
 {
-	kArgmax<<<1,A->shape[0] > THREADS_PER_BLOCKS ? THREADS_PER_BLOCKS : A->shape[0]>>>(A->data, out->data, A->shape[0], A->shape[1]);
+	kArgmax<<<1,A->rows > THREADS_PER_BLOCKS ? THREADS_PER_BLOCKS : A->rows>>>(A->data, out->data, A->rows, A->cols);
 
 	cudaThreadSynchronize();
 
@@ -542,7 +542,7 @@ void argmax(Matrix* A, Matrix* out)
 
 Matrix *equal(Matrix *A, Matrix *B)
 {
-	Matrix *out = empty(A->shape[0],A->shape[1]);
+	Matrix *out = empty(A->rows,A->cols);
 	equal(A, B, out);
 
 	return out;
