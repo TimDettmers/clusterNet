@@ -53,10 +53,54 @@ Matrix *ClusterNet::dot(Matrix *A, Matrix *B)
 {
 	//if(m_hasMPI){ return dotMPI(A,B);}
 	Matrix *out = zeros(A->rows,B->cols);
-	if(checkMatrixOperation(A, B, out, 1) == 1){ throw "Matrix *size error:\n"; }
 	dot(A, B, out);
 
 	return out;
+}
+
+Matrix *ClusterNet::Tdot(Matrix *A, Matrix *B)
+{
+	//if(m_hasMPI){ return dotMPI(A,B);}
+	Matrix *out = zeros(A->cols,B->cols);
+	Tdot(A, B, out);
+
+	return out;
+}
+
+Matrix *ClusterNet::dotT(Matrix *A, Matrix *B)
+{
+	//if(m_hasMPI){ return dotMPI(A,B);}
+	Matrix *out = zeros(A->rows,B->rows);
+	dotT(A, B, out);
+
+	return out;
+}
+
+void ClusterNet::dotT(Matrix *A, Matrix *B, Matrix *out){ dot(A,B,out,CUBLAS_OP_N, CUBLAS_OP_T); }
+void ClusterNet::Tdot(Matrix *A, Matrix *B, Matrix *out){ dot(A,B,out,CUBLAS_OP_T, CUBLAS_OP_N); }
+void ClusterNet::dot(Matrix *A, Matrix *B, Matrix *out){ dot(A,B,out,CUBLAS_OP_N, CUBLAS_OP_N); }
+void ClusterNet::dot(Matrix *A, Matrix *B, Matrix *out, cublasOperation_t T1, cublasOperation_t T2)
+{
+	//if(checkMatrixOperation(A, B, out, 1) == 1){ throw "Matrix *size error:\n"; }
+	cublasStatus_t status;
+
+	const float alpha = 1.0f;
+	const float beta = 0.0f;
+	int A_rows = A->rows, B_rows = B->rows, A_cols = A->cols, B_cols = B->cols;
+	if(T1 == CUBLAS_OP_T){ A_rows = A->cols; A_cols = A->rows; }
+	if(T2 == CUBLAS_OP_T){ B_rows = B->cols; B_cols = B->rows; }
+
+	status = cublasSgemm(m_handle, T1, T2,
+				A_rows, B_cols, A_cols,
+				&alpha, A->data, A->rows,
+				B->data, B->rows,
+				&beta, out->data, out->rows);
+
+	if(status != CUBLAS_STATUS_SUCCESS)
+	{
+		std::cout << "CUBLAS ERROR: Status " << status << std::endl;
+		throw "CUBLAS ERROR";
+	}
 }
 
 Matrix *ClusterNet::dotMPI_batchSlice(Matrix *A, Matrix *B)
@@ -168,28 +212,6 @@ Matrix *ClusterNet::dotMPI_unitSlice(Matrix *A, Matrix *B)
 
 	return out;
 }
-
-void ClusterNet::dot(Matrix *A, Matrix *B, Matrix *out)
-{
-	if(checkMatrixOperation(A, B, out, 1) == 1){ throw "Matrix *size error:\n"; }
-	cublasStatus_t status;
-
-	const float alpha = 1.0f;
-	const float beta = 0.0f;
-
-	status = cublasSgemm(m_handle, CUBLAS_OP_N, CUBLAS_OP_N,
-				A->rows, B->cols, A->cols,
-				&alpha, A->data, A->rows,
-				B->data, B->rows,
-				&beta, out->data, out->rows);
-
-	if(status != CUBLAS_STATUS_SUCCESS)
-	{
-		std::cout << "CUBLAS ERROR!\n";
-		throw "CUBLAS ERROR";
-	}
-}
-
 
 //Uniform
 Matrix *ClusterNet::rand(int rows, int cols)

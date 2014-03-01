@@ -24,7 +24,11 @@ public:
 	 int TOTAL_BATCHES_CV;
 
 	 Matrix *dot(Matrix *A, Matrix *B);
+	 Matrix *Tdot(Matrix *A, Matrix *B);
+	 Matrix *dotT(Matrix *A, Matrix *B);
 	 void dot(Matrix *A, Matrix *B, Matrix *out);
+	 void Tdot(Matrix *A, Matrix *B, Matrix *out);
+	 void dotT(Matrix *A, Matrix *B, Matrix *out);
 	 Matrix *dotMPI_unitSlice(Matrix *A, Matrix *B);
 	 Matrix *dotMPI_batchSlice(Matrix *A, Matrix *B);
 
@@ -80,6 +84,7 @@ private:
 	 bool m_hasMPI;
 	 MPI_Status m_status;
 
+	 void dot(Matrix *A, Matrix *B, Matrix *out, cublasOperation_t T1, cublasOperation_t T2);
 	 void init(int seed);
 	 void init_MPI(int argc, char *argv[]);
 	 void waitForAllRequests();

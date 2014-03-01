@@ -143,9 +143,10 @@ void print_matrix(Matrix *A)
 		  }
 		  printf("]\n");
 	  }
+	  printf("\n");
 }
 
-void print_gpu_matrix(Matrix *A)
+void printmat(Matrix *A)
 {
   Matrix * m = to_host(A);
   print_matrix(m);

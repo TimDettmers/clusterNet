@@ -35,7 +35,7 @@ void run_neural_network()
   clock_t t1,t2;
   t1=clock();
   //code goes here
-  int epochs  = 33;
+  int epochs  = 100;
   gpu.tick();
   float learning_rate = 0.003;
   //size_t free = 0;
@@ -50,6 +50,7 @@ void run_neural_network()
 	  if(momentum > 0.95) momentum = 0.95;
 	  for(int i = 0; i < gpu.TOTAL_BATCHES; i++)
 	  {
+
 		  gpu.allocate_next_batch_async();
 
 		  //nesterov updates
@@ -59,23 +60,21 @@ void run_neural_network()
 		  add(w2,m1,w2);
 
 		  Matrix *d0 = gpu.dropout(gpu.m_current_batch_X,0.2);
+		  //print_gpu_matrix(w1);
 		  Matrix *z1 = gpu.dot(d0, w1);
 		  logistic(z1, z1);
 		  Matrix *d1 = gpu.dropout(z1,0.6);
 		  Matrix *a2 = gpu.dot(d1,w2);
 		  Matrix *out = softmax(a2);
-		  Matrix *z1_T = T(z1);
-		  Matrix *X_T = T(gpu.m_current_batch_X);
-		  Matrix *w2_T = T(w2);
 		  Matrix *t = create_t_matrix(gpu.m_current_batch_y,10);
 
 		  //backprop
 		  Matrix *e1 = sub(out, t);
-		  Matrix *e2 = gpu.dot(e1, w2_T);
+		  Matrix *e2 = gpu.dotT(e1, w2);
+		  gpu.Tdot(z1,e1,grad_w2);
 		  logisticGrad(z1,z1);
 		  mul(e2,z1,e2);
-		  gpu.dot(z1_T,e1,grad_w2);
-		  gpu.dot(X_T,e2,grad_w1);
+		  gpu.Tdot(gpu.m_current_batch_X,e2,grad_w1);
 
 		  RMSprop_with_nesterov_weight_update(ms1,grad_w1,w1,m1,0.9f,learning_rate,gpu.m_current_batch_X->rows);
 		  RMSprop_with_nesterov_weight_update(ms2,grad_w2,w2,m2,0.9f,learning_rate,gpu.m_current_batch_X->rows);
@@ -85,9 +84,6 @@ void run_neural_network()
 		  cudaFree(z1->data);
 		  cudaFree(a2->data);
 		  cudaFree(out->data);
-		  cudaFree(z1_T->data);
-		  cudaFree(X_T->data);
-		  cudaFree(w2_T->data);
 		  cudaFree(t->data);
 		  cudaFree(d0->data);
 		  cudaFree(d1->data);
