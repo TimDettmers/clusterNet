@@ -275,34 +275,37 @@ int run_basicOps_test(int argc, char *argv[])
   }
 
   //softmax test
-  m1 = softmax(ones(1,10));
-  m_host = to_host(m1,1);
-  assert(test_matrix(m_host,1,10));
+  m1 = softmax(ones(2056,10));
+  m_host = to_host(m1);
+  assert(test_matrix(m_host,2056,10));
   for(int i = 0; i < m_host->size; i++)
   {
 	  assert(test_eq(m_host->data[i],0.1,"Softmax equal test"));
   }
 
-  m1 = softmax(gpu.rand(1,10));
-  m_host = to_host(m1,1);
-  assert(test_matrix(m_host,1,10));
+  m1 = softmax(gpu.rand(2222,17));
+  m_host = to_host(m1);
+  assert(test_matrix(m_host,2222,17));
   float sum_value = 0;
   for(int i = 0; i < m_host->size; i++)
   {
 	  sum_value += m_host->data[i];
+	  if((i > 0) &&  (((i+1) % 17) == 0))
+	  {
+		  ASSERT((sum_value > 0.99) && (sum_value < 1.01), "Softmax row sum equal one");
+		  sum_value = 0.0f;
+	  }
   }
 
-  ASSERT(sum_value > 0.98, "Softmax row sum equal one");
-  ASSERT(sum_value < 1.02, "Softmax row sum equal one");
 
-  m1 = ones(10,10);
+  m1 = zeros(10,10);
   m2 = ones(10,1);
   //sub matrix vector test: A - v
   m_host= to_host(subMatrixVector(m1,m2));
   assert(test_matrix(m_host,10,10));
   for(int i = 0; i < m_host->size; i++)
   {
-	  assert(test_eq(m_host->data[i],0.0f, "Matrix - vector, equal data test"));
+	  assert(test_eq(m_host->data[i],-1.0f, "Matrix - vector, equal data test"));
   }
 
   //      0 2    3
@@ -315,21 +318,20 @@ int run_basicOps_test(int argc, char *argv[])
   assert(test_matrix(m_host,2,1));
   assert(test_eq(m_host->data[0],2.0f, "Argmax test"));
   assert(test_eq(m_host->data[1],2.0f, "Argmax test"));
-  m1 = gpu.rand(256,10);
+  m1 = gpu.rand(2056,10);
   m_host = to_host(argmax(m1));
-  int count0 = 0;
-  int count1 = 0;
-  assert(test_matrix(m_host,256,1));
+  int counts[10] = {0,0,0,0,0,
+		  	  	  	0,0,0,0,0};
+  assert(test_matrix(m_host,2056,1));
   for(int i = 0; i < m_host->size; i++)
   {
-	  if(m_host->data[i] == 0.0f)
-		  count0++;
-
-	  if(m_host->data[i] == 1.0f)
-		  count1++;
+	  counts[(int)m_host->data[i]]++;
   }
-  ASSERT((count0 > 10) && (count0 < 40), "Argmax value test");
-  ASSERT((count1 > 10) && (count1 < 40), "Argmax value test");
+  for(int i = 0; i < 10; i++)
+  {
+	  //expectation is 205.6 each;
+	  ASSERT((counts[i] > 160) && (counts[i] < 260), "Argmax value test");
+  }
 
   //create t matrix test
   m1 = scalarMul(ones(10,1),4);
@@ -351,17 +353,17 @@ int run_basicOps_test(int argc, char *argv[])
   //equal test
   gpu = ClusterNet(12345);
   ClusterNet gpu2 = ClusterNet(12345);
-  m2 = gpu.rand(10,10);
-  m1 = gpu2.rand(10,10);
+  m2 = gpu.rand(10,7);
+  m1 = gpu2.rand(10,7);
   m_host = to_host(equal(m1,m2));
-  assert(test_matrix(m_host,10,10));
+  assert(test_matrix(m_host,10,7));
   for(int i = 0; i < m_host->size; i++)
   {
 	  assert(test_eq(m_host->data[i],1.0f, "Matrix matrix Equal data test"));
   }
-  m1 = gpu2.rand(10,10);
+  m1 = gpu2.rand(10,7);
   m_host = to_host(equal(m1,m2));
-  assert(test_matrix(m_host,10,10));
+  assert(test_matrix(m_host,10,7));
   for(int i = 0; i < m_host->size; i++)
   {
 	  assert(test_eq(m_host->data[i],0.0f, "Matrix matrix Equal data test"));

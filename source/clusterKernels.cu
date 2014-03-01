@@ -423,23 +423,27 @@ __global__ void kSubMatrixVector(float *A, float *v, float *out, int rows, int s
 
 __global__ void kArgmax(float* A, float* out, unsigned int rows, unsigned int cols)
 {
+	  const unsigned int numThreads = blockDim.x * gridDim.x;
 	  const int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
 	  float max_value = -FLT_MAX;
 	  float max_i = 0;
 	  float col_value = 0.0f;
 
-	  for (unsigned int i = 0; i < cols; i++)
+	  for (unsigned int row = idx; row < rows; row += numThreads)
 	  {
-		  col_value = A[(i*rows) + idx];
-		  if(col_value > max_value)
+		  for (unsigned int i = 0; i < cols; i++)
 		  {
-			  max_value = col_value;
-			  max_i = i;
-		  }
+			  col_value = A[(i*rows) + row];
+			  if(col_value > max_value)
+			  {
+				  max_value = col_value;
+				  max_i = i;
+			  }
 
+		  }
+		  out[row] = max_i;
 	  }
 
-	  out[idx] = max_i;
 }
 
 __global__ void kCreate_t_matrix(float *labels, float *out, int rows, int size)

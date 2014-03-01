@@ -8,7 +8,7 @@ SCR := $(wildcard source/*.cu) $(wildcard source/*.cpp)
 INCLUDE = -I $(MPI_DIR)/include -I $(TOP)source -I $(TOP)tests -I /usr/local/cuda-5.5/include
 LIB = -L $(MPI_DIR)/lib -L /usr/local/cuda-5.5/lib64
 CFLAGS = -gencode arch=compute_35,code=sm_35 -lcublas -lcurand -lmpi_cxx -lmpi $(LIB) $(INCLUDE) 
-LINK = source/util.cu source/clusterKernels.cu source/basicOps.cu source/clusterNet.cpp 
+LINK = source/util.cu source/clusterKernels.cu source/basicOps.cu source/clusterNet.cpp source/batchAllocator.cpp 
 
 EXECSRC = build/clusterNet.out
 EXECTEST = build/testSuite.out
