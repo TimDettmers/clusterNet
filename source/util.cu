@@ -14,7 +14,7 @@
 using std::string;
 using std::vector;
 
-Matrix *read_csv (char* filename)
+Matrix *read_csv (const char* filename)
 {
   std::ifstream  dStream(filename);
   int columns = 0;
@@ -154,6 +154,16 @@ void printmat(Matrix *A)
   free(m);
 
 }
+
+bool replace(std::string& str, const std::string& from, const std::string& to)
+{
+    size_t start_pos = str.find(from);
+    if(start_pos == std::string::npos)
+        return false;
+    str.replace(start_pos, from.length(), to);
+    return true;
+}
+
 
 
 

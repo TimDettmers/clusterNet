@@ -1,5 +1,5 @@
-#ifndef util
-#define util
+#ifndef util_H
+#define util_H
 #include <basicOps.cuh>
 #include <string>
 
@@ -12,7 +12,7 @@
         } \
     } while (false)
 
-Matrix *read_csv(char* filename);
+Matrix *read_csv(const char* filename);
 cudaEvent_t* tick();
 void tock(cudaEvent_t* startstop);
 void tock(cudaEvent_t* startstop, std::string text);
@@ -25,5 +25,6 @@ int test_eq(int i1, int i2, int idx1, int idx2, char* message);
 int test_matrix(Matrix *A, int rows, int cols);
 void print_matrix(Matrix *A);
 void printmat(Matrix *A);
+bool replace(std::string& str, const std::string& from, const std::string& to);
 #endif
 

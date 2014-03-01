@@ -1,5 +1,5 @@
-#ifndef basicOps
-#define basicOps
+#ifndef basicOps_H
+#define basicOps_H
 
 #define TILE_DIM (32)
 #define BLOCK_ROWS (8)

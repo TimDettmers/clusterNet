@@ -30,13 +30,14 @@ void run_neural_network()
   float error = 0;
 
   std::cout << "size: " << X->rows << std::endl;
+  std::cout << "size: " << X->cols << std::endl;
 
   BatchAllocator b = BatchAllocator(X, y, 0.2, 128, 512);
 
   clock_t t1,t2;
   t1=clock();
   //code goes here
-  int epochs  = 100;
+  int epochs  = 10;
   gpu.tick();
   float learning_rate = 0.003;
   //size_t free = 0;
@@ -123,7 +124,7 @@ void run_neural_network()
 		  float sum_value = to_host(sum_mat)->data[0];
 
 		  //std::cout << "Error count: " << 128.0f - sum_value << std::endl;
-		  error += (128.0f - sum_value)/ (128.0f*b.TOTAL_BATCHES) ;
+		  error += (b.m_current_batch_X->rows - sum_value)/ (1.0f * b.m_current_batch_X->rows *b.TOTAL_BATCHES) ;
 
 
 		  cudaFree(a1->data);
@@ -162,7 +163,7 @@ void run_neural_network()
 		  float sum_value = to_host(sum_mat)->data[0];
 
 		  //std::cout << "Error count: " << gpu.m_total_batches_cv - sum_value << std::endl;
-		  error += (512.0f - sum_value)/ (512.0f*b.TOTAL_BATCHES_CV) ;
+		  error += (b.m_current_batch_cv_X->rows  - sum_value)/ (1.0f * b.m_current_batch_cv_X->rows *b.TOTAL_BATCHES_CV) ;
 
 
 		  cudaFree(a1->data);
@@ -176,7 +177,6 @@ void run_neural_network()
 	  }
 
 	  std::cout << "Cross validation error: " << error << std::endl;
-
 
 
   }

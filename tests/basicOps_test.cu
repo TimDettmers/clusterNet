@@ -1,10 +1,8 @@
 #include <stdio.h>
 #include <mpi.h>
 #include <assert.h>
-#include <basicOps.cuh>
+//#include <basicOps.cuh>
 #include <math.h>
-#include <curand.h>
-#include <curand_kernel.h>
 #include <util.cuh>
 #include <clusterNet.h>
 

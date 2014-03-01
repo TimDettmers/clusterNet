@@ -44,6 +44,18 @@ BatchAllocator::BatchAllocator(Matrix *X, Matrix *y, float cross_validation_size
 	TOTAL_BATCHES = ceil(m_cv_beginning /(m_batch_size*1.0f));
 	TOTAL_BATCHES_CV = ceil((m_full_X->rows - m_cv_beginning)/(m_batch_size_cv*1.0f));
 
+	if(m_batch_size_cv > (X->rows*cross_validation_size))
+	{
+		std::cout << "ERROR: Cross validation batch size must be smaller than the cross validation set." << std::endl;
+		throw "Cross validation batch size must be smaller than the cross validation set.";
+	}
+
+	if(m_batch_size > m_cv_beginning)
+	{
+		std::cout << "ERROR: Batch size must be smaller than the training set." << std::endl;
+		throw "ERROR: Batch size must be smaller than the training set.";
+	}
+
 	cudaStreamCreate(&m_streamNext_batch_X);
 	cudaStreamCreate(&m_streamNext_batch_y);
 	cudaStreamCreate(&m_streamNext_batch_cv_X);
