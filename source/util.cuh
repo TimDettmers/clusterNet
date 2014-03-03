@@ -26,5 +26,6 @@ int test_matrix(Matrix *A, int rows, int cols);
 void print_matrix(Matrix *A);
 void printmat(Matrix *A);
 bool replace(std::string& str, const std::string& from, const std::string& to);
+Matrix *read_hdf5(const char * filepath);
 #endif
 

@@ -10,36 +10,38 @@
 void run_miniMNIST_test(int argc, char *argv[])
 {
 
+	// Tests RMSprop with weight updates, logistic grad.
+	// Additionally tests the interplay between different functions.
 
-  char buff[1024];
-  ssize_t len = ::readlink("/proc/self/exe", buff, sizeof(buff)-1);
-  std::string path = std::string(buff);
-  replace(path,"/build/testSuite.out","/tests/");
+	char buff[1024];
+	ssize_t len = ::readlink("/proc/self/exe", buff, sizeof(buff)-1);
+	std::string path = std::string(buff);
+	replace(path,"/build/testSuite.out","/tests/");
 
-  Matrix *X = read_csv((path + "/mnist_mini_X.csv").c_str());
-  Matrix *y = read_csv((path+ "/mnist_mini_y.csv").c_str());
+	Matrix *X = read_csv((path + "/mnist_mini_X.csv").c_str());
+	Matrix *y = read_csv((path+ "/mnist_mini_y.csv").c_str());
 
-  ClusterNet gpu = ClusterNet(12345);
+	ClusterNet gpu = ClusterNet(12345);
 
-  Matrix *w1 = scalarMul(gpu.rand(784,1000),0.4*sqrt(6.0f/(784.0+1000.0)));
-  Matrix *w2 = scalarMul(gpu.rand(1000,10),0.4*sqrt(6.0f/(10.0+1000.0)));
-  Matrix *m1 = zeros(784,1000);
-  Matrix *m2 = zeros(1000,10);
-  Matrix *ms1 = zeros(784,1000);
-  Matrix *ms2 = zeros(1000,10);
-  Matrix *grad_w1_ms = zeros(784,1000);
-  Matrix *grad_w2_ms = zeros(1000,10);
-  Matrix *grad_w2 = empty(1000,10);
-  Matrix *grad_w1 = empty(784,1000);
-  float cv_error = 0.0f;
-  float train_error = 0.0f;
+	Matrix *w1 = scalarMul(gpu.rand(784,1000),0.4*sqrt(6.0f/(784.0+1000.0)));
+	Matrix *w2 = scalarMul(gpu.rand(1000,10),0.4*sqrt(6.0f/(10.0+1000.0)));
+	Matrix *m1 = zeros(784,1000);
+	Matrix *m2 = zeros(1000,10);
+	Matrix *ms1 = zeros(784,1000);
+	Matrix *ms2 = zeros(1000,10);
+	Matrix *grad_w1_ms = zeros(784,1000);
+	Matrix *grad_w2_ms = zeros(1000,10);
+	Matrix *grad_w2 = empty(1000,10);
+	Matrix *grad_w1 = empty(784,1000);
+	float cv_error = 0.0f;
+	float train_error = 0.0f;
 
-  BatchAllocator b = BatchAllocator(X, y, 0.2, 32, 64);
-  int epochs  = 10;
-  float learning_rate = 0.003;
-  float momentum = 0.5;
-  for(int EPOCH = 1; EPOCH < epochs; EPOCH++)
-  {
+	BatchAllocator b = BatchAllocator(X, y, 0.2, 32, 64);
+	int epochs  = 10;
+	float learning_rate = 0.003;
+	float momentum = 0.5;
+	for(int EPOCH = 1; EPOCH < epochs; EPOCH++)
+	{
 	  momentum += 0.01;
 	  if(momentum > 0.95) momentum = 0.95;
 	  for(int i = 0; i < b.TOTAL_BATCHES; i++)
@@ -146,12 +148,12 @@ void run_miniMNIST_test(int argc, char *argv[])
 	  //std::cout << "Cross validation error: " << cv_error << std::endl;
 
 
-  }
+	}
 
-  assert(test_eq(train_error,0.0f,"mini-MNIST train error 10 epochs."));
-  ASSERT(cv_error < 0.16, "mini-MNIST train error 10 epochs.");
+	assert(test_eq(train_error,0.0f,"mini-MNIST train error 10 epochs."));
+	ASSERT(cv_error < 0.16, "mini-MNIST train error 10 epochs.");
 
-  b.finish_batch_allocator();
+	b.finish_batch_allocator();
 
 
 }
