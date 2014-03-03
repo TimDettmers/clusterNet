@@ -49,6 +49,55 @@ Matrix *read_csv (const char* filename)
   return out;
 }
 
+Matrix *read_hdf5(const char * filepath)
+{
+	   hid_t       file_id, dataset_id;
+
+	   file_id = H5Fopen(filepath, H5F_ACC_RDWR, H5P_DEFAULT);
+	   dataset_id = H5Dopen2(file_id, "/Default", H5P_DEFAULT);
+
+	   hid_t dspace = H5Dget_space(dataset_id);
+	   hsize_t dims[2];
+	   H5Sget_simple_extent_dims(dspace, dims, NULL);
+	   size_t bytes = sizeof(float)*dims[0]*dims[1];
+	   float *data = (float*)malloc(bytes);
+
+	   H5Dread(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, data);
+	   //status = H5Dread (dset, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT,  &readBuf[0]);
+	   H5Dclose(dataset_id);
+	   H5Fclose(file_id);
+
+	   Matrix *out = (Matrix*)malloc(sizeof(Matrix));
+	   out->rows = dims[0];
+	   out->cols= dims[1];
+	   out->bytes = bytes;
+	   out->data = data;
+	   out->size = dims[0]*dims[1];
+
+	   return out;
+}
+
+void write_hdf5(const char * filepath, Matrix *A)
+{
+	   hid_t       file_id, dataset_id, dataspace_id;
+	   hsize_t     dims[2];
+
+	   file_id = H5Fcreate(filepath, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+	   dims[0] = A->rows;
+	   dims[1] = A->cols;
+	   dataspace_id = H5Screate_simple(2, dims, NULL);
+	   dataset_id = H5Dcreate2(file_id, "/Default", H5T_NATIVE_FLOAT, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+
+	   float data[A->rows][A->cols];
+	   for(int row = 0; row < A->rows; row++)
+		   for(int col = 0; col < A->cols; col++)
+			   data[row][col] = A->data[(row*A->cols) + col];
+
+	   H5Dwrite(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, data);
+	   H5Dclose(dataset_id);
+	   H5Fclose(file_id);
+}
+
 cudaEvent_t* tick()
 {
     cudaEvent_t* startstop;
@@ -162,38 +211,4 @@ bool replace(std::string& str, const std::string& from, const std::string& to)
     str.replace(start_pos, from.length(), to);
     return true;
 }
-
-
-Matrix *read_hdf5(const char * filepath)
-{
-	   hid_t       file_id, dataset_id;
-
-	   file_id = H5Fopen(filepath, H5F_ACC_RDWR, H5P_DEFAULT);
-	   dataset_id = H5Dopen2(file_id, "/Default", H5P_DEFAULT);
-
-	   hid_t dspace = H5Dget_space(dataset_id);
-	   hsize_t dims[2];
-	   H5Sget_simple_extent_dims(dspace, dims, NULL);
-	   size_t bytes = sizeof(float)*dims[0]*dims[1];
-	   float *data = (float*)malloc(bytes);
-
-	   H5Dwrite(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, data);
-	   H5Dread(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, data);
-
-	   //status = H5Dread (dset, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT,  &readBuf[0]);
-	   H5Dclose(dataset_id);
-	   H5Fclose(file_id);
-
-	   Matrix *out = (Matrix*)malloc(sizeof(Matrix));
-	   out->rows = dims[0];
-	   out->cols= dims[1];
-	   out->bytes = bytes;
-	   out->data = data;
-	   out->size = dims[0]*dims[1];
-
-	   return out;
-}
-
-
-
 

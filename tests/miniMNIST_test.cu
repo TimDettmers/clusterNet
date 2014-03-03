@@ -18,8 +18,8 @@ void run_miniMNIST_test(int argc, char *argv[])
 	std::string path = std::string(buff);
 	replace(path,"/build/testSuite.out","/tests/");
 
-	Matrix *X = read_csv((path + "/mnist_mini_X.csv").c_str());
-	Matrix *y = read_csv((path+ "/mnist_mini_y.csv").c_str());
+	Matrix *X = read_hdf5((path + "/mnist_mini_X.hdf5").c_str());
+	Matrix *y = read_hdf5((path+ "/mnist_mini_y.hdf5").c_str());
 
 	ClusterNet gpu = ClusterNet(12345);
 

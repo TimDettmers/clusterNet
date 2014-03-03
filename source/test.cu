@@ -417,9 +417,14 @@ int main(int argc, char *argv[])
 
 	//run_neural_network();
 
-	Matrix *test = read_hdf5("/home/tim/mnist_full_X.hdf5");
 
+	Matrix *test = read_csv("/home/tim/git/clusterNet/tests/mnist_mini_y.csv");
+	write_hdf5("/home/tim/git/clusterNet/tests/mnist_mini_y.hdf5",test);
 	printf("dims: %ix%i\n",test->rows,test->cols);
+	test = read_hdf5("/home/tim/git/clusterNet/tests/mnist_mini_y.hdf5");
+	printf("dims: %ix%i\n",test->rows,test->cols);
+
+
 
 
 

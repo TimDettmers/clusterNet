@@ -13,6 +13,9 @@
     } while (false)
 
 Matrix *read_csv(const char* filename);
+Matrix *read_hdf5(const char * filepath);
+void write_hdf5(const char * filepath, Matrix *A);
+
 cudaEvent_t* tick();
 void tock(cudaEvent_t* startstop);
 void tock(cudaEvent_t* startstop, std::string text);
@@ -26,6 +29,5 @@ int test_matrix(Matrix *A, int rows, int cols);
 void print_matrix(Matrix *A);
 void printmat(Matrix *A);
 bool replace(std::string& str, const std::string& from, const std::string& to);
-Matrix *read_hdf5(const char * filepath);
 #endif
 
