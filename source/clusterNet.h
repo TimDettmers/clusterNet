@@ -40,6 +40,7 @@ public:
 
 	 void benchmark_dot();
 	 void shutdown_MPI();
+	 Matrix *rdmSqrtWeight(int rows, int cols);
 private:
 	 cublasHandle_t m_handle;
 	 curandGenerator_t m_generator;

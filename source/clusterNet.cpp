@@ -310,5 +310,13 @@ Matrix *ClusterNet::dropout(Matrix *A, float dropout_rate)
 	return out;
 }
 
+Matrix *ClusterNet::rdmSqrtWeight(int rows, int cols)
+{
+	Matrix * out = rand(rows, cols);
+	::rdmSqrtWeight(out);
+	return out;
+
+}
+
 
 

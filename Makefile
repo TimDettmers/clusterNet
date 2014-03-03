@@ -10,7 +10,7 @@ SCR := $(wildcard source/*.cu) $(wildcard source/*.cpp)
 INCLUDE = -I $(MPI_DIR)/include -I $(TOP)source -I $(TOP)tests -I /usr/local/cuda-5.5/include -I $(HDF5_DIR)include -I $(SZIP_DIR)include
 LIB = -L $(MPI_DIR)/lib -L /usr/local/cuda-5.5/lib64 -L $(HDF5_DIR)lib -L $(SZIP_DIR)lib
 CFLAGS = -gencode arch=compute_35,code=sm_35 -lcublas -lcurand -lmpi_cxx -lmpi -lhdf5 -lhdf5_hl -lz $(LIB) $(INCLUDE) 
-LINK = source/util.cu source/clusterKernels.cu source/basicOps.cu source/clusterNet.cpp source/batchAllocator.cpp 
+LINK = source/util.cu source/clusterKernels.cu source/basicOps.cu $(wildcard source/*.cpp)
 
 EXECSRC = build/clusterNet.out
 EXECTEST = build/testSuite.out

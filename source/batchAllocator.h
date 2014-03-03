@@ -11,6 +11,7 @@ class BatchAllocator
 {
 
 public:
+	 BatchAllocator();
 	 BatchAllocator(Matrix *X, Matrix *y, float cross_validation_size, int batch_size, int cv_batch_size);
 	 Matrix *m_current_batch_X;
 	 Matrix *m_current_batch_y;

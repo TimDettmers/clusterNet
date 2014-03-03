@@ -13,7 +13,7 @@
 
 using std::cout;
 using std::endl;
-
+BatchAllocator::BatchAllocator(){}
 BatchAllocator::BatchAllocator(Matrix *X, Matrix *y, float cross_validation_size, int batch_size, int batch_size_cv)
 {
 	float * pinned_memory_X;

@@ -9,6 +9,7 @@
 #include <clusterNet.h>
 #include <time.h>
 #include <batchAllocator.h>
+#include <DeepNeuralNetwork.h>
 
 void run_neural_network()
 {
@@ -404,15 +405,13 @@ int main(int argc, char *argv[])
 
 
 
-/*
 
-	  Matrix *X = read_csv("/home/tim/Downloads/mnist_full_X.csv");
-	  write_hdf5("/home/tim/mnist_full_X.hdf5", X);
-	  Matrix *y = read_csv("/home/tim/Downloads/mnist_full_y.csv");
-	  write_hdf5("/home/tim/mnist_full_y.hdf5", y);
-*/
-
-		run_neural_network();
+	Matrix *X = read_hdf5("/home/tim/mnist_full_X.hdf5");
+	Matrix *y = read_hdf5("/home/tim/mnist_full_y.hdf5");
+	std::vector<int> layers;
+	layers.push_back(800);
+	DeepNeuralNetwork net = DeepNeuralNetwork(X,y,0.15,layers);
+	net.train();
 
 
 

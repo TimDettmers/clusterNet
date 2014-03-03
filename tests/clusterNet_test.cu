@@ -218,6 +218,7 @@ int run_clusterNet_test(int argc, char *argv[])
 	//dropout test
 	m1 = gpu.rand(1000,1000);
 	m_host = to_host(gpu.dropout(m1,0.5));
+	assert(test_matrix(m_host,1000,1000));
 	int count = 0;
 	for(int i = 0; i < m1->size; i++)
 	{
@@ -246,7 +247,23 @@ int run_clusterNet_test(int argc, char *argv[])
 
 
 
-	//These should just pass without error
+	//rdmsqrtweight
+	m1 = gpu.rdmSqrtWeight(784,777);
+	m_host = to_host(m1);
+	assert(test_matrix(m_host,784,777));
+	count = 0;
+	for(int i = 0; i < m1->size; i++)
+	{
+	  ASSERT((m_host->data[i] > -4.0f*sqrt(6.0f/(784.0+777.0))) && (m_host->data[i] < 4.0f*sqrt(6.0f/(784.0+777.0))),"RdmSqrtWeight test");
+	  if(m_host->data[i] == 0)
+		  count++;
+	}
+
+	ASSERT(count < 10,"RdmSqrtWeight test");
+
+
+
+	//This should just pass without error
 	ticktock_test.tock("ClusterNet test ran in");
 
 	return 0;

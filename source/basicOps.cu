@@ -2,6 +2,7 @@
 #include <basicOps.cuh>
 #include <clusterKernels.cuh>
 #include <assert.h>
+#include <util.cuh>
 
 Matrix *to_gpu(Matrix *A){ return to_gpu(A, 0); }
 Matrix *to_gpu(Matrix *A, int is_col_major)
@@ -123,6 +124,12 @@ Matrix *zeros(int rows, int cols)
 Matrix *ones(int rows, int cols)
 {
   return fill_matrix(rows, cols, 1.0f);
+}
+
+void rdmSqrtWeight(Matrix * uniform_rdm)
+{
+	int block_size = (uniform_rdm->size/THREADS_PER_BLOCKS) + 1;
+	kCreateRdmSqrtWeight_Logistic<<<block_size,THREADS_PER_BLOCKS>>>(uniform_rdm->data, uniform_rdm->rows, uniform_rdm->cols);
 }
 
 Matrix *arange(int rows, int cols){	return arange(0, rows, cols); }

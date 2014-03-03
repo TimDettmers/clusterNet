@@ -32,6 +32,7 @@ Matrix *zeros(int rows, int cols);
 Matrix *empty(int rows, int cols);
 Matrix *arange(int rows, int cols);
 Matrix *arange(int start, int rows, int cols);
+void rdmSqrtWeight(Matrix * uniform_rdm);
 
 Matrix *add(Matrix *A, Matrix *B);
 void add(Matrix *A, Matrix *B, Matrix *out);
