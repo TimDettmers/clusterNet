@@ -318,10 +318,24 @@ Matrix *ClusterNet::dropout(Matrix *A, float dropout_rate)
 	return out;
 }
 
-Matrix *ClusterNet::rdmSqrtWeight(int rows, int cols)
+Matrix *ClusterNet::uniformSqrtWeight(int rows, int cols)
 {
 	Matrix * out = rand(rows, cols);
-	::rdmSqrtWeight(out);
+	::uniformSqrtWeight(out);
+	return out;
+
+}
+
+
+Matrix *ClusterNet::sparseInitWeight(int rows, int cols){ return sparseInitWeight(rows, cols, 15); }
+Matrix *ClusterNet::sparseInitWeight(int rows, int cols, int connections)
+{
+
+	Matrix *rdm = randn(connections*cols,1);
+	Matrix *idx = rand_int(connections*cols,1,0,rows-1);
+	Matrix *out = zeros(rows, cols);
+	sparseRdmWeight(rdm,idx,out,connections);
+
 	return out;
 
 }

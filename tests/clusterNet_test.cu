@@ -248,7 +248,7 @@ int run_clusterNet_test(int argc, char *argv[])
 
 
 	//rdmsqrtweight test
-	m1 = gpu.rdmSqrtWeight(784,777);
+	m1 = gpu.uniformSqrtWeight(784,777);
 	m_host = to_host(m1);
 	assert(test_matrix(m_host,784,777));
 	count = 0;
@@ -299,6 +299,36 @@ int run_clusterNet_test(int argc, char *argv[])
 		ASSERT((counts[i] > 95000) && (counts[i] < 105000), "rand_int test");
 	}
 
+	//rdmsparseweight test
+	m1 = gpu.sparseInitWeight(532,421);
+	m_host = to_host(m1,1);
+	assert(test_matrix(m_host,532,421));
+	count = 0;
+	for(int col = 0; col < m_host->cols; col++)
+	{
+		for(int row = 0; row < m_host->rows; row++)
+		{
+			if(m_host->data[(col*m_host->rows) + row] > 0.0f)
+				count++;
+		}
+	}
+	//average should be bigger than 14
+	ASSERT(count/421.0f > 14.0f,"sparse weight test");
+	m1 = gpu.sparseInitWeight(532,2000,73);
+	m_host = to_host(m1,1);
+	assert(test_matrix(m_host,532,2000));
+	count = 0;
+	for(int col = 0; col < m_host->cols; col++)
+	{
+		for(int row = 0; row < m_host->rows; row++)
+		{
+			if(m_host->data[(col*m_host->rows) + row] > 0.0f)
+				count++;
+		}
+	}
+	//average should be bigger than 70 (there is a high chance of rerolling the same number)
+	printf("%f\n",count/421.0f);
+	ASSERT(count/421.0f > 70.0f,"sparse weight test");
 
 
 	//This should just pass without error

@@ -41,7 +41,9 @@ public:
 
 	 void benchmark_dot();
 	 void shutdown_MPI();
-	 Matrix *rdmSqrtWeight(int rows, int cols);
+	 Matrix *uniformSqrtWeight(int rows, int cols);
+	 Matrix *sparseInitWeight(int rows, int cols);
+	 Matrix *sparseInitWeight(int rows, int cols, int connections);
 private:
 	 cublasHandle_t m_handle;
 	 curandGenerator_t m_generator;

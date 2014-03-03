@@ -36,7 +36,7 @@ void run_neural_network()
   clock_t t1,t2;
   t1=clock();
   //code goes here
-  int epochs  = 30;
+  int epochs  = 100;
   gpu.tick();
   float learning_rate = 0.003;
   //size_t free = 0;
@@ -403,16 +403,16 @@ int main(int argc, char *argv[])
 
   //MPI_benchmark(argc, argv);
 
+run_neural_network();
 
-
-
+/*
 	Matrix *X = read_hdf5("/home/tim/mnist_full_X.hdf5");
 	Matrix *y = read_hdf5("/home/tim/mnist_full_y.hdf5");
 	std::vector<int> layers;
 	layers.push_back(800);
 	DeepNeuralNetwork net = DeepNeuralNetwork(X,y,0.15,layers);
 	net.train();
-
+*/
 
 
 

@@ -132,7 +132,7 @@ void rand_int(Matrix *uniform_rdm,int low, int high)
 	kRandInt<<<block_size,THREADS_PER_BLOCKS>>>(uniform_rdm->data, low, high, uniform_rdm->size);
 }
 
-void rdmSqrtWeight(Matrix * uniform_rdm)
+void uniformSqrtWeight(Matrix * uniform_rdm)
 {
 	int block_size = (uniform_rdm->size/THREADS_PER_BLOCKS) + 1;
 	kCreateRdmSqrtWeight_Logistic<<<block_size,THREADS_PER_BLOCKS>>>(uniform_rdm->data, uniform_rdm->rows, uniform_rdm->cols);
@@ -534,6 +534,12 @@ void softmax(Matrix *A, Matrix *out)
 
     cudaThreadSynchronize();
 
+}
+
+void sparseRdmWeight(Matrix *rdm, Matrix *idx, Matrix *out, int connections)
+{
+	int blocks = (idx->size/THREADS_PER_BLOCKS) + 1;
+    kCreateSparseRdmWeight<<<blocks,THREADS_PER_BLOCKS>>>(rdm->data,idx->data, out->data, out->rows, out->cols, connections);
 }
 
 

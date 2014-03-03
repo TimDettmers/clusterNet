@@ -33,7 +33,8 @@ Matrix *empty(int rows, int cols);
 Matrix *arange(int rows, int cols);
 Matrix *arange(int start, int rows, int cols);
 
-void rdmSqrtWeight(Matrix * uniform_rdm);
+void uniformSqrtWeight(Matrix * uniform_rdm);
+void sparseRdmWeight(Matrix *rdm, Matrix *idx, Matrix *out, int connections);
 void rand_int(Matrix *int_values,int low, int high);
 
 Matrix *add(Matrix *A, Matrix *B);

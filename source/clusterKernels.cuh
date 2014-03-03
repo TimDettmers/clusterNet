@@ -37,4 +37,5 @@ __global__ void kRMSprop(float *RMS, float *grad, float RMS_multiplier, float le
 __global__ void kRMSprop_with_nesterov_weight_update(float *RMS, float *grad, float *w, float *m, float RMS_multiplier, float learning_rate, int batch_size, int size);
 __global__ void kCreateRdmSqrtWeight_Logistic(float *A, int in, int out);
 __global__ void kRandInt(float *A, int lower_limit, int upper_limit, int size);
+__global__ void kCreateSparseRdmWeight(float *rdm, float* indicies, float *out, int rows, int cols, int connections);
 #endif

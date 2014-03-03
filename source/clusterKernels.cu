@@ -28,6 +28,25 @@ __global__ void kCreateRdmSqrtWeight_Logistic(float *A, int in, int out)
   }
 }
 
+__global__ void kCreateSparseRdmWeight(float *rdm, float* indicies, float *out, int rows, int cols, int connections)
+{
+  const unsigned int numThreads = blockDim.x * gridDim.x;
+  const int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
+  int connection_idx = 0;
+  float rdm_value = 0.0f;
+  int size = connections*cols;
+  int current_col = 0;
+
+  //each thread fills one row
+  for (unsigned int i = idx; i < size; i += numThreads)
+  {
+	  connection_idx = (int)indicies[i];
+	  rdm_value = rdm[i];
+	  current_col = i/(connections);
+	  out[(current_col*rows)+connection_idx] = rdm_value;
+  }
+}
+
 __global__ void kRandInt(float *A, int lower_limit, int upper_limit, int size)
 {
   const unsigned int numThreads = blockDim.x * gridDim.x;
@@ -375,8 +394,6 @@ __global__ void kSoftMax(float* A, float* out, unsigned int rows, unsigned int c
 			max_values[idx] = -FLT_MAX;
 			row_sums[idx] = 0.0f;
 
-			__syncthreads();
-
 		     //calc max value of the row
 			for (unsigned int i = 0; i < cols; i++)
 			{
@@ -583,4 +600,6 @@ __global__ void kRMSprop_with_nesterov_weight_update(float *RMS, float *grad, fl
 		  w[i] = weight_value + momentum_matrix_value;
 	  }
 }
+
+
 
