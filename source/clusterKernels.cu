@@ -28,6 +28,21 @@ __global__ void kCreateRdmSqrtWeight_Logistic(float *A, int in, int out)
   }
 }
 
+__global__ void kRandInt(float *A, int lower_limit, int upper_limit, int size)
+{
+  const unsigned int numThreads = blockDim.x * gridDim.x;
+  const int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
+  const int range = upper_limit-lower_limit + 1;
+
+  for (unsigned int i = idx;i < size; i += numThreads)
+  {
+	  //use uniform random sample to get integers
+       A[i] = (float)(((int)((A[i]*range))) + lower_limit);
+  }
+}
+
+
+
 //vertical stack for column major format
 __global__ void vStack(float *A, float *B, float *out, int size_out, int rows_a, int rows, int cols)
 {

@@ -247,7 +247,7 @@ int run_clusterNet_test(int argc, char *argv[])
 
 
 
-	//rdmsqrtweight
+	//rdmsqrtweight test
 	m1 = gpu.rdmSqrtWeight(784,777);
 	m_host = to_host(m1);
 	assert(test_matrix(m_host,784,777));
@@ -260,6 +260,44 @@ int run_clusterNet_test(int argc, char *argv[])
 	}
 
 	ASSERT(count < 10,"RdmSqrtWeight test");
+
+	//rand_int test
+	m1 = gpu.rand_int(784,777,2,10);
+	m_host = to_host(m1);
+	assert(test_matrix(m_host,784,777));
+	count = 0;
+	for(int i = 0; i < m1->size; i++)
+	{
+	  ASSERT((m_host->data[i] >= 2) && (m_host->data[i] <= 10),"rand_int test");
+	  if(m_host->data[i] == 0)
+		  count++;
+	}
+
+	m1 = gpu.rand_int(100,100,782965,78254609);
+	m_host = to_host(m1);
+	assert(test_matrix(m_host,100,100));
+	count = 0;
+	for(int i = 0; i < m1->size; i++)
+	{
+	  ASSERT((m_host->data[i] >= 782965) && (m_host->data[i] <= 78254609),"rand_int test");
+	  if(m_host->data[i] == 0)
+		  count++;
+	}
+	ASSERT(count == 0,"rand_int test");
+
+	m_host = to_host(gpu.rand_int(1000,1000,0,9));
+	int counts[10] = {0,0,0,0,0,
+					  0,0,0,0,0};
+	assert(test_matrix(m_host,1000,1000));
+	for(int i = 0; i < m_host->size; i++)
+	{
+		counts[(int)m_host->data[i]]++;
+	}
+	for(int i = 0; i < 10; i++)
+	{
+		//expectation is 100000 each
+		ASSERT((counts[i] > 95000) && (counts[i] < 105000), "rand_int test");
+	}
 
 
 

@@ -126,6 +126,12 @@ Matrix *ones(int rows, int cols)
   return fill_matrix(rows, cols, 1.0f);
 }
 
+void rand_int(Matrix *uniform_rdm,int low, int high)
+{
+	int block_size = (uniform_rdm->size/THREADS_PER_BLOCKS) + 1;
+	kRandInt<<<block_size,THREADS_PER_BLOCKS>>>(uniform_rdm->data, low, high, uniform_rdm->size);
+}
+
 void rdmSqrtWeight(Matrix * uniform_rdm)
 {
 	int block_size = (uniform_rdm->size/THREADS_PER_BLOCKS) + 1;

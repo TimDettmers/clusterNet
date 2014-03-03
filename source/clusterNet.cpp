@@ -242,6 +242,14 @@ void ClusterNet::randn(int rows, int cols, float mean, float std, Matrix *out)
 	curandGenerateNormal(m_generator, out->data, rows*cols, 0.0f, 1.0f);
 }
 
+Matrix *ClusterNet::rand_int(int rows, int cols, int low, int high)
+{
+	Matrix * out = rand(rows, cols);
+	::rand_int(out, low, high);
+
+	return out;
+}
+
 
 void ClusterNet::tick(){tick("default"); }
 void ClusterNet::tick(std::string name)

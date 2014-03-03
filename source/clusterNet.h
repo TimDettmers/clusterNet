@@ -32,6 +32,7 @@ public:
 	 Matrix *randn(int rows, int cols, float mean, float std);
 	 void randn(int rows, int cols, float mean, float std, Matrix *out);
 	 Matrix *dropout(Matrix *A, float dropout_rate);
+	 Matrix *rand_int(int rows, int cols, int low, int high);
 
 	 void tick(std::string name);
 	 void tick();
