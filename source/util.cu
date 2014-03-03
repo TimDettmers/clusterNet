@@ -63,7 +63,6 @@ Matrix *read_hdf5(const char * filepath)
 	   float *data = (float*)malloc(bytes);
 
 	   H5Dread(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, data);
-	   //status = H5Dread (dset, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT,  &readBuf[0]);
 	   H5Dclose(dataset_id);
 	   H5Fclose(file_id);
 

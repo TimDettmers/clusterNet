@@ -11,6 +11,8 @@
 #include <algorithm>
 #include <vector>
 
+using std::cout;
+using std::endl;
 
 BatchAllocator::BatchAllocator(Matrix *X, Matrix *y, float cross_validation_size, int batch_size, int batch_size_cv)
 {
@@ -40,9 +42,9 @@ BatchAllocator::BatchAllocator(Matrix *X, Matrix *y, float cross_validation_size
 
 	m_batch_size = batch_size;
 	m_batch_size_cv = batch_size_cv;
-	m_cv_beginning = ceil(X->rows - (X->rows*cross_validation_size));
+	m_cv_beginning = ceil(X->rows * (1.0f-cross_validation_size));
 	TOTAL_BATCHES = ceil(m_cv_beginning /(m_batch_size*1.0f));
-	TOTAL_BATCHES_CV = ceil((m_full_X->rows - m_cv_beginning)/(m_batch_size_cv*1.0f));
+	TOTAL_BATCHES_CV = ceil((X->rows - m_cv_beginning)/(m_batch_size_cv*1.0f));
 
 	if(m_batch_size_cv > (X->rows*cross_validation_size))
 	{
@@ -97,6 +99,7 @@ void BatchAllocator::allocate_next_batch_async()
 	int copy_range_bytes_X = m_next_batch_X->bytes;
 	int copy_range_bytes_y = m_next_batch_y->bytes;
 
+
 	if((m_batch_size * (m_next_batch_number + 1)) > m_cv_beginning)
 	{
 		//the next batch is smaller than the given standard batch size
@@ -142,7 +145,7 @@ void BatchAllocator::allocate_next_cv_batch_async()
 void BatchAllocator::replace_current_batch_with_next()
 {
 
-	if(m_next_batch_X->rows != m_current_batch_cv_X->rows)
+	if(m_next_batch_X->rows != m_current_batch_X->rows)
 	{
 		cudaFree(m_current_batch_X->data);
 		cudaFree(m_current_batch_y->data);

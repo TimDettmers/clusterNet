@@ -12,8 +12,8 @@
 
 void run_neural_network()
 {
-  Matrix *X = read_csv("/home/tim/Downloads/mnist_full_X.csv");
-  Matrix *y = read_csv("/home/tim/Downloads/mnist_full_y.csv");
+  Matrix *X = read_hdf5("/home/tim/mnist_full_X.hdf5");
+  Matrix *y = read_hdf5("/home/tim/mnist_full_y.hdf5");
 
   ClusterNet gpu = ClusterNet(12345);
 
@@ -28,24 +28,22 @@ void run_neural_network()
   Matrix *grad_w2 = empty(1000,10);
   Matrix *grad_w1 = empty(784,1000);
   float error = 0;
+  float cv_size = 0.1428571f;
 
-  std::cout << "size: " << X->rows << std::endl;
-  std::cout << "size: " << X->cols << std::endl;
-
-  BatchAllocator b = BatchAllocator(X, y, 0.2, 128, 512);
+  BatchAllocator b = BatchAllocator(X, y,  cv_size, 512, 512);
 
   clock_t t1,t2;
   t1=clock();
   //code goes here
-  int epochs  = 10;
+  int epochs  = 30;
   gpu.tick();
   float learning_rate = 0.003;
   //size_t free = 0;
   //size_t total = 0;
   float momentum = 0.5;
-  for(int EPOCH = 1; EPOCH < epochs; EPOCH++)
+  for(int EPOCH = 0; EPOCH < epochs; EPOCH++)
   {
-	  std::cout << "EPOCH: " << EPOCH << std::endl;
+	  std::cout << "EPOCH: " << EPOCH + 1 << std::endl;
 	  //cudaMemGetInfo(&free, &total);
 	  //std::cout << free << std::endl;
 	  momentum += 0.01;
@@ -113,18 +111,12 @@ void run_neural_network()
 
 		  Matrix *result = argmax(out);
 
-
-		  /*
-		  std::cout << "y" << std::endl;
-		  std::cout << "-----------------------" << std::endl;
-		  print_gpu_matrix(gpu.m_current_batch_y);
-		  */
 		  Matrix *eq = equal(result,b.m_current_batch_y);
 		  Matrix *sum_mat = sum(eq);
 		  float sum_value = to_host(sum_mat)->data[0];
 
 		  //std::cout << "Error count: " << 128.0f - sum_value << std::endl;
-		  error += (b.m_current_batch_X->rows - sum_value)/ (1.0f * b.m_current_batch_X->rows *b.TOTAL_BATCHES) ;
+		  error += (b.m_current_batch_X->rows - sum_value);
 
 
 		  cudaFree(a1->data);
@@ -138,17 +130,13 @@ void run_neural_network()
 	  }
 
 
-	  std::cout << "Train error: " << error << std::endl;
+	  std::cout << "Train error: " << error/((1.0f - cv_size)*70000.0f)<< std::endl;
 
 
 	  error = 0;
 	  for(int i = 0; i < b.TOTAL_BATCHES_CV; i++)
 	  {
-		  //std::cout << "i: " << i << std::endl;
 		  b.allocate_next_cv_batch_async();
-		  //std::cout << "batch size: " << gpu.m_current_batch_cv_X->rows << std::endl;
-		  //std::cout << "batches : " << gpu.m_total_batches_cv << std::endl;
-
 		  Matrix *a1 = gpu.dot(b.m_current_batch_cv_X,w1);
 
 		  logistic(a1, a1);
@@ -163,7 +151,7 @@ void run_neural_network()
 		  float sum_value = to_host(sum_mat)->data[0];
 
 		  //std::cout << "Error count: " << gpu.m_total_batches_cv - sum_value << std::endl;
-		  error += (b.m_current_batch_cv_X->rows  - sum_value)/ (1.0f * b.m_current_batch_cv_X->rows *b.TOTAL_BATCHES_CV) ;
+		  error += (b.m_current_batch_cv_X->rows  - sum_value);
 
 
 		  cudaFree(a1->data);
@@ -176,7 +164,7 @@ void run_neural_network()
 		  b.replace_current_cv_batch_with_next();
 	  }
 
-	  std::cout << "Cross validation error: " << error << std::endl;
+	  std::cout << "Cross validation error: " << error/(cv_size*70000) << std::endl;
 
 
   }
@@ -415,17 +403,16 @@ int main(int argc, char *argv[])
   //MPI_benchmark(argc, argv);
 
 
-	//run_neural_network();
 
+/*
 
-	Matrix *test = read_csv("/home/tim/git/clusterNet/tests/mnist_mini_y.csv");
-	write_hdf5("/home/tim/git/clusterNet/tests/mnist_mini_y.hdf5",test);
-	printf("dims: %ix%i\n",test->rows,test->cols);
-	test = read_hdf5("/home/tim/git/clusterNet/tests/mnist_mini_y.hdf5");
-	printf("dims: %ix%i\n",test->rows,test->cols);
+	  Matrix *X = read_csv("/home/tim/Downloads/mnist_full_X.csv");
+	  write_hdf5("/home/tim/mnist_full_X.hdf5", X);
+	  Matrix *y = read_csv("/home/tim/Downloads/mnist_full_y.csv");
+	  write_hdf5("/home/tim/mnist_full_y.hdf5", y);
+*/
 
-
-
+		run_neural_network();
 
 
 
