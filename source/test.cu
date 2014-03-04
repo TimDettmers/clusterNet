@@ -67,7 +67,7 @@ void run_neural_network()
 		  Matrix *d1 = gpu.dropout(z1,0.6);
 		  Matrix *a2 = gpu.dot(d1,w2);
 		  Matrix *out = softmax(a2);
-		  Matrix *t = create_t_matrix(b.m_current_batch_y,10);
+		  Matrix *t = create_t_matrix(b.CURRENT_BATCH_Y,10);
 
 		  //backprop
 		  Matrix *e1 = sub(out, t);
@@ -112,7 +112,7 @@ void run_neural_network()
 
 		  Matrix *result = argmax(out);
 
-		  Matrix *eq = equal(result,b.m_current_batch_y);
+		  Matrix *eq = equal(result,b.CURRENT_BATCH_Y);
 		  Matrix *sum_mat = sum(eq);
 		  float sum_value = to_host(sum_mat)->data[0];
 
@@ -147,7 +147,7 @@ void run_neural_network()
 
 		  Matrix *result = argmax(out);
 
-		  Matrix *eq = equal(result,b.m_current_batch_cv_y);
+		  Matrix *eq = equal(result,b.CURRENT_BATCH_CV_Y);
 		  Matrix *sum_mat = sum(eq);
 		  float sum_value = to_host(sum_mat)->data[0];
 
@@ -409,9 +409,8 @@ int main(int argc, char *argv[])
 	Matrix *X = read_hdf5("/home/tim/mnist_full_X.hdf5");
 	Matrix *y = read_hdf5("/home/tim/mnist_full_y.hdf5");
 	std::vector<int> layers;
-	layers.push_back(1500);
 	layers.push_back(1000);
-	DeepNeuralNetwork net = DeepNeuralNetwork(X,y,0.15,layers);
+	DeepNeuralNetwork net = DeepNeuralNetwork(X,y,0.20,layers,Regression);
 	net.train();
 
 

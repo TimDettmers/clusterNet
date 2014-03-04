@@ -377,7 +377,6 @@ __device__ void reduceToSumLocal(float* sdata, unsigned int tid)
 
 __global__ void kSoftMax(float* A, float* out, unsigned int rows, unsigned int cols)
 {
-
 	const unsigned int numThreads = blockDim.x * gridDim.x;
 	const int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
 	float col_value = 0.0f;
@@ -385,72 +384,34 @@ __global__ void kSoftMax(float* A, float* out, unsigned int rows, unsigned int c
 	__shared__ float max_values[THREADS_PER_BLOCKS];
 	__shared__ float row_sums[THREADS_PER_BLOCKS];
 
-	//fill with min values
+	for (unsigned int row = idx; row < rows; row += numThreads)
+	{
+		//fill with min values
+		max_values[idx] = -FLT_MAX;
+		row_sums[idx] = 0.0f;
 
-
-
-	  for (unsigned int row = idx; row < rows; row += numThreads)
-	  {
-			max_values[idx] = -FLT_MAX;
-			row_sums[idx] = 0.0f;
-
-		     //calc max value of the row
-			for (unsigned int i = 0; i < cols; i++)
+		 //calc max value of the row
+		for (unsigned int i = 0; i < cols; i++)
+		{
+			col_value = A[(i*rows) + row];
+			if(col_value > max_values[idx])
 			{
-				col_value = A[(i*rows) + row];
-				if(col_value > max_values[idx])
-				{
-					max_values[idx] = col_value;
-				}
+				max_values[idx] = col_value;
 			}
+		}
 
-			//calc the row sum
-			for (unsigned int i = 0; i < cols; i++)
-			{
-				row_sums[idx] += __expf(A[(i*rows) + row] - max_values[idx]);
-			}
+		//calc the row sum
+		for (unsigned int i = 0; i < cols; i++)
+		{
+			row_sums[idx] += __expf(A[(i*rows) + row] - max_values[idx]);
+		}
 
-			//calc the value of each element in the row
-			for (unsigned int i = 0; i < cols; i++)
-			{
-				out[(i*rows) + row] = __expf(A[(i*rows) + row] - max_values[idx])/row_sums[idx];
-			}
-	  }
-
-
-	  /*
-  extern __shared__ float max_vals[] ;
-  float cur_max = -FLT_MAX;
-  float val = 0;
-  const int column = gridDim.x * blockIdx.y + blockIdx.x;
-  if (column < rows) {
-    float *cur_data = &mat[column * cols] ;
-    max_vals[threadIdx.x]=-FLT_MAX;
-    for (unsigned int i = threadIdx.x; i < cols; i += blockDim.x) {
-      val = cur_data[i];
-      if (val > cur_max) {
-        cur_max = val;
-      }
-    }
-    max_vals[threadIdx.x] = cur_max;
-    reduceToMax(max_vals, threadIdx.x);
-    __syncthreads();
-    cur_max = max_vals[0] ;
-    __syncthreads();
-    val = 0;
-    for (unsigned int i = threadIdx.x; i < cols; i += blockDim.x) {
-      val += __expf(cur_data[i]-cur_max);
-    }
-    max_vals[threadIdx.x] = val;
-    reduceToSumLocal(max_vals, threadIdx.x);
-    __syncthreads();
-    float norm = max_vals[0] ;
-    float *cur_target = &target[column * cols] ;
-    for (unsigned int i = threadIdx.x; i < cols; i += blockDim.x) {
-      cur_target[i] = __expf(cur_data[i]-cur_max) / norm ;
-    }
-    */
-
+		//calc the value of each element in the row
+		for (unsigned int i = 0; i < cols; i++)
+		{
+			out[(i*rows) + row] = __expf(A[(i*rows) + row] - max_values[idx])/row_sums[idx];
+		}
+	}
 }
 
 //for column major data
@@ -519,6 +480,35 @@ __global__ void kEqual(float *A, float *B, float *out, int size)
 	  {
 		  out[i] = (float)(A[i] == B[i]);
 	  }
+}
+
+__global__ void kRectifiedLinear(float *A, float *out, int size)
+{
+	  const unsigned int numThreads = blockDim.x * gridDim.x;
+	  const int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
+
+	  for (unsigned int i = idx;i < size; i += numThreads)
+		  out[i] = A[i] > 0.0f ? A[i] : 0.0f;
+
+}
+
+__global__ void kRectifiedLinear_Derivative(float *A, float *out, int size)
+{
+	  const unsigned int numThreads = blockDim.x * gridDim.x;
+	  const int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
+
+	  for (unsigned int i = idx;i < size; i += numThreads)
+		  out[i] = A[i] > 0.0f ? 1.0f : 0.0f;
+
+}
+
+__global__ void kSquaredError(float *A, float *t, float *out, int size)
+{
+	  const unsigned int numThreads = blockDim.x * gridDim.x;
+	  const int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
+
+	  for (unsigned int i = idx;i < size; i += numThreads)
+		  out[i] = powf(A[i] -t[i],2.0f);
 }
 
 __global__ void kSum(float *v, float *out, int size)

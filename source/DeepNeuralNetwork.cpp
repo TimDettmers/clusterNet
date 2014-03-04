@@ -12,7 +12,7 @@ using std::endl;
 
 
 
-DeepNeuralNetwork::DeepNeuralNetwork(Matrix *X, Matrix *y, float cv_size, std::vector<int> lLayerSizes)
+DeepNeuralNetwork::DeepNeuralNetwork(Matrix *X, Matrix *y, float cv_size, std::vector<int> lLayerSizes, Networktype_t net_type)
 {
 	m_BA = BatchAllocator(X,y,cv_size,128,512);
 	m_gpus = ClusterNet(12345);
@@ -22,11 +22,19 @@ DeepNeuralNetwork::DeepNeuralNetwork(Matrix *X, Matrix *y, float cv_size, std::v
 
 	lLayers = lLayerSizes;
 
+
+	if(net_type == Classification){ m_costFunction = Root_Squared_Error;}
+	if(net_type == Regression){ m_costFunction = Cross_Entropy; }
+
 	lDropout.push_back(0.2f);
 	for(int i = 0;i < lLayers.size(); i++)
 	{
+		if(net_type == Classification){lUnits.push_back(Logistic); }
+		if(net_type == Regression){lUnits.push_back(Rectified_Linear); }
 		lDropout.push_back(0.5f);
 	}
+	if(net_type == Classification){lUnits.push_back(Softmax); }
+	if(net_type == Regression){lUnits.push_back(Linear); }
 }
 
 void DeepNeuralNetwork::init_weights()
@@ -46,20 +54,18 @@ void DeepNeuralNetwork::init_weights()
 	M.push_back(zeros(lLayers.back(),10));
 	MS.push_back(zeros(lLayers.back(),10));
 	GRAD.push_back(zeros(lLayers.back(),10));
-
-	cout << W.size() << endl;
-	cout << lDropout.size() << endl;
 }
 
 void DeepNeuralNetwork::backprop()
 {
 	  //backprop
-	  Matrix *t = create_t_matrix(m_BA.m_current_batch_y,10);
+	  Matrix *t = create_t_matrix(m_BA.CURRENT_BATCH_Y,10);
 	  E.push_back(sub(Z.back(), t));
 	  for(int i = W.size()-1; i > 0; i--)
 	  {
 		  m_gpus.Tdot(Z[i],E.back(),GRAD[i]);
-		  logisticGrad(Z[i],Z[i]);
+		  derivative_function(i, Z[i]);
+		  //logisticGrad(Z[i],Z[i]);
 		  E.push_back(m_gpus.dotT(E.back(), W[i]));
 		  mul(E.back(),Z[i],E.back());
 	  }
@@ -75,7 +81,7 @@ void DeepNeuralNetwork::free_variables()
 	  for(int i = 1; i < Z.size(); i++)
 			cudaFree(Z[i]->data);
 	  Z.clear();
-	  for(int i = 1; i < E.size(); i++)
+	  for(int i = 0; i < E.size(); i++)
 			cudaFree(E[i]->data);
 	  E.clear();
 }
@@ -99,10 +105,7 @@ void DeepNeuralNetwork::feedforward(FeedForward_t ff)
 		{
 		  D.push_back(m_gpus.dropout(Z.back(),lDropout[i]));
 		  Z.push_back(m_gpus.dot(D.back(), W[i]));
-		  if(i == W.size() - 1)
-			  softmax(Z.back(),Z.back());
-		  else
-			  logistic(Z.back(),Z.back());
+		  activation_function(i, Z.back());
 		}
 	}
 	else
@@ -113,116 +116,143 @@ void DeepNeuralNetwork::feedforward(FeedForward_t ff)
 		for(int i = 0; i < W.size(); i++)
 		{
 			Z.push_back(m_gpus.dot(Z.back(), W[i]));
-			if(i == W.size() - 1)
-			  softmax(Z.back(),Z.back());
-			else
-			  logistic(Z.back(),Z.back());
+			activation_function(i, Z.back());
 		}
 	}
 
+}
 
+int DeepNeuralNetwork::get_classification_errors(Batchtype_t batch_t)
+{
+	  Matrix *result = argmax(Z.back());
+	  Matrix *eq;
+	  if(batch_t == Train){	eq = equal(result,m_BA.CURRENT_BATCH_Y);}
+	  else{	eq = equal(result,m_BA.CURRENT_BATCH_CV_Y);}
+
+	  Matrix *sum_mat = sum(eq);
+	  float sum_value = to_host(sum_mat)->data[0];
+	  int errors = (Z.back()->rows  - sum_value);
+
+	  cudaFree(result->data);
+	  cudaFree(eq->data);
+	  cudaFree(sum_mat->data);
+
+	  return errors;
+}
+
+void DeepNeuralNetwork::activation_function(int layer, Matrix * A)
+{
+	switch(lUnits[layer])
+	{
+		case Logistic:
+			logistic(A,A);
+			break;
+		case Rectified_Linear:
+			rectified_linear(A,A);
+			break;
+		case Softmax:
+			softmax(A,A);
+			break;
+		case Linear:
+			break;
+	}
+}
+
+void DeepNeuralNetwork::derivative_function(int layer, Matrix * A)
+{
+	switch(lUnits[layer-1])
+	{
+		case Logistic:
+			logisticGrad(A,A);
+			break;
+		case Rectified_Linear:
+			rectified_linear_derivative(A,A);
+			break;
+		default:
+			throw "Unknown unit";
+			break;
+	}
+}
+
+void DeepNeuralNetwork::nesterov_updates()
+{
+	//nesterov updates
+	for(int i = 0;i < M.size(); i++)
+	{
+		scalarMul(M[i],MOMENTUM,M[i]);
+		add(W[i],M[i],W[i]);
+	}
 }
 
 void DeepNeuralNetwork::train()
 {
-	  ClusterNet gpu = ClusterNet(12345);
 
-	  init_weights();
-	  float error = 0;
-	  int epochs = 100;
+	init_weights();
+	float error = 0;
+	int epochs = 100;
 
-	 size_t free, total;
-	 gpu.tick();
-	 for(int EPOCH = 0; EPOCH < epochs; EPOCH++)
-	  {
-		  std::cout << "EPOCH: " << EPOCH + 1 << std::endl;
-		  cudaMemGetInfo(&free, &total);
-		  std::cout << free << std::endl;
-		  MOMENTUM += 0.01;
-		  if(MOMENTUM > 0.95) MOMENTUM = 0.95;
-		  for(int i = 0; i < m_BA.TOTAL_BATCHES; i++)
-		  {
-			  m_BA.allocate_next_batch_async();
+	//size_t free, total;
+	m_gpus.tick();
+	for(int EPOCH = 0; EPOCH < epochs; EPOCH++)
+	{
+		std::cout << "EPOCH: " << EPOCH + 1 << std::endl;
+		//cudaMemGetInfo(&free, &total);
+		//std::cout << free << std::endl;
+		MOMENTUM += 0.01;
+		if(MOMENTUM > 0.95) MOMENTUM = 0.95;
+		for(int i = 0; i < m_BA.TOTAL_BATCHES; i++)
+		{
+		  m_BA.allocate_next_batch_async();
 
-			  //nesterov updates
-			  for(int i = 0;i < M.size(); i++)
-			  {
-				  scalarMul(M[i],MOMENTUM,M[i]);
-				  add(W[i],M[i],W[i]);
-			  }
+		  nesterov_updates();
 
-			  feedforward(Dropout);
-			  backprop();
-			  weight_updates();
-			  free_variables();
+		  feedforward(Dropout);
+		  backprop();
+		  weight_updates();
+		  free_variables();
 
-
-			  m_BA.replace_current_batch_with_next();
-
-
-
-
-		  }
-
-
-		  //Matrix *sum_value = sum(w1);
-		  //std::cout << "weight 1 Sum: " << to_host(sum_value)->data[0] << std::endl;
-
-		  error = 0;
-		  for(int i = 0; i < m_BA.TOTAL_BATCHES; i++)
-		  {
-			  m_BA.allocate_next_batch_async();
-
-			  feedforward(Train_error);
-			  Matrix *result = argmax(Z.back());
-
-			  Matrix *eq = equal(result,m_BA.m_current_batch_y);
-			  Matrix *sum_mat = sum(eq);
-			  float sum_value = to_host(sum_mat)->data[0];
-
-			  //std::cout << "Error count: " << 128.0f - sum_value << std::endl;
-			  error += (m_BA.CURRENT_BATCH->rows - sum_value);
-
-			  free_variables();
-			  cudaFree(result->data);
-			  cudaFree(eq->data);
-			  cudaFree(sum_mat->data);
-
-			  m_BA.replace_current_batch_with_next();
-		  }
-
-
-		  std::cout << "Train error: " << error/((1.0f - 0.15)*70000.0f)<< std::endl;
-
-
-		  error = 0;
-		  for(int i = 0; i < m_BA.TOTAL_BATCHES_CV; i++)
-		  {
-			  m_BA.allocate_next_cv_batch_async();
-			  feedforward(CV_error);
-
-			  Matrix *result = argmax(Z.back());
-
-			  Matrix *eq = equal(result,m_BA.m_current_batch_cv_y);
-			  Matrix *sum_mat = sum(eq);
-			  float sum_value = to_host(sum_mat)->data[0];
-
-			  //std::cout << "Error count: " << m_gpus.m_total_batches_cv - sum_value << std::endl;
-			  error += (m_BA.CURRENT_BATCH_CV->rows  - sum_value);
-
-
-
-
-			  free_variables();
-			  cudaFree(result->data);
-			  cudaFree(eq->data);
-			  cudaFree(sum_mat->data);
-
-			  m_BA.replace_current_cv_batch_with_next();
-		  }
-
-		  std::cout << "Cross validation error: " << error/(0.15*70000) << std::endl;
+		  m_BA.replace_current_batch_with_next();
 	  }
-	 gpu.tock();
 
+		train_error();
+		cross_validation_error();
+	}
+
+	 m_gpus.tock();
+
+}
+void DeepNeuralNetwork::train_error()
+{
+	  int errors = 0;
+	  for(int i = 0; i < m_BA.TOTAL_BATCHES; i++)
+	  {
+		  m_BA.allocate_next_batch_async();
+
+		  feedforward(Train_error);
+		  errors += get_classification_errors(Train);
+
+		  free_variables();
+
+		  m_BA.replace_current_batch_with_next();
+	  }
+
+	  std::cout << "Train error: " << errors/(float)m_BA.TRAIN_SET_SIZE << std::endl;
+}
+
+
+void DeepNeuralNetwork::cross_validation_error()
+{
+	  int errors = 0;
+	  for(int i = 0; i < m_BA.TOTAL_BATCHES_CV; i++)
+	  {
+		  m_BA.allocate_next_cv_batch_async();
+		  feedforward(CV_error);
+		  errors += get_classification_errors(CV);
+
+		  free_variables();
+
+		  m_BA.replace_current_cv_batch_with_next();
+	  }
+
+	  std::cout << "Cross validation error: " << errors/(float)m_BA.CV_SET_SIZE << std::endl;
 }

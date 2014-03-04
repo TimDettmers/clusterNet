@@ -88,6 +88,12 @@ void create_t_matrix(Matrix *labels, Matrix *out);
 Matrix *equal(Matrix *A, Matrix *B);
 void equal(Matrix *A, Matrix *B, Matrix *out);
 
+Matrix *rectified_linear(Matrix *A);
+void rectified_linear(Matrix *A, Matrix *out);
+Matrix *rectified_linear_derivative(Matrix *A);
+void rectified_linear_derivative(Matrix *A, Matrix *out);
+Matrix *squared_error(Matrix *A, Matrix *targets);
+void squared_error(Matrix *A, Matrix *targets, Matrix *out);
 
 int checkMatrixOperation(Matrix *A, Matrix *B, Matrix *C, int blnMatrixProduct);
 int blnFaultySizes(Matrix *A, Matrix *B, Matrix *C);

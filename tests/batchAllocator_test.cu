@@ -18,9 +18,9 @@ int run_batchAllocator_test(int argc, char *argv[])
   m2 = to_host(arange(10000,1));
   BatchAllocator b = BatchAllocator(m1,m2,0.20,128,256);
   assert(test_matrix(b.CURRENT_BATCH,128,784));
-  assert(test_matrix(b.m_current_batch_y,128,1));
+  assert(test_matrix(b.CURRENT_BATCH_Y,128,1));
   assert(test_matrix(b.CURRENT_BATCH_CV,256,784));
-  assert(test_matrix(b.m_current_batch_cv_y,256,1));
+  assert(test_matrix(b.CURRENT_BATCH_CV_Y,256,1));
   Matrix *m_host2;
   int value = 0;
   int value_y = 0;
@@ -31,7 +31,7 @@ int run_batchAllocator_test(int argc, char *argv[])
 	  for(int batchno = 0; batchno < b.TOTAL_BATCHES; batchno++)
 	  {
 		  m_host = to_host(b.CURRENT_BATCH);
-		  m_host2 = to_host(b.m_current_batch_y);
+		  m_host2 = to_host(b.CURRENT_BATCH_Y);
 		  b.allocate_next_batch_async();
 
 
@@ -58,7 +58,7 @@ int run_batchAllocator_test(int argc, char *argv[])
 	  for(int batchno = 0; batchno < b.TOTAL_BATCHES_CV; batchno++)
 	  {
 		  m_host = to_host(b.CURRENT_BATCH_CV);
-		  m_host2 = to_host(b.m_current_batch_cv_y);
+		  m_host2 = to_host(b.CURRENT_BATCH_CV_Y);
 		  b.allocate_next_cv_batch_async();
 
 		  for(int i = 0; i <  b.CURRENT_BATCH_CV->rows*784; i++)
@@ -85,9 +85,9 @@ int run_batchAllocator_test(int argc, char *argv[])
 	   m2 = to_host(arange(70000,10));
 	   b = BatchAllocator(m1,m2,0.20,128,512);
 	   assert(test_matrix(b.CURRENT_BATCH,128,784));
-	   assert(test_matrix(b.m_current_batch_y,128,10));
+	   assert(test_matrix(b.CURRENT_BATCH_Y,128,10));
 	   assert(test_matrix(b.CURRENT_BATCH_CV,512,784));
-	   assert(test_matrix(b.m_current_batch_cv_y,512,10));
+	   assert(test_matrix(b.CURRENT_BATCH_CV_Y,512,10));
 
 	   for(int epoch = 0; epoch < 2; epoch++)
 	   {
@@ -96,7 +96,7 @@ int run_batchAllocator_test(int argc, char *argv[])
 		   for(int batchno = 0; batchno < b.TOTAL_BATCHES; batchno++)
 		   {
 			  m_host = to_host(b.CURRENT_BATCH);
-			  m_host2 = to_host(b.m_current_batch_y);
+			  m_host2 = to_host(b.CURRENT_BATCH_Y);
 			  b.allocate_next_batch_async();
 
 			  for(int i = 0; i < b.CURRENT_BATCH->rows*784; i++)
@@ -121,7 +121,7 @@ int run_batchAllocator_test(int argc, char *argv[])
 		for(int batchno = 0; batchno < b.TOTAL_BATCHES_CV; batchno++)
 		{
 		  m_host = to_host(b.CURRENT_BATCH_CV);
-		  m_host2 = to_host(b.m_current_batch_cv_y);
+		  m_host2 = to_host(b.CURRENT_BATCH_CV_Y);
 		  b.allocate_next_cv_batch_async();
 
 		  for(int i = 0; i < b.CURRENT_BATCH_CV->rows*784; i++)

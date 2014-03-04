@@ -615,3 +615,40 @@ void RMSprop_with_nesterov_weight_update(Matrix *RMS, Matrix *grad, Matrix *w, M
 	kRMSprop_with_nesterov_weight_update<<<blocks,THREADS_PER_BLOCKS>>>(RMS->data, grad->data, w->data, m->data, RMS_multiplier, learning_rate, batch_size, RMS->size);
 }
 
+Matrix *rectified_linear(Matrix *A)
+{
+	Matrix *out = empty(A->rows,A->cols);
+	rectified_linear(A,out);
+	return out;
+}
+void rectified_linear(Matrix *A, Matrix *out)
+{
+	int blocks = (out->size/THREADS_PER_BLOCKS) + 1;
+	kRectifiedLinear<<<blocks,THREADS_PER_BLOCKS>>>(A->data, out->data, out->size);
+}
+
+Matrix *rectified_linear_derivative(Matrix *A)
+{
+	Matrix *out = empty(A->rows,A->cols);
+	rectified_linear_derivative(A,out);
+	return out;
+}
+void rectified_linear_derivative(Matrix *A, Matrix *out)
+{
+	int blocks = (out->size/THREADS_PER_BLOCKS) + 1;
+	kRectifiedLinear_Derivative<<<blocks,THREADS_PER_BLOCKS>>>(A->data, out->data, out->size);
+}
+
+Matrix *squared_error(Matrix *A, Matrix *targets)
+{
+	Matrix *out = empty(A->rows,A->cols);
+	squared_error(A,targets,out);
+	return out;
+}
+void squared_error(Matrix *A, Matrix *targets, Matrix *out)
+{
+	int blocks = (out->size/THREADS_PER_BLOCKS) + 1;
+	kSquaredError<<<blocks,THREADS_PER_BLOCKS>>>(A->data, targets->data, out->data, out->size);
+}
+
+

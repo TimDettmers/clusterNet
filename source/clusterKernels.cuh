@@ -38,4 +38,7 @@ __global__ void kRMSprop_with_nesterov_weight_update(float *RMS, float *grad, fl
 __global__ void kCreateRdmSqrtWeight_Logistic(float *A, int in, int out);
 __global__ void kRandInt(float *A, int lower_limit, int upper_limit, int size);
 __global__ void kCreateSparseRdmWeight(float *rdm, float* indicies, float *out, int rows, int cols, int connections);
+__global__ void kRectifiedLinear(float *A, float *out, int size);
+__global__ void kRectifiedLinear_Derivative(float *A, float *out, int size);
+__global__ void kSquaredError(float *A, float *t, float *out, int size);
 #endif

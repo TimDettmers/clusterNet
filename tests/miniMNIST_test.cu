@@ -62,7 +62,7 @@ void run_miniMNIST_test(int argc, char *argv[])
 		  Matrix *d1 = gpu.dropout(z1,0.6);
 		  Matrix *a2 = gpu.dot(d1,w2);
 		  Matrix *out = softmax(a2);
-		  Matrix *t = create_t_matrix(b.m_current_batch_y,10);
+		  Matrix *t = create_t_matrix(b.CURRENT_BATCH_Y,10);
 
 		  //backprop
 		  Matrix *e1 = sub(out, t);
@@ -99,7 +99,7 @@ void run_miniMNIST_test(int argc, char *argv[])
 		  Matrix *a2 = gpu.dot(a1,w2);
 		  Matrix *out = softmax(a2);
 		  Matrix *result = argmax(out);
-		  Matrix *eq = equal(result,b.m_current_batch_y);
+		  Matrix *eq = equal(result,b.CURRENT_BATCH_Y);
 		  Matrix *sum_mat = sum(eq);
 		  float sum_value = to_host(sum_mat)->data[0];
 
@@ -129,7 +129,7 @@ void run_miniMNIST_test(int argc, char *argv[])
 		  Matrix *a2 = gpu.dot(a1,w2);
 		  Matrix *out = softmax(a2);
 		  Matrix *result = argmax(out);
-		  Matrix *eq = equal(result,b.m_current_batch_cv_y);
+		  Matrix *eq = equal(result,b.CURRENT_BATCH_CV_Y);
 		  Matrix *sum_mat = sum(eq);
 		  float sum_value = to_host(sum_mat)->data[0];
 
