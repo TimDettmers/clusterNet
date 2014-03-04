@@ -18,8 +18,8 @@ void run_neural_network()
 
   ClusterNet gpu = ClusterNet(12345);
 
-  Matrix *w1 = scalarMul(gpu.rand(784,1000),0.4*sqrt(6.0f/(784.0+1000.0)));
-  Matrix *w2 = scalarMul(gpu.rand(1000,10),0.4*sqrt(6.0f/(10.0+1000.0)));
+  Matrix *w1 = gpu.sparseInitWeight(784,1000);
+  Matrix *w2 = gpu.sparseInitWeight(1000,10);
   Matrix *m1 = zeros(784,1000);
   Matrix *m2 = zeros(1000,10);
   Matrix *ms1 = zeros(784,1000);
@@ -31,7 +31,7 @@ void run_neural_network()
   float error = 0;
   float cv_size = 0.1428571f;
 
-  BatchAllocator b = BatchAllocator(X, y,  cv_size, 512, 512);
+  BatchAllocator b = BatchAllocator(X, y,  cv_size, 128, 512);
 
   clock_t t1,t2;
   t1=clock();

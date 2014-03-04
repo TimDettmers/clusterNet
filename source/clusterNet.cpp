@@ -331,8 +331,8 @@ Matrix *ClusterNet::sparseInitWeight(int rows, int cols){ return sparseInitWeigh
 Matrix *ClusterNet::sparseInitWeight(int rows, int cols, int connections)
 {
 
-	Matrix *rdm = randn(connections*cols,1);
-	Matrix *idx = rand_int(connections*cols,1,0,rows-1);
+	Matrix *rdm = randn(cols,connections);
+	Matrix *idx = rand_int(cols,connections,0,rows-1);
 	Matrix *out = zeros(rows, cols);
 	sparseRdmWeight(rdm,idx,out,connections);
 
