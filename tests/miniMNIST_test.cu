@@ -55,7 +55,7 @@ void run_miniMNIST_test(int argc, char *argv[])
 		  add(w1,m1,w1);
 		  add(w2,m1,w2);
 
-		  Matrix *d0 = gpu.dropout(b.m_current_batch_X,0.2);
+		  Matrix *d0 = gpu.dropout(b.CURRENT_BATCH,0.2);
 		  //print_gpu_matrix(w1);
 		  Matrix *z1 = gpu.dot(d0, w1);
 		  logistic(z1, z1);
@@ -70,10 +70,10 @@ void run_miniMNIST_test(int argc, char *argv[])
 		  gpu.Tdot(z1,e1,grad_w2);
 		  logisticGrad(z1,z1);
 		  mul(e2,z1,e2);
-		  gpu.Tdot(b.m_current_batch_X,e2,grad_w1);
+		  gpu.Tdot(b.CURRENT_BATCH,e2,grad_w1);
 
-		  RMSprop_with_nesterov_weight_update(ms1,grad_w1,w1,m1,0.9f,learning_rate,b.m_current_batch_X->rows);
-		  RMSprop_with_nesterov_weight_update(ms2,grad_w2,w2,m2,0.9f,learning_rate,b.m_current_batch_X->rows);
+		  RMSprop_with_nesterov_weight_update(ms1,grad_w1,w1,m1,0.9f,learning_rate,b.CURRENT_BATCH->rows);
+		  RMSprop_with_nesterov_weight_update(ms2,grad_w2,w2,m2,0.9f,learning_rate,b.CURRENT_BATCH->rows);
 
 		  cudaFree(e1->data);
 		  cudaFree(e2->data);
@@ -93,7 +93,7 @@ void run_miniMNIST_test(int argc, char *argv[])
 	  {
 		  b.allocate_next_batch_async();
 
-		  Matrix *a1 = gpu.dot(b.m_current_batch_X,w1);
+		  Matrix *a1 = gpu.dot(b.CURRENT_BATCH,w1);
 
 		  logistic(a1, a1);
 		  Matrix *a2 = gpu.dot(a1,w2);
@@ -103,7 +103,7 @@ void run_miniMNIST_test(int argc, char *argv[])
 		  Matrix *sum_mat = sum(eq);
 		  float sum_value = to_host(sum_mat)->data[0];
 
-		  train_error += (b.m_current_batch_X->rows - sum_value)/ (1.0f * b.m_current_batch_X->rows *b.TOTAL_BATCHES) ;
+		  train_error += (b.CURRENT_BATCH->rows - sum_value)/ (1.0f * b.CURRENT_BATCH->rows *b.TOTAL_BATCHES) ;
 
 		  cudaFree(a1->data);
 		  cudaFree(a2->data);
@@ -124,7 +124,7 @@ void run_miniMNIST_test(int argc, char *argv[])
 	  {
 		  b.allocate_next_cv_batch_async();
 
-		  Matrix *a1 = gpu.dot(b.m_current_batch_cv_X,w1);
+		  Matrix *a1 = gpu.dot(b.CURRENT_BATCH_CV,w1);
 		  logistic(a1, a1);
 		  Matrix *a2 = gpu.dot(a1,w2);
 		  Matrix *out = softmax(a2);
@@ -133,7 +133,7 @@ void run_miniMNIST_test(int argc, char *argv[])
 		  Matrix *sum_mat = sum(eq);
 		  float sum_value = to_host(sum_mat)->data[0];
 
-		  cv_error += (b.m_current_batch_cv_X->rows  - sum_value)/ (1.0f * b.m_current_batch_cv_X->rows *b.TOTAL_BATCHES_CV) ;
+		  cv_error += (b.CURRENT_BATCH_CV->rows  - sum_value)/ (1.0f * b.CURRENT_BATCH_CV->rows *b.TOTAL_BATCHES_CV) ;
 
 		  cudaFree(a1->data);
 		  cudaFree(a2->data);

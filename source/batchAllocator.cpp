@@ -40,19 +40,19 @@ BatchAllocator::BatchAllocator(Matrix *X, Matrix *y, float cross_validation_size
 	m_full_y->size = y->size;
 	m_full_y->data = pinned_memory_y;
 
-	m_batch_size = batch_size;
-	m_batch_size_cv = batch_size_cv;
+	BATCH_SIZE = batch_size;
+	BATCH_SIZE_CV = batch_size_cv;
 	m_cv_beginning = ceil(X->rows * (1.0f-cross_validation_size));
-	TOTAL_BATCHES = ceil(m_cv_beginning /(m_batch_size*1.0f));
-	TOTAL_BATCHES_CV = ceil((X->rows - m_cv_beginning)/(m_batch_size_cv*1.0f));
+	TOTAL_BATCHES = ceil(m_cv_beginning /(BATCH_SIZE*1.0f));
+	TOTAL_BATCHES_CV = ceil((X->rows - m_cv_beginning)/(BATCH_SIZE_CV*1.0f));
 
-	if(m_batch_size_cv > (X->rows*cross_validation_size))
+	if(BATCH_SIZE_CV > (X->rows*cross_validation_size))
 	{
 		std::cout << "ERROR: Cross validation batch size must be smaller than the cross validation set." << std::endl;
 		throw "Cross validation batch size must be smaller than the cross validation set.";
 	}
 
-	if(m_batch_size > m_cv_beginning)
+	if(BATCH_SIZE > m_cv_beginning)
 	{
 		std::cout << "ERROR: Batch size must be smaller than the training set." << std::endl;
 		throw "ERROR: Batch size must be smaller than the training set.";
@@ -63,29 +63,29 @@ BatchAllocator::BatchAllocator(Matrix *X, Matrix *y, float cross_validation_size
 	cudaStreamCreate(&m_streamNext_batch_cv_X);
 	cudaStreamCreate(&m_streamNext_batch_cv_y);
 
-	m_current_batch_X = empty(m_batch_size,m_full_X->cols);
-	m_next_batch_X = empty(m_batch_size,m_full_X->cols);
-	m_current_batch_y = empty(m_batch_size,m_full_y->cols);
-	m_next_batch_y = empty(m_batch_size,m_full_y->cols);
+	CURRENT_BATCH = empty(BATCH_SIZE,m_full_X->cols);
+	m_next_batch_X = empty(BATCH_SIZE,m_full_X->cols);
+	m_current_batch_y = empty(BATCH_SIZE,m_full_y->cols);
+	m_next_batch_y = empty(BATCH_SIZE,m_full_y->cols);
 
-	m_current_batch_cv_X = empty(m_batch_size_cv,m_full_X->cols);
-	m_next_batch_cv_X = empty(m_batch_size_cv,m_full_X->cols);
-	m_current_batch_cv_y = empty(m_batch_size_cv,m_full_y->cols);
-	m_next_batch_cv_y = empty(m_batch_size_cv,m_full_y->cols);
+	CURRENT_BATCH_CV = empty(BATCH_SIZE_CV,m_full_X->cols);
+	m_next_batch_cv_X = empty(BATCH_SIZE_CV,m_full_X->cols);
+	m_current_batch_cv_y = empty(BATCH_SIZE_CV,m_full_y->cols);
+	m_next_batch_cv_y = empty(BATCH_SIZE_CV,m_full_y->cols);
 
 
-	cudaMemcpy(&m_current_batch_X->data[0],&m_full_X->data[0],m_current_batch_X->bytes,cudaMemcpyDefault);
+	cudaMemcpy(&CURRENT_BATCH->data[0],&m_full_X->data[0],CURRENT_BATCH->bytes,cudaMemcpyDefault);
 	cudaMemcpy(&m_current_batch_y->data[0],&m_full_y->data[0],m_current_batch_y->bytes,cudaMemcpyDefault);
-	cudaMemcpy(&m_current_batch_cv_X->data[0],&m_full_X->data[m_cv_beginning*m_full_X->cols],m_current_batch_cv_X->bytes,cudaMemcpyDefault);
+	cudaMemcpy(&CURRENT_BATCH_CV->data[0],&m_full_X->data[m_cv_beginning*m_full_X->cols],CURRENT_BATCH_CV->bytes,cudaMemcpyDefault);
 	cudaMemcpy(&m_current_batch_cv_y->data[0],&m_full_y->data[m_cv_beginning*m_full_y->cols],m_current_batch_cv_y->bytes,cudaMemcpyDefault);
 
-	Matrix * X_T = to_col_major(m_current_batch_X);
-	m_current_batch_X = X_T;
+	Matrix * X_T = to_col_major(CURRENT_BATCH);
+	CURRENT_BATCH = X_T;
 	Matrix * y_T = to_col_major(m_current_batch_y);
 	m_current_batch_y = y_T;
 
-	Matrix * X_T_cv = to_col_major(m_current_batch_cv_X);
-	m_current_batch_cv_X = X_T_cv;
+	Matrix * X_T_cv = to_col_major(CURRENT_BATCH_CV);
+	CURRENT_BATCH_CV = X_T_cv;
 	Matrix * y_T_cv = to_col_major(m_current_batch_cv_y);
 	m_current_batch_cv_y = y_T_cv;
 
@@ -100,11 +100,11 @@ void BatchAllocator::allocate_next_batch_async()
 	int copy_range_bytes_y = m_next_batch_y->bytes;
 
 
-	if((m_batch_size * (m_next_batch_number + 1)) > m_cv_beginning)
+	if((BATCH_SIZE * (m_next_batch_number + 1)) > m_cv_beginning)
 	{
 		//the next batch is smaller than the given standard batch size
 
-		int partial_batch_size = m_cv_beginning % m_batch_size;
+		int partial_batch_size = m_cv_beginning % BATCH_SIZE;
 		copy_range_bytes_X = partial_batch_size*m_full_X->cols*sizeof(float);
 		copy_range_bytes_y = partial_batch_size*m_full_y->cols*sizeof(float);
 		cudaFree(m_next_batch_X->data);
@@ -113,9 +113,9 @@ void BatchAllocator::allocate_next_batch_async()
 		m_next_batch_y = empty(partial_batch_size, m_full_y->cols);
 	}
 
-	cudaMemcpyAsync(&m_next_batch_X->data[0],&m_full_X->data[(m_full_X->cols * m_next_batch_number * m_batch_size)],
+	cudaMemcpyAsync(&m_next_batch_X->data[0],&m_full_X->data[(m_full_X->cols * m_next_batch_number * BATCH_SIZE)],
 					copy_range_bytes_X, cudaMemcpyHostToDevice,m_streamNext_batch_X);
-	cudaMemcpyAsync(&m_next_batch_y->data[0],&m_full_y->data[(m_full_y->cols * m_next_batch_number * m_batch_size)],
+	cudaMemcpyAsync(&m_next_batch_y->data[0],&m_full_y->data[(m_full_y->cols * m_next_batch_number * BATCH_SIZE)],
 					copy_range_bytes_y, cudaMemcpyHostToDevice,m_streamNext_batch_y);
 }
 
@@ -124,10 +124,10 @@ void BatchAllocator::allocate_next_cv_batch_async()
 	int copy_range_bytes_X = m_next_batch_cv_X->bytes;
 	int copy_range_bytes_y = m_next_batch_cv_y->bytes;
 
-	if((m_batch_size_cv * (m_next_batch_number_cv + 1)) > (m_full_X->rows - m_cv_beginning))
+	if((BATCH_SIZE_CV * (m_next_batch_number_cv + 1)) > (m_full_X->rows - m_cv_beginning))
 	{
 		//the next batch is smaller than the given standard batch size
-		int partial_batch_size = (m_full_X->rows - m_cv_beginning) % m_batch_size_cv;
+		int partial_batch_size = (m_full_X->rows - m_cv_beginning) % BATCH_SIZE_CV;
 		copy_range_bytes_X = partial_batch_size*m_full_X->cols*sizeof(float);
 		copy_range_bytes_y = partial_batch_size*m_full_y->cols*sizeof(float);
 		cudaFree(m_next_batch_cv_X->data);
@@ -136,25 +136,25 @@ void BatchAllocator::allocate_next_cv_batch_async()
 		m_next_batch_cv_y = empty(partial_batch_size, m_full_y->cols);
 	}
 
-	cudaMemcpyAsync(&m_next_batch_cv_X->data[0],&m_full_X->data[(m_cv_beginning * m_full_X->cols)  + (m_next_batch_number_cv * m_batch_size_cv * m_full_X->cols)],
+	cudaMemcpyAsync(&m_next_batch_cv_X->data[0],&m_full_X->data[(m_cv_beginning * m_full_X->cols)  + (m_next_batch_number_cv * BATCH_SIZE_CV * m_full_X->cols)],
 					copy_range_bytes_X, cudaMemcpyHostToDevice,m_streamNext_batch_cv_X);
-	cudaMemcpyAsync(&m_next_batch_cv_y->data[0],&m_full_y->data[(m_cv_beginning * m_full_y->cols)  + (m_next_batch_number_cv * m_batch_size_cv * m_full_y->cols)],
+	cudaMemcpyAsync(&m_next_batch_cv_y->data[0],&m_full_y->data[(m_cv_beginning * m_full_y->cols)  + (m_next_batch_number_cv * BATCH_SIZE_CV * m_full_y->cols)],
 					copy_range_bytes_y, cudaMemcpyHostToDevice,m_streamNext_batch_cv_y);
 }
 
 void BatchAllocator::replace_current_batch_with_next()
 {
 
-	if(m_next_batch_X->rows != m_current_batch_X->rows)
+	if(m_next_batch_X->rows != CURRENT_BATCH->rows)
 	{
-		cudaFree(m_current_batch_X->data);
+		cudaFree(CURRENT_BATCH->data);
 		cudaFree(m_current_batch_y->data);
-		m_current_batch_X = empty(m_next_batch_X->rows,m_next_batch_X->cols);
+		CURRENT_BATCH = empty(m_next_batch_X->rows,m_next_batch_X->cols);
 		m_current_batch_y = empty(m_next_batch_y->rows,m_next_batch_y->cols);
 	}
 
 	cudaStreamSynchronize(m_streamNext_batch_X);
-	to_col_major(m_next_batch_X, m_current_batch_X);
+	to_col_major(m_next_batch_X, CURRENT_BATCH);
 	cudaStreamSynchronize(m_streamNext_batch_y);
 	to_col_major(m_next_batch_y, m_current_batch_y);
 	m_next_batch_number += 1;
@@ -163,12 +163,12 @@ void BatchAllocator::replace_current_batch_with_next()
 	{
 		//reset to the intial state
 		m_next_batch_number = 0;
-		if(m_current_batch_X->rows != m_batch_size)
+		if(CURRENT_BATCH->rows != BATCH_SIZE)
 		{
 			cudaFree(m_next_batch_X->data);
 			cudaFree(m_next_batch_y->data);
-			m_next_batch_X = empty(m_batch_size,m_full_X->cols);
-			m_next_batch_y = empty(m_batch_size,m_full_y->cols);
+			m_next_batch_X = empty(BATCH_SIZE,m_full_X->cols);
+			m_next_batch_y = empty(BATCH_SIZE,m_full_y->cols);
 		}
 	}
 }
@@ -176,16 +176,16 @@ void BatchAllocator::replace_current_batch_with_next()
 void BatchAllocator::replace_current_cv_batch_with_next()
 {
 
-	if(m_next_batch_cv_X->rows != m_current_batch_cv_X->rows)
+	if(m_next_batch_cv_X->rows != CURRENT_BATCH_CV->rows)
 	{
-		cudaFree(m_current_batch_cv_X->data);
+		cudaFree(CURRENT_BATCH_CV->data);
 		cudaFree(m_current_batch_cv_y->data);
-		m_current_batch_cv_X = empty(m_next_batch_cv_X->rows,m_next_batch_cv_X->cols);
+		CURRENT_BATCH_CV = empty(m_next_batch_cv_X->rows,m_next_batch_cv_X->cols);
 		m_current_batch_cv_y = empty(m_next_batch_cv_y->rows,m_next_batch_cv_y->cols);
 	}
 
 	cudaStreamSynchronize(m_streamNext_batch_cv_X);
-	to_col_major(m_next_batch_cv_X,m_current_batch_cv_X);
+	to_col_major(m_next_batch_cv_X,CURRENT_BATCH_CV);
 	cudaStreamSynchronize(m_streamNext_batch_cv_y);
 	to_col_major(m_next_batch_cv_y,m_current_batch_cv_y);
 	m_next_batch_number_cv += 1;
@@ -195,12 +195,12 @@ void BatchAllocator::replace_current_cv_batch_with_next()
 		//std::cout << "reset size" << std::endl;
 		//reset to the intial state
 		m_next_batch_number_cv = 0;
-		if(m_current_batch_cv_X->rows != m_batch_size_cv)
+		if(CURRENT_BATCH_CV->rows != BATCH_SIZE_CV)
 		{
 			cudaFree(m_next_batch_cv_X->data);
 			cudaFree(m_next_batch_cv_y->data);
-			m_next_batch_cv_X = empty(m_batch_size_cv,m_full_X->cols);
-			m_next_batch_cv_y = empty(m_batch_size_cv,m_full_y->cols);
+			m_next_batch_cv_X = empty(BATCH_SIZE_CV,m_full_X->cols);
+			m_next_batch_cv_y = empty(BATCH_SIZE_CV,m_full_y->cols);
 		}
 	}
 }

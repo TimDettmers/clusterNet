@@ -323,7 +323,6 @@ Matrix *ClusterNet::uniformSqrtWeight(int rows, int cols)
 	Matrix * out = rand(rows, cols);
 	::uniformSqrtWeight(out);
 	return out;
-
 }
 
 

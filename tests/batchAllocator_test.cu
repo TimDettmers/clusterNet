@@ -17,9 +17,9 @@ int run_batchAllocator_test(int argc, char *argv[])
   m1 = to_host(arange(10000,784));
   m2 = to_host(arange(10000,1));
   BatchAllocator b = BatchAllocator(m1,m2,0.20,128,256);
-  assert(test_matrix(b.m_current_batch_X,128,784));
+  assert(test_matrix(b.CURRENT_BATCH,128,784));
   assert(test_matrix(b.m_current_batch_y,128,1));
-  assert(test_matrix(b.m_current_batch_cv_X,256,784));
+  assert(test_matrix(b.CURRENT_BATCH_CV,256,784));
   assert(test_matrix(b.m_current_batch_cv_y,256,1));
   Matrix *m_host2;
   int value = 0;
@@ -30,20 +30,20 @@ int run_batchAllocator_test(int argc, char *argv[])
   	  value_y = 0;
 	  for(int batchno = 0; batchno < b.TOTAL_BATCHES; batchno++)
 	  {
-		  m_host = to_host(b.m_current_batch_X);
+		  m_host = to_host(b.CURRENT_BATCH);
 		  m_host2 = to_host(b.m_current_batch_y);
 		  b.allocate_next_batch_async();
 
 
 		  //std::cout << "bachtsize X: " << gpu.CURRENT_BATCHSIZE << std::endl;
 
-		  for(int i = 0; i <  b.m_current_batch_X->rows*784; i++)
+		  for(int i = 0; i <  b.CURRENT_BATCH->rows*784; i++)
 		  {
 			  assert(test_eq(m_host->data[i],(float)value,i,i,"Batch test"));
 			  value++;
 		  }
 
-		  for(int i = 0; i <  b.m_current_batch_X->rows; i++)
+		  for(int i = 0; i <  b.CURRENT_BATCH->rows; i++)
 		  {
 			  assert(test_eq(m_host2->data[i],(float)value_y,i,i,"Batch test"));
 			  value_y++;
@@ -57,17 +57,17 @@ int run_batchAllocator_test(int argc, char *argv[])
 
 	  for(int batchno = 0; batchno < b.TOTAL_BATCHES_CV; batchno++)
 	  {
-		  m_host = to_host(b.m_current_batch_cv_X);
+		  m_host = to_host(b.CURRENT_BATCH_CV);
 		  m_host2 = to_host(b.m_current_batch_cv_y);
 		  b.allocate_next_cv_batch_async();
 
-		  for(int i = 0; i <  b.m_current_batch_cv_X->rows*784; i++)
+		  for(int i = 0; i <  b.CURRENT_BATCH_CV->rows*784; i++)
 		  {
 			  assert(test_eq(m_host->data[i],(float)value,"Batch test"));
 			  value++;
 		  }
 
-		  for(int i = 0; i <  b.m_current_batch_cv_X->rows; i++)
+		  for(int i = 0; i <  b.CURRENT_BATCH_CV->rows; i++)
 		  {
 			  assert(test_eq(m_host2->data[i],(float)value_y,"Batch test"));
 			  value_y++;
@@ -84,9 +84,9 @@ int run_batchAllocator_test(int argc, char *argv[])
 	   m1 = to_host(arange(70000,784));
 	   m2 = to_host(arange(70000,10));
 	   b = BatchAllocator(m1,m2,0.20,128,512);
-	   assert(test_matrix(b.m_current_batch_X,128,784));
+	   assert(test_matrix(b.CURRENT_BATCH,128,784));
 	   assert(test_matrix(b.m_current_batch_y,128,10));
-	   assert(test_matrix(b.m_current_batch_cv_X,512,784));
+	   assert(test_matrix(b.CURRENT_BATCH_CV,512,784));
 	   assert(test_matrix(b.m_current_batch_cv_y,512,10));
 
 	   for(int epoch = 0; epoch < 2; epoch++)
@@ -95,17 +95,17 @@ int run_batchAllocator_test(int argc, char *argv[])
 		   value_y = 0;
 		   for(int batchno = 0; batchno < b.TOTAL_BATCHES; batchno++)
 		   {
-			  m_host = to_host(b.m_current_batch_X);
+			  m_host = to_host(b.CURRENT_BATCH);
 			  m_host2 = to_host(b.m_current_batch_y);
 			  b.allocate_next_batch_async();
 
-			  for(int i = 0; i < b.m_current_batch_X->rows*784; i++)
+			  for(int i = 0; i < b.CURRENT_BATCH->rows*784; i++)
 			  {
 				  assert(test_eq(m_host->data[i],(float)value,"Batch test"));
 				  value++;
 			  }
 
-			  for(int i = 0; i < b.m_current_batch_X->rows*10; i++)
+			  for(int i = 0; i < b.CURRENT_BATCH->rows*10; i++)
 			  {
 				  assert(test_eq(m_host2->data[i],(float)value_y,"Batch test"));
 				  value_y++;
@@ -120,17 +120,17 @@ int run_batchAllocator_test(int argc, char *argv[])
 
 		for(int batchno = 0; batchno < b.TOTAL_BATCHES_CV; batchno++)
 		{
-		  m_host = to_host(b.m_current_batch_cv_X);
+		  m_host = to_host(b.CURRENT_BATCH_CV);
 		  m_host2 = to_host(b.m_current_batch_cv_y);
 		  b.allocate_next_cv_batch_async();
 
-		  for(int i = 0; i < b.m_current_batch_cv_X->rows*784; i++)
+		  for(int i = 0; i < b.CURRENT_BATCH_CV->rows*784; i++)
 		  {
 			  assert(test_eq(m_host->data[i],(float)value,"Batch test"));
 			  value++;
 		  }
 
-		  for(int i = 0; i < b.m_current_batch_cv_X->rows*10; i++)
+		  for(int i = 0; i < b.CURRENT_BATCH_CV->rows*10; i++)
 		  {
 			  assert(test_eq(m_host2->data[i],(float)value_y,"Batch test"));
 			  value_y++;

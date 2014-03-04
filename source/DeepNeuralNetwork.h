@@ -24,6 +24,9 @@ private:
 	std::vector<Matrix*> M;
 	std::vector<Matrix*> GRAD;
 	std::vector<Matrix*> MS;
+	std::vector<Matrix*> D;
+	std::vector<Matrix*> Z;
+	std::vector<Matrix*> E;
 
 	void init_weights();
 

@@ -13,12 +13,14 @@ class BatchAllocator
 public:
 	 BatchAllocator();
 	 BatchAllocator(Matrix *X, Matrix *y, float cross_validation_size, int batch_size, int cv_batch_size);
-	 Matrix *m_current_batch_X;
+	 Matrix *CURRENT_BATCH;
 	 Matrix *m_current_batch_y;
-	 Matrix *m_current_batch_cv_X;
+	 Matrix *CURRENT_BATCH_CV;
 	 Matrix *m_current_batch_cv_y;
 	 int TOTAL_BATCHES;
 	 int TOTAL_BATCHES_CV;
+	 int BATCH_SIZE;
+	 int BATCH_SIZE_CV;
 
 	 void finish_batch_allocator();
 	 void allocate_next_batch_async();
@@ -33,10 +35,8 @@ private:
 	 Matrix *m_full_X;
 	 Matrix *m_full_y;
 
-	 int m_batch_size;
 	 int m_next_batch_number;
 	 int m_cv_beginning;
-	 int m_batch_size_cv;
 	 int m_next_batch_number_cv;
 
 	 cudaStream_t m_streamNext_batch_X;
