@@ -406,12 +406,16 @@ int main(int argc, char *argv[])
 //run_neural_network();
 
 
+
 	Matrix *X = read_hdf5("/home/tim/mnist_full_X.hdf5");
 	Matrix *y = read_hdf5("/home/tim/mnist_full_y.hdf5");
 	std::vector<int> layers;
 	layers.push_back(1000);
 	DeepNeuralNetwork net = DeepNeuralNetwork(X,y,0.20,layers,Regression);
 	net.train();
+
+	ClusterNet gpu = ClusterNet();
+	//gpu.terminate();
 
 
 

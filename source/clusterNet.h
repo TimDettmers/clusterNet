@@ -7,13 +7,23 @@
 #include <mpi.h>
 #include <list>
 
+
 class ClusterNet
 {
+
 
 public:
 	 ClusterNet();
 	 ClusterNet(int seed);
 	 ClusterNet(int argc, char *argv[], int seed);
+	 ~ClusterNet();
+
+
+	 struct threadargs
+	 {
+	 	ClusterNet *instance;
+	 	long threadid;
+	 };
 
 	 int m_rank;
 
@@ -44,6 +54,7 @@ public:
 	 Matrix *uniformSqrtWeight(int rows, int cols);
 	 Matrix *sparseInitWeight(int rows, int cols);
 	 Matrix *sparseInitWeight(int rows, int cols, int connections);
+	 void PCIe_Worker(long threadid);
 private:
 	 cublasHandle_t m_handle;
 	 curandGenerator_t m_generator;
@@ -52,6 +63,8 @@ private:
 	 std::list<MPI_Request*> m_requests;
 	 std::map<std::string,Matrix*> m_matrixCache;
 	 std::map<std::string,int> m_matrixCacheUsage;
+	 int m_gpucount;
+	 pthread_t *m_threads;
 
 	 int m_nodes;
 	 bool m_hasMPI;
@@ -61,6 +74,12 @@ private:
 	 void init(int seed);
 	 void init_MPI(int argc, char *argv[]);
 	 void waitForAllRequests();
+	 static void *PCIe_Worker_Binder(void *args)
+	 {
+	 	struct threadargs* values = (struct threadargs*) args;
+	 	((ClusterNet*)values->instance)->PCIe_Worker(values->threadid);
+	 	return 0;
+	 }
 };
 #endif
 

@@ -10,8 +10,14 @@
 #include <assert.h>
 #include <algorithm>
 #include <vector>
+#include <pthread.h>
 
 
+ClusterNet::~ClusterNet()
+{
+	for(int i = 0; i < m_gpucount-1;i++)
+		pthread_cancel(m_threads[i]);
+}
 ClusterNet::ClusterNet(){ init((int)(time(0) % 10000)); }
 ClusterNet::ClusterNet(int seed){ init(seed);}
 ClusterNet::ClusterNet(int argc, char* argv[], int seed){ init(seed); init_MPI(argc, argv); }
@@ -34,6 +40,34 @@ void ClusterNet::init(int seed)
 	curandSetGeneratorOffset(m_generator, 100);
 	cublasCreate(&m_handle);
 	m_hasMPI = false;
+	int gpus;
+	cudaGetDeviceCount(&gpus);
+	if(gpus > 1)
+	{
+		m_threads = (pthread_t*)malloc(sizeof(pthread_t)*(gpus-1));
+		long t;
+		for(t=1; t<gpus; t++)
+		 {
+			 threadargs *args = new threadargs();
+			 args->instance = this;
+			 args->threadid = t;
+			 pthread_create(&m_threads[t], NULL, PCIe_Worker_Binder, args);
+
+		 }
+	 }
+
+	m_gpucount = gpus;
+}
+
+void ClusterNet::PCIe_Worker(long threadid)
+{
+	long tid;
+	tid = (long)threadid;
+	cudaSetDevice((int)tid);
+	while(true)
+	{
+		sleep(50);
+	}
 }
 
 void ClusterNet::init_MPI(int argc, char * argv[])

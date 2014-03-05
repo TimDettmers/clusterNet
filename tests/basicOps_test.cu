@@ -434,8 +434,6 @@ int run_basicOps_test(int argc, char *argv[])
 	  assert(test_eq(m_host->data[i],(float)(i + 101), "Arange data test."));
   }
 
-
-
   return 0;
 }
 
