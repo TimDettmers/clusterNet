@@ -181,7 +181,7 @@ int run_clusterNet_test(int argc, char *argv[])
 	Matrix *m4 = gpu.dotMPI_batchSlice(m1,m2);
 	m3 = to_host(m3);
 	m4 = to_host(m4);
-	if(gpu.m_rank == 0)
+	if(gpu.m_myrank == 0)
 	{
 
 	  for (int i = 0; i < m3->size; ++i)
@@ -200,7 +200,7 @@ int run_clusterNet_test(int argc, char *argv[])
 	m4 = gpu.dotMPI_unitSlice(m1,m2);
 	m3 = to_host(m3);
 	m4 = to_host(m4);
-	if(gpu.m_rank == 0)
+	if(gpu.m_myrank == 0)
 	{
 
 	  for (int i = 0; i < m3->size; ++i)

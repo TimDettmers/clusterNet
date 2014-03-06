@@ -16,16 +16,6 @@ public:
 	 ClusterNet();
 	 ClusterNet(int seed);
 	 ClusterNet(int argc, char *argv[], int seed);
-	 ~ClusterNet();
-
-
-	 struct threadargs
-	 {
-	 	ClusterNet *instance;
-	 	long threadid;
-	 };
-
-	 int m_rank;
 
 	 Matrix *dot(Matrix *A, Matrix *B);
 	 Matrix *Tdot(Matrix *A, Matrix *B);
@@ -54,7 +44,8 @@ public:
 	 Matrix *uniformSqrtWeight(int rows, int cols);
 	 Matrix *sparseInitWeight(int rows, int cols);
 	 Matrix *sparseInitWeight(int rows, int cols, int connections);
-	 void PCIe_Worker(long threadid);
+
+	 int m_myrank;
 private:
 	 cublasHandle_t m_handle;
 	 curandGenerator_t m_generator;
@@ -69,17 +60,12 @@ private:
 	 int m_nodes;
 	 bool m_hasMPI;
 	 MPI_Status m_status;
+	 MPI_Comm m_MPIWorld;
 
 	 void dot(Matrix *A, Matrix *B, Matrix *out, cublasOperation_t T1, cublasOperation_t T2);
 	 void init(int seed);
 	 void init_MPI(int argc, char *argv[]);
 	 void waitForAllRequests();
-	 static void *PCIe_Worker_Binder(void *args)
-	 {
-	 	struct threadargs* values = (struct threadargs*) args;
-	 	((ClusterNet*)values->instance)->PCIe_Worker(values->threadid);
-	 	return 0;
-	 }
 };
 #endif
 

@@ -25,8 +25,8 @@ $(EXECTEST): $(SCR) $(TESTS)
 
 test:
 	scp $(TOP)$(EXECTEST) $(NODES):$(TOP)build/;	
-	$(MPI_DIR)/bin/mpirun -x LD_LIBRARY_PATH -np 2 -hostfile $(HOSTFILE) $(TOP)$(EXECTEST) 
+	$(MPI_DIR)/bin/mpirun -x LD_LIBRARY_PATH -np 2 -hostfile $(HOSTFILE)test $(TOP)$(EXECTEST) 
 
 run:
 	scp $(TOP)$(EXECSRC) $(NODES):$(TOP)build/;
-	$(MPI_DIR)/bin/mpirun -x LD_LIBRARY_PATH -np 2 -hostfile $(HOSTFILE) $(TOP)$(EXECSRC) 
+	$(MPI_DIR)/bin/mpirun -x LD_LIBRARY_PATH -np 4 -hostfile $(HOSTFILE) $(TOP)$(EXECSRC) 

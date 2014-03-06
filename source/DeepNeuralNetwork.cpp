@@ -14,7 +14,7 @@ using std::endl;
 
 DeepNeuralNetwork::DeepNeuralNetwork(Matrix *X, Matrix *y, float cv_size, std::vector<int> lLayerSizes, Networktype_t net_type)
 {
-	m_BA = BatchAllocator(X,y,cv_size,128,512);
+	m_BA = BatchAllocator(X,y,cv_size,1024,512);
 	m_gpus = ClusterNet(12345);
 
 	LEARNING_RATE = 0.003;

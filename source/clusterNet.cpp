@@ -13,11 +13,6 @@
 #include <pthread.h>
 
 
-ClusterNet::~ClusterNet()
-{
-	for(int i = 0; i < m_gpucount-1;i++)
-		pthread_cancel(m_threads[i]);
-}
 ClusterNet::ClusterNet(){ init((int)(time(0) % 10000)); }
 ClusterNet::ClusterNet(int seed){ init(seed);}
 ClusterNet::ClusterNet(int argc, char* argv[], int seed){ init(seed); init_MPI(argc, argv); }
@@ -40,42 +35,51 @@ void ClusterNet::init(int seed)
 	curandSetGeneratorOffset(m_generator, 100);
 	cublasCreate(&m_handle);
 	m_hasMPI = false;
-	int gpus;
-	cudaGetDeviceCount(&gpus);
-	if(gpus > 1)
-	{
-		m_threads = (pthread_t*)malloc(sizeof(pthread_t)*(gpus-1));
-		long t;
-		for(t=1; t<gpus; t++)
-		 {
-			 threadargs *args = new threadargs();
-			 args->instance = this;
-			 args->threadid = t;
-			 pthread_create(&m_threads[t], NULL, PCIe_Worker_Binder, args);
 
-		 }
-	 }
 
-	m_gpucount = gpus;
 }
 
-void ClusterNet::PCIe_Worker(long threadid)
-{
-	long tid;
-	tid = (long)threadid;
-	cudaSetDevice((int)tid);
-	while(true)
-	{
-		sleep(50);
-	}
-}
+
 
 void ClusterNet::init_MPI(int argc, char * argv[])
 {
+	int myrank, size;
 	MPI_Init(&argc, &argv);
-	MPI_Comm_rank(MPI_COMM_WORLD, &m_rank);
-	m_nodes = MPI::COMM_WORLD.Get_size();
+	MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
+	MPI_Comm_size(MPI_COMM_WORLD, &size);
+
+	int gpus;
+	cudaGetDeviceCount(&gpus);
+	int mygpu_id;
+	int your_gpu_id;
+	if(myrank == 0)
+	{
+		mygpu_id = 0;
+		if(gpus > 1)
+			your_gpu_id = 1;
+		else
+			your_gpu_id = 0;
+
+		MPI_Send(&your_gpu_id,1, MPI_INT,1,0,MPI_COMM_WORLD);
+	}
+	else
+	{
+		MPI_Recv(&mygpu_id,1,MPI_INT,myrank-1,0,MPI_COMM_WORLD,&m_status);
+		if(gpus > mygpu_id+1)
+			your_gpu_id = mygpu_id + 1;
+		else
+			your_gpu_id = 0;
+		if(myrank < size-1)
+			MPI_Send(&your_gpu_id,1, MPI_INT,myrank+1,0,MPI_COMM_WORLD);
+	}
+
+	cudaSetDevice(mygpu_id);
+	m_nodes = size;
 	m_hasMPI = true;
+	m_myrank = myrank;
+
+	std::cout << "there are " << m_nodes << " processes and I work on gpu device " << mygpu_id << std::endl;
+
 }
 
 void ClusterNet::shutdown_MPI()
@@ -85,7 +89,6 @@ void ClusterNet::shutdown_MPI()
 
 Matrix *ClusterNet::dot(Matrix *A, Matrix *B)
 {
-	//if(m_hasMPI){ return dotMPI(A,B);}
 	Matrix *out = zeros(A->rows,B->cols);
 	dot(A, B, out);
 
@@ -144,14 +147,14 @@ Matrix *ClusterNet::dotMPI_batchSlice(Matrix *A, Matrix *B)
 	Matrix *out_rev = empty(split_size,B->cols);
 
 	tick("slice batch");
-	Matrix *A1 = slice_rows(A, split_size*m_rank,split_size*(m_rank+1)-1);
+	Matrix *A1 = slice_rows(A, split_size*m_myrank,split_size*(m_myrank+1)-1);
 	tick("slice batch");
 	tick("dot batch");
 	dot(A1,B,out);
 	tick("dot batch");
 	for(int i = 0; i < m_nodes; i++)
 	{
-		if(m_rank == i) { continue; }
+		if(m_myrank == i) { continue; }
 		MPI_Request *request = (MPI_Request*)malloc(sizeof(MPI_Request));
 		tick("send batch");
 		MPI_Isend(out->data, out->size, MPI_FLOAT, i, 100, MPI_COMM_WORLD, request);
@@ -160,7 +163,7 @@ Matrix *ClusterNet::dotMPI_batchSlice(Matrix *A, Matrix *B)
 
 	for(int i = 0; i < m_nodes; i++)
 	{
-		if(m_rank == i) { continue; }
+		if(m_myrank == i) { continue; }
 		tick("receive batch");
 		MPI_Request *request = (MPI_Request*)malloc(sizeof(MPI_Request));
 		//m_receiveRequests[i].push_back(request);
@@ -206,14 +209,14 @@ Matrix *ClusterNet::dotMPI_unitSlice(Matrix *A, Matrix *B)
 	}
 
 	tick("slice unit");
-	Matrix *B1 = slice_cols(B, split_size*m_rank,split_size*(m_rank+1)-1);
+	Matrix *B1 = slice_cols(B, split_size*m_myrank,split_size*(m_myrank+1)-1);
 	tick("slice unit");
 	tick("dot unit");
 	dot(A,B1,out);
 	tick("dot unit");
 	for(int i = 0; i < m_nodes; i++)
 	{
-		if(m_rank == i) { continue; }
+		if(m_myrank == i) { continue; }
 		MPI_Request *request = (MPI_Request*)malloc(sizeof(MPI_Request));
 		tick("send unit");
 		MPI_Isend(out->data, out->size, MPI_FLOAT, i, 100, MPI_COMM_WORLD, request);
@@ -222,7 +225,7 @@ Matrix *ClusterNet::dotMPI_unitSlice(Matrix *A, Matrix *B)
 
 	for(int i = 0; i < m_nodes; i++)
 	{
-		if(m_rank == i) { continue; }
+		if(m_myrank == i) { continue; }
 		tick("receive unit");
 		MPI_Request *request = (MPI_Request*)malloc(sizeof(MPI_Request));
 		//m_receiveRequests[i].push_back(request);

@@ -11,6 +11,9 @@
 #include <batchAllocator.h>
 #include <DeepNeuralNetwork.h>
 
+using std::cout;
+using std::endl;
+
 void run_neural_network()
 {
   Matrix *X = read_hdf5("/home/tim/mnist_full_X.hdf5");
@@ -186,6 +189,177 @@ void run_neural_network()
 
   printf("Finished!\n");
 }
+
+void MPI_benchmark_P2P(int argc, char *argv[])
+{
+	char name[100];
+    int myrank, length, size;
+    MPI_Init(&argc, &argv);
+    MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
+    MPI_Get_processor_name(name, &length);
+	MPI_Comm_size(MPI_COMM_WORLD, &size);
+	MPI_Status status;
+
+	int local_rank = myrank % 4;
+
+	int gpus;
+	cudaGetDeviceCount(&gpus);
+	int mygpu_id;
+	int your_gpu_id;
+	if(myrank == 0)
+	{
+		mygpu_id = 0;
+		if(gpus > 1)
+			your_gpu_id = 1;
+		else
+			your_gpu_id = 0;
+
+		MPI_Send(&your_gpu_id,1, MPI_INT,1,0,MPI_COMM_WORLD);
+	}
+	else
+	{
+		MPI_Recv(&mygpu_id,1,MPI_INT,myrank-1,0,MPI_COMM_WORLD,&status);
+		if(gpus > mygpu_id+1)
+			your_gpu_id = mygpu_id + 1;
+		else
+			your_gpu_id = 0;
+		if(myrank < size-1)
+			MPI_Send(&your_gpu_id,1, MPI_INT,myrank+1,0,MPI_COMM_WORLD);
+	}
+
+	cudaSetDevice(mygpu_id);
+
+
+		int batch_size = 128;
+		int inner_dim = 10000;
+		int outer_dim = 15000;
+
+		ClusterNet gpu = ClusterNet();
+		Matrix *A = gpu.rand(batch_size,inner_dim);
+		Matrix *B = gpu.rand(inner_dim,outer_dim);
+		Matrix *out = empty(batch_size,outer_dim);
+		Matrix *rec = empty(batch_size,outer_dim);
+
+		Matrix *A1 = gpu.rand(batch_size/2,inner_dim);
+		Matrix *B1 = gpu.rand(inner_dim,outer_dim);
+		Matrix *rec1 = empty(batch_size/2,outer_dim);
+		Matrix *out1 = empty(batch_size/2,outer_dim);
+
+		Matrix *A2 = gpu.rand(batch_size,inner_dim);
+		Matrix *B2 = gpu.rand(inner_dim,outer_dim/2);
+		Matrix *rec2 = empty(batch_size,outer_dim/2);
+		Matrix *out2 = empty(batch_size,outer_dim/2);
+
+
+		gpu.tick("Direct compute");
+	    for(int i = 0; i< 100; i++)
+	    {
+	      gpu.dot(A,B, out);
+		//add(A, B, out);
+	    }
+	    gpu.tock("Direct compute");
+
+		gpu.tick("partial batch direct compute");
+	    for(int i = 0; i< 100; i++)
+	    {
+	      gpu.dot(A1,B1, out1);
+		//add(A, B, out);
+	    }
+	    gpu.tock("partial batch direct compute");
+
+		gpu.tick("partial units direct compute");
+	    for(int i = 0; i< 100; i++)
+	    {
+	      gpu.dot(A2,B2, out2);
+		//add(A, B, out);
+	    }
+	    gpu.tock("partial units direct compute");
+
+
+
+
+		gpu.tick("PCIe transfer");
+		for(int i = 0; i< 100; i++)
+		{
+			if(local_rank == 0 && gpus > 1)
+			{
+				MPI_Send(out->data, out->size, MPI_FLOAT, 1, 100, MPI_COMM_WORLD);
+			}
+			else if(local_rank == 1 && gpus > 1)
+			{
+				//add(A2,B, out);
+				MPI_Recv(rec->data, rec->size, MPI_FLOAT, 0, 100, MPI_COMM_WORLD, &status);
+			}
+		}
+		gpu.tock("PCIe transfer");
+
+
+		gpu.tick("PCIe dot");
+		for(int i = 0; i< 100; i++)
+		{
+			if(local_rank == 0 && gpus > 1)
+			{
+				gpu.dot(A2,B2,out2);
+				MPI_Send(out1->data, out1->size, MPI_FLOAT, 1, 100, MPI_COMM_WORLD);
+			}
+			else if(local_rank == 1 && gpus > 1)
+			{
+				gpu.dot(A2,B2,out2);
+				MPI_Recv(rec1->data, rec1->size, MPI_FLOAT, 0, 100, MPI_COMM_WORLD, &status);
+				vStack(out2,rec2,rec);
+			}
+		}
+		gpu.tock("PCIe dot");
+
+
+
+		gpu.tick("RDMA transfer");
+		for(int i = 0; i< 100; i++)
+		{
+			if(myrank == 0)
+			{
+				MPI_Send(out->data, out->size, MPI_FLOAT, 3, 100, MPI_COMM_WORLD);
+			}
+			else if(myrank == 3)
+			{
+				//add(A2,B, out);
+				MPI_Recv(rec->data, rec->size, MPI_FLOAT, 0, 100, MPI_COMM_WORLD, &status);
+			}
+		}
+		gpu.tock("RDMA transfer");
+
+
+		gpu.tick("RDMA dot");
+		for(int i = 0; i< 100; i++)
+		{
+			if(myrank == 0)
+			{
+				gpu.dot(A2,B2,out2);
+				MPI_Send(out->data, out->size, MPI_FLOAT, 3, 100, MPI_COMM_WORLD);
+			}
+			else if(myrank == 3)
+			{
+				//add(A2,B, out);
+				gpu.dot(A2,B2,out2);
+				MPI_Recv(rec->data, rec->size, MPI_FLOAT, 0, 100, MPI_COMM_WORLD, &status);
+				vStack(out2,rec2,rec);
+			}
+		}
+		gpu.tock("RDMA dot");
+
+
+
+
+
+
+
+
+	MPI_Finalize();
+
+
+
+}
+
 
 void MPI_benchmark(int argc, char *argv[])
 {
@@ -379,7 +553,7 @@ void dotMPI_test(int argc, char *argv[])
 	}
 	gpu.tock("dot mpi unit");
 
-	printf("My rank: %i\n",gpu.m_rank);
+	printf("My rank: %i\n",gpu.m_myrank);
 	gpu.benchmark_dot();
 
 
@@ -401,28 +575,28 @@ void dotMPI_test(int argc, char *argv[])
 int main(int argc, char *argv[])
 {
 
-  //MPI_benchmark(argc, argv);
+	//MPI_benchmark_P2P(argc, argv);
 
 //run_neural_network();
 
-
+/*
 
 	Matrix *X = read_hdf5("/home/tim/mnist_full_X.hdf5");
 	Matrix *y = read_hdf5("/home/tim/mnist_full_y.hdf5");
 	std::vector<int> layers;
 	layers.push_back(1000);
-	DeepNeuralNetwork net = DeepNeuralNetwork(X,y,0.20,layers,Regression);
+	DeepNeuralNetwork net = DeepNeuralNetwork(X,y,0.20,layers,Classification);
 	net.train();
-
-	ClusterNet gpu = ClusterNet();
-	//gpu.terminate();
+	*/
 
 
+	dotMPI_test(argc, argv);
 
 
 
 
 }
+
 
 
 
