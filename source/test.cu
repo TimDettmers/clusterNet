@@ -589,8 +589,28 @@ int main(int argc, char *argv[])
 	net.train();
 	*/
 
+	ClusterNet gpu = ClusterNet(argc, argv, 13456);
+	//dotMPI_test(argc, argv);
 
-	dotMPI_test(argc, argv);
+	int input = 64;
+	int inner = 4000;
+	int output = 2000;
+
+	Matrix *A = gpu.rand(input,inner);
+	Matrix *B = gpu.rand(inner,output);
+	Matrix *out = empty(input,output);
+
+	gpu.tick();
+	for(int i = 0; i < 100; i++)
+		gpu.dot(A,B,out);
+	gpu.tock();
+	gpu.tick("cluster");
+	for(int i = 0; i < 100; i++)
+		gpu.dotMPI_unitSlice(A,B);
+	gpu.tock("cluster");
+
+
+	gpu.shutdown_MPI();
 
 
 

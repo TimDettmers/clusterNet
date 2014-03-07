@@ -15,7 +15,7 @@
 
 ClusterNet::ClusterNet(){ init((int)(time(0) % 10000)); }
 ClusterNet::ClusterNet(int seed){ init(seed);}
-ClusterNet::ClusterNet(int argc, char* argv[], int seed){ init(seed); init_MPI(argc, argv); }
+ClusterNet::ClusterNet(int argc, char* argv[], int seed){ init_MPI(argc, argv); init(seed); }
 void ClusterNet::init(int seed)
 {
 	/*
@@ -35,8 +35,6 @@ void ClusterNet::init(int seed)
 	curandSetGeneratorOffset(m_generator, 100);
 	cublasCreate(&m_handle);
 	m_hasMPI = false;
-
-
 }
 
 
@@ -69,6 +67,7 @@ void ClusterNet::init_MPI(int argc, char * argv[])
 			your_gpu_id = mygpu_id + 1;
 		else
 			your_gpu_id = 0;
+
 		if(myrank < size-1)
 			MPI_Send(&your_gpu_id,1, MPI_INT,myrank+1,0,MPI_COMM_WORLD);
 	}
@@ -77,9 +76,6 @@ void ClusterNet::init_MPI(int argc, char * argv[])
 	m_nodes = size;
 	m_hasMPI = true;
 	m_myrank = myrank;
-
-	std::cout << "there are " << m_nodes << " processes and I work on gpu device " << mygpu_id << std::endl;
-
 }
 
 void ClusterNet::shutdown_MPI()
