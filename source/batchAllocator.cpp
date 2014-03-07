@@ -10,35 +10,59 @@
 #include <assert.h>
 #include <algorithm>
 #include <vector>
+#include <string>
 
 using std::cout;
 using std::endl;
-BatchAllocator::BatchAllocator(){}
-BatchAllocator::BatchAllocator(Matrix *X, Matrix *y, float cross_validation_size, int batch_size, int batch_size_cv)
+
+void BatchAllocator::init(Matrix *X, Matrix *y, float cross_validation_size, int batch_size, int batch_size_cv)
+{ init(X,y,cross_validation_size,batch_size,batch_size_cv,0,0,1,Single_GPU); }
+void BatchAllocator::init(std::string path_X, std::string path_y, float cross_validation_size, int batch_size, int cv_batch_size, int myrank, int mygpuID, int nodes, Batchtype_t batchtype)
 {
-	float * pinned_memory_X;
-	cudaHostAlloc(&pinned_memory_X, X->bytes, cudaHostAllocPortable);
-	memcpy(pinned_memory_X,X->data,X->bytes);
-	free(X->data);
+	Matrix *X;
+	Matrix *y;
+	if(mygpuID == 0)
+	{
+		if(path_X.find("cvs") != std::string::npos)
+		{
+			X = read_csv(path_X.c_str());
+			y = read_csv(path_y.c_str());
+		}
+		else if(path_X.find("hdf5") != std::string::npos)
+		{
+			X = read_hdf5(path_X.c_str());
+			y = read_hdf5(path_y.c_str());
+		}
+		else
+		{
+			cout << "Only the cvs and hdf5 formats are supported!" << endl;
+			throw "Only the cvs and hdf5 formats are supported!";
+		}
 
-	m_full_X = (Matrix*)malloc(sizeof(Matrix));
-	m_full_X->rows = X->rows;
-	m_full_X->cols = X->cols;
-	m_full_X->bytes = X->bytes;
-	m_full_X->size = X->size;
-	m_full_X->data = pinned_memory_X;
 
-	float * pinned_memory_y;
-	cudaHostAlloc(&pinned_memory_y, y->bytes, cudaHostAllocPortable);
-	memcpy(pinned_memory_y,y->data,y->bytes);
-	free(y->data);
+	}
+	else
+	{
+		X = zeros(1,1);
+		y = zeros(1,1);
+	}
 
-	m_full_y = (Matrix*)malloc(sizeof(Matrix));
-	m_full_y->rows = y->rows;
-	m_full_y->cols = y->cols;
-	m_full_y->bytes = y->bytes;
-	m_full_y->size = y->size;
-	m_full_y->data = pinned_memory_y;
+	init(X,y,cross_validation_size,batch_size,cv_batch_size,myrank,mygpuID,nodes,batchtype);
+
+}
+
+void BatchAllocator::MPI_get_dataset_dimensions(Matrix *X, Matrix *y)
+{
+
+}
+
+void BatchAllocator::init(Matrix *X, Matrix *y, float cross_validation_size, int batch_size, int batch_size_cv, int myrank, int mygpuID, int nodes, Batchtype_t batchtype)
+{
+	m_full_X = X;
+	m_full_y = y;
+
+	if(batchtype == Batch_split)
+		MPI_get_dataset_dimensions(X,y);
 
 	BATCH_SIZE = batch_size;
 	BATCH_SIZE_CV = batch_size_cv;

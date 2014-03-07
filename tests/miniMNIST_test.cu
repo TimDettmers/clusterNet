@@ -36,7 +36,8 @@ void run_miniMNIST_test(int argc, char *argv[])
 	float cv_error = 0.0f;
 	float train_error = 0.0f;
 
-	BatchAllocator b = BatchAllocator(X, y, 0.2, 32, 64);
+	BatchAllocator b = BatchAllocator();
+	b.init(X, y, 0.2, 32, 64);
 	int epochs  = 10;
 	float learning_rate = 0.003;
 	float momentum = 0.5;

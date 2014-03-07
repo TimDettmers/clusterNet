@@ -36,13 +36,14 @@ Matrix *read_csv (const char* filename)
     }
 
   float *data;
-  data = (float*)malloc(columns*rows*sizeof(float));
+  size_t bytes = columns*rows*sizeof(float);
+  cudaHostAlloc(&data, bytes, cudaHostAllocPortable);
   memcpy(data,&X[0], columns*rows*sizeof(float));
 
   Matrix *out = (Matrix*)malloc(sizeof(Matrix));
   out->rows = rows;
   out->cols = columns;
-  out->bytes = columns*rows*sizeof(float);
+  out->bytes = bytes;
   out->size = columns*rows;
   out->data = data;
 
@@ -60,7 +61,9 @@ Matrix *read_hdf5(const char * filepath)
 	   hsize_t dims[2];
 	   H5Sget_simple_extent_dims(dspace, dims, NULL);
 	   size_t bytes = sizeof(float)*dims[0]*dims[1];
-	   float *data = (float*)malloc(bytes);
+
+	   float *data;
+	   cudaHostAlloc(&data, bytes, cudaHostAllocPortable);
 
 	   H5Dread(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, data);
 	   H5Dclose(dataset_id);

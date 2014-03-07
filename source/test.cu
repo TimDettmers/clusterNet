@@ -34,7 +34,8 @@ void run_neural_network()
   float error = 0;
   float cv_size = 0.1428571f;
 
-  BatchAllocator b = BatchAllocator(X, y,  cv_size, 128, 512);
+  BatchAllocator b = BatchAllocator();
+  b.init(X, y,  cv_size, 128, 512);
 
   clock_t t1,t2;
   t1=clock();
@@ -579,7 +580,8 @@ int main(int argc, char *argv[])
 
 //run_neural_network();
 
-/*
+
+	/*
 
 	Matrix *X = read_hdf5("/home/tim/mnist_full_X.hdf5");
 	Matrix *y = read_hdf5("/home/tim/mnist_full_y.hdf5");
@@ -587,9 +589,13 @@ int main(int argc, char *argv[])
 	layers.push_back(1000);
 	DeepNeuralNetwork net = DeepNeuralNetwork(X,y,0.20,layers,Classification);
 	net.train();
-	*/
+*/
+
 
 	ClusterNet gpu = ClusterNet(argc, argv, 13456);
+
+	gpu.shutdown_MPI();
+	/*
 	//dotMPI_test(argc, argv);
 
 	int input = 64;
@@ -611,6 +617,8 @@ int main(int argc, char *argv[])
 
 
 	gpu.shutdown_MPI();
+
+	*/
 
 
 

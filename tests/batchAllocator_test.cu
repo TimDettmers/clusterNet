@@ -16,7 +16,8 @@ int run_batchAllocator_test(int argc, char *argv[])
   //batch allocator test
   m1 = to_host(arange(10000,784));
   m2 = to_host(arange(10000,1));
-  BatchAllocator b = BatchAllocator(m1,m2,0.20,128,256);
+  BatchAllocator b = BatchAllocator();
+  b.init(m1,m2,0.20,128,256);
   assert(test_matrix(b.CURRENT_BATCH,128,784));
   assert(test_matrix(b.CURRENT_BATCH_Y,128,1));
   assert(test_matrix(b.CURRENT_BATCH_CV,256,784));
@@ -83,7 +84,8 @@ int run_batchAllocator_test(int argc, char *argv[])
 
 	   m1 = to_host(arange(70000,784));
 	   m2 = to_host(arange(70000,10));
-	   b = BatchAllocator(m1,m2,0.20,128,512);
+	   b = BatchAllocator();
+	   b.init(m1,m2,0.20,128,512);
 	   assert(test_matrix(b.CURRENT_BATCH,128,784));
 	   assert(test_matrix(b.CURRENT_BATCH_Y,128,10));
 	   assert(test_matrix(b.CURRENT_BATCH_CV,512,784));

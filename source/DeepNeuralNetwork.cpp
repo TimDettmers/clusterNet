@@ -11,11 +11,18 @@ using std::cout;
 using std::endl;
 
 
-
 DeepNeuralNetwork::DeepNeuralNetwork(Matrix *X, Matrix *y, float cv_size, std::vector<int> lLayerSizes, Networktype_t net_type)
+{ init(X,y,cv_size,lLayerSizes,net_type,-1,NULL); }
+DeepNeuralNetwork::DeepNeuralNetwork(Matrix *X, Matrix *y, float cv_size, std::vector<int> lLayerSizes, Networktype_t net_type, int argc, char *argv[])
+{init(X,y,cv_size,lLayerSizes,net_type,argc,argv);}
+void DeepNeuralNetwork::init(Matrix *X, Matrix *y, float cv_size, std::vector<int> lLayerSizes, Networktype_t net_type, int argc, char *argv[])
 {
-	m_BA = BatchAllocator(X,y,cv_size,1024,512);
-	m_gpus = ClusterNet(12345);
+	m_BA = BatchAllocator();
+	m_BA.init(X,y,cv_size,1024,512);
+	if(argc == -1)
+		m_gpus = ClusterNet(12354);
+	else
+		m_gpus = ClusterNet(argc, argv, 12354);//TODO: not working yet!
 
 	LEARNING_RATE = 0.003;
 	MOMENTUM = 0.5;
@@ -29,12 +36,12 @@ DeepNeuralNetwork::DeepNeuralNetwork(Matrix *X, Matrix *y, float cv_size, std::v
 	lDropout.push_back(0.2f);
 	for(int i = 0;i < lLayers.size(); i++)
 	{
-		if(net_type == Classification){lUnits.push_back(Logistic); }
-		if(net_type == Regression){lUnits.push_back(Rectified_Linear); }
+		if(net_type == Classification){ lUnits.push_back(Logistic); }
+		if(net_type == Regression){ lUnits.push_back(Rectified_Linear); }
 		lDropout.push_back(0.5f);
 	}
-	if(net_type == Classification){lUnits.push_back(Softmax); }
-	if(net_type == Regression){lUnits.push_back(Linear); }
+	if(net_type == Classification){ lUnits.push_back(Softmax); }
+	if(net_type == Regression){ lUnits.push_back(Linear); }
 }
 
 void DeepNeuralNetwork::init_weights()

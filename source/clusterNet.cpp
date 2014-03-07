@@ -12,8 +12,10 @@
 #include <vector>
 #include <pthread.h>
 
+using std::cout;
+using std::endl;
 
-ClusterNet::ClusterNet(){ init((int)(time(0) % 10000)); }
+ClusterNet::ClusterNet(){ init((int)(time(0) % 10000));}
 ClusterNet::ClusterNet(int seed){ init(seed);}
 ClusterNet::ClusterNet(int argc, char* argv[], int seed){ init_MPI(argc, argv); init(seed); }
 void ClusterNet::init(int seed)
@@ -41,41 +43,107 @@ void ClusterNet::init(int seed)
 
 void ClusterNet::init_MPI(int argc, char * argv[])
 {
-	int myrank, size;
 	MPI_Init(&argc, &argv);
-	MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
-	MPI_Comm_size(MPI_COMM_WORLD, &size);
+	MPI_Comm_rank(MPI_COMM_WORLD, &m_myrank);
+	MPI_Comm_size(MPI_COMM_WORLD, &m_MPISize);
 
+
+	m_hasMPI = true;
+	compute_GPUID_and_Nodes();
+	compute_PCIe_ranks();
+
+}
+
+void ClusterNet::compute_GPUID_and_Nodes()
+{
 	int gpus;
 	cudaGetDeviceCount(&gpus);
-	int mygpu_id;
 	int your_gpu_id;
-	if(myrank == 0)
+	if(m_myrank == 0)
 	{
-		mygpu_id = 0;
+		m_mygpuID = 0;
+		m_nodes = 1;
 		if(gpus > 1)
 			your_gpu_id = 1;
 		else
 			your_gpu_id = 0;
 
 		MPI_Send(&your_gpu_id,1, MPI_INT,1,0,MPI_COMM_WORLD);
+		MPI_Send(&m_nodes,1, MPI_INT,1,1,MPI_COMM_WORLD);
 	}
 	else
 	{
-		MPI_Recv(&mygpu_id,1,MPI_INT,myrank-1,0,MPI_COMM_WORLD,&m_status);
-		if(gpus > mygpu_id+1)
-			your_gpu_id = mygpu_id + 1;
+		MPI_Recv(&m_mygpuID,1,MPI_INT,m_myrank-1,0,MPI_COMM_WORLD,&m_status);
+		MPI_Recv(&m_nodes,1,MPI_INT,m_myrank-1,1,MPI_COMM_WORLD,&m_status);
+		if(gpus > m_mygpuID+1)
+			your_gpu_id = m_mygpuID + 1;
 		else
+		{
 			your_gpu_id = 0;
+			m_nodes += 1;
+		}
 
-		if(myrank < size-1)
-			MPI_Send(&your_gpu_id,1, MPI_INT,myrank+1,0,MPI_COMM_WORLD);
+		if(m_myrank < m_MPISize-1)
+		{
+			MPI_Send(&your_gpu_id,1, MPI_INT,m_myrank+1,0,MPI_COMM_WORLD);
+			MPI_Send(&m_nodes,1, MPI_INT,m_myrank+1,1,MPI_COMM_WORLD);
+		}
 	}
 
-	cudaSetDevice(mygpu_id);
-	m_nodes = size;
-	m_hasMPI = true;
-	m_myrank = myrank;
+	int *nodes_buffer;
+	if(m_myrank == m_MPISize -1)
+	{
+		nodes_buffer  = (int*)malloc(sizeof(int)*m_MPISize);
+		for(int i =0; i < m_MPISize; i++)
+			nodes_buffer[i] = m_nodes-1;
+	}
+	//scatter total nodes
+	MPI_Scatter(nodes_buffer,1,MPI_INT,&m_nodes,1,MPI_INT,m_MPISize-1,MPI_COMM_WORLD);
+	MPI_Gather(&m_nodes,1,MPI_INT,nodes_buffer,1,MPI_INT,m_MPISize-1,MPI_COMM_WORLD);
+	if(m_myrank == m_MPISize -1){ free(nodes_buffer); }
+
+
+	cudaSetDevice(m_mygpuID);
+}
+
+void ClusterNet::compute_PCIe_ranks()
+{
+	int gpus;
+	cudaGetDeviceCount(&gpus);
+	if(gpus > 1)
+	{
+		int *PCIe_Ranks_buffer = (int*)malloc(sizeof(int)*gpus-1);
+		if(m_mygpuID == 0)
+		{
+			//device 0 on the PCIe does know how many gpus are on the board
+			//and also which gpu has which rank -> spread the information
+			for(int i = 0; i < gpus; i++)
+				PCIe_Ranks_buffer[i] = m_myrank + i;
+
+			for(int i = 0; i < gpus; i++)
+			{
+				if(i > 0 && PCIe_Ranks_buffer[i] < m_MPISize)
+					MPI_Send(PCIe_Ranks_buffer,gpus,MPI_INT,PCIe_Ranks_buffer[i],17,MPI_COMM_WORLD);
+				PCIe_RANKS.push_back(PCIe_Ranks_buffer[i]);
+			}
+		}
+		else
+		{
+			MPI_Recv(PCIe_Ranks_buffer,gpus,MPI_INT,m_myrank - m_mygpuID,17,MPI_COMM_WORLD,&m_status);
+			for(int i = 0; i < gpus; i++)
+				PCIe_RANKS.push_back(PCIe_Ranks_buffer[i]);
+		}
+		free(PCIe_Ranks_buffer);
+	}
+	else
+	{
+		//no sends and receives
+		PCIe_RANKS.push_back(m_myrank);
+	}
+
+
+	for(int i = 0; i < gpus; i++)
+			cout << "my rank " << m_myrank << " my gpu id " << m_mygpuID << " PCI ranks " << PCIe_RANKS[i] << endl;
 }
 
 void ClusterNet::shutdown_MPI()
@@ -138,7 +206,7 @@ void ClusterNet::dot(Matrix *A, Matrix *B, Matrix *out, cublasOperation_t T1, cu
 
 Matrix *ClusterNet::dotMPI_batchSlice(Matrix *A, Matrix *B)
 {
-	int split_size = A->rows/m_nodes;
+	int split_size = A->rows/m_MPISize;
 	Matrix *out = empty(split_size,B->cols);
 	Matrix *out_rev = empty(split_size,B->cols);
 
@@ -148,7 +216,7 @@ Matrix *ClusterNet::dotMPI_batchSlice(Matrix *A, Matrix *B)
 	tick("dot batch");
 	dot(A1,B,out);
 	tick("dot batch");
-	for(int i = 0; i < m_nodes; i++)
+	for(int i = 0; i < m_MPISize; i++)
 	{
 		if(m_myrank == i) { continue; }
 		MPI_Request *request = (MPI_Request*)malloc(sizeof(MPI_Request));
@@ -157,7 +225,7 @@ Matrix *ClusterNet::dotMPI_batchSlice(Matrix *A, Matrix *B)
 		tick("send batch");
 	}
 
-	for(int i = 0; i < m_nodes; i++)
+	for(int i = 0; i < m_MPISize; i++)
 	{
 		if(m_myrank == i) { continue; }
 		tick("receive batch");
@@ -177,7 +245,7 @@ Matrix *ClusterNet::dotMPI_batchSlice(Matrix *A, Matrix *B)
 
 Matrix *ClusterNet::dotMPI_unitSlice(Matrix *A, Matrix *B)
 {
-	int split_size = B->cols/m_nodes;
+	int split_size = B->cols/m_MPISize;
 	std::string matrix_size = A->rows + "x" + split_size;
 	Matrix *out;
 	Matrix *out_rev;
@@ -210,7 +278,7 @@ Matrix *ClusterNet::dotMPI_unitSlice(Matrix *A, Matrix *B)
 	tick("dot unit");
 	dot(A,B1,out);
 	tick("dot unit");
-	for(int i = 0; i < m_nodes; i++)
+	for(int i = 0; i < m_MPISize; i++)
 	{
 		if(m_myrank == i) { continue; }
 		MPI_Request *request = (MPI_Request*)malloc(sizeof(MPI_Request));
@@ -219,7 +287,7 @@ Matrix *ClusterNet::dotMPI_unitSlice(Matrix *A, Matrix *B)
 		tick("send unit");
 	}
 
-	for(int i = 0; i < m_nodes; i++)
+	for(int i = 0; i < m_MPISize; i++)
 	{
 		if(m_myrank == i) { continue; }
 		tick("receive unit");

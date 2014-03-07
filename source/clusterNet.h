@@ -6,6 +6,7 @@
 #include <curand.h>
 #include <mpi.h>
 #include <list>
+#include <vector>
 
 
 class ClusterNet
@@ -46,6 +47,9 @@ public:
 	 Matrix *sparseInitWeight(int rows, int cols, int connections);
 
 	 int m_myrank;
+	 int m_nodes;
+	 int m_mygpuID;
+	 std::vector<int> PCIe_RANKS;
 private:
 	 cublasHandle_t m_handle;
 	 curandGenerator_t m_generator;
@@ -57,7 +61,7 @@ private:
 	 int m_gpucount;
 	 pthread_t *m_threads;
 
-	 int m_nodes;
+	 int m_MPISize;
 	 bool m_hasMPI;
 	 MPI_Status m_status;
 	 MPI_Comm m_MPIWorld;
@@ -66,6 +70,9 @@ private:
 	 void init(int seed);
 	 void init_MPI(int argc, char *argv[]);
 	 void waitForAllRequests();
+
+	 void compute_PCIe_ranks();
+	 void compute_GPUID_and_Nodes();
 };
 #endif
 
