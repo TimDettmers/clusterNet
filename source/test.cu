@@ -554,7 +554,7 @@ void dotMPI_test(int argc, char *argv[])
 	}
 	gpu.tock("dot mpi unit");
 
-	printf("My rank: %i\n",gpu.m_myrank);
+	printf("My rank: %i\n",gpu.MYRANK);
 	gpu.benchmark_dot();
 
 
@@ -594,7 +594,25 @@ int main(int argc, char *argv[])
 
 	ClusterNet gpu = ClusterNet(argc, argv, 13456);
 	BatchAllocator b = BatchAllocator();
-			b.init("/home/tim/mnist_full_X.hdf5","/home/tim/mnist_full_y.hdf5",0.2,64,512,gpu,Batch_split);
+			b.init("/home/tim/mnist_full_X.hdf5","/home/tim/mnist_full_y.hdf5",0.2,64,12,gpu,Batch_split);
+
+
+	Matrix *B = gpu.rand(784,500);
+	size_t free, total;
+	for (int epoch = 0; epoch < 10; epoch++)
+	{
+		for(int i = 0; i < b.TOTAL_ITERATIONS;i++)
+		{
+			b.allocate_next_batch_async();
+			b.broadcast_batch_to_PCI();
+			b.replace_current_batch_with_next();
+		}
+
+		cudaMemGetInfo(&free, &total);
+		std::cout << free << std::endl;
+	}
+
+	cout << "finished!" << endl;
 
 	gpu.shutdown_MPI();
 	/*

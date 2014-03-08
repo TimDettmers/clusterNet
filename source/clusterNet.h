@@ -46,9 +46,10 @@ public:
 	 Matrix *sparseInitWeight(int rows, int cols);
 	 Matrix *sparseInitWeight(int rows, int cols, int connections);
 
-	 int m_myrank;
-	 int m_nodes;
+	 int MYRANK;
+	 int NODES;
 	 int MYGPUID;
+	 int MPI_SIZE;
 	 std::vector<int> PCIe_RANKS;
 private:
 	 cublasHandle_t m_handle;
@@ -61,7 +62,6 @@ private:
 	 int m_gpucount;
 	 pthread_t *m_threads;
 
-	 int m_MPISize;
 	 bool m_hasMPI;
 	 MPI_Status m_status;
 	 MPI_Comm m_MPIWorld;
