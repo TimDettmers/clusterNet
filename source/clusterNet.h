@@ -48,7 +48,7 @@ public:
 
 	 int m_myrank;
 	 int m_nodes;
-	 int m_mygpuID;
+	 int MYGPUID;
 	 std::vector<int> PCIe_RANKS;
 private:
 	 cublasHandle_t m_handle;

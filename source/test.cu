@@ -593,6 +593,8 @@ int main(int argc, char *argv[])
 
 
 	ClusterNet gpu = ClusterNet(argc, argv, 13456);
+	BatchAllocator b = BatchAllocator();
+			b.init("/home/tim/mnist_full_X.hdf5","/home/tim/mnist_full_y.hdf5",0.2,64,512,gpu,Batch_split);
 
 	gpu.shutdown_MPI();
 	/*

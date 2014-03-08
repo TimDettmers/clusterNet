@@ -17,7 +17,7 @@ using std::endl;
 
 ClusterNet::ClusterNet(){ init((int)(time(0) % 10000));}
 ClusterNet::ClusterNet(int seed){ init(seed);}
-ClusterNet::ClusterNet(int argc, char* argv[], int seed){ init_MPI(argc, argv); init(seed); }
+ClusterNet::ClusterNet(int argc, char* argv[], int seed){init_MPI(argc, argv); init(seed); }
 void ClusterNet::init(int seed)
 {
 	/*
@@ -36,7 +36,15 @@ void ClusterNet::init(int seed)
 	curandSetPseudoRandomGeneratorSeed(m_generator, seed);
 	curandSetGeneratorOffset(m_generator, 100);
 	cublasCreate(&m_handle);
-	m_hasMPI = false;
+	if(!m_hasMPI)
+	{
+		MYGPUID = 0;
+		cudaSetDevice(0);
+		m_nodes = 1;
+		PCIe_RANKS.push_back(0);
+		m_myrank = 0;
+		m_hasMPI = false;
+	}
 }
 
 
@@ -61,7 +69,7 @@ void ClusterNet::compute_GPUID_and_Nodes()
 	int your_gpu_id;
 	if(m_myrank == 0)
 	{
-		m_mygpuID = 0;
+		MYGPUID = 0;
 		m_nodes = 1;
 		if(gpus > 1)
 			your_gpu_id = 1;
@@ -73,10 +81,10 @@ void ClusterNet::compute_GPUID_and_Nodes()
 	}
 	else
 	{
-		MPI_Recv(&m_mygpuID,1,MPI_INT,m_myrank-1,0,MPI_COMM_WORLD,&m_status);
+		MPI_Recv(&MYGPUID,1,MPI_INT,m_myrank-1,0,MPI_COMM_WORLD,&m_status);
 		MPI_Recv(&m_nodes,1,MPI_INT,m_myrank-1,1,MPI_COMM_WORLD,&m_status);
-		if(gpus > m_mygpuID+1)
-			your_gpu_id = m_mygpuID + 1;
+		if(gpus > MYGPUID+1)
+			your_gpu_id = MYGPUID + 1;
 		else
 		{
 			your_gpu_id = 0;
@@ -103,7 +111,7 @@ void ClusterNet::compute_GPUID_and_Nodes()
 	if(m_myrank == m_MPISize -1){ free(nodes_buffer); }
 
 
-	cudaSetDevice(m_mygpuID);
+	cudaSetDevice(MYGPUID);
 }
 
 void ClusterNet::compute_PCIe_ranks()
@@ -113,7 +121,7 @@ void ClusterNet::compute_PCIe_ranks()
 	if(gpus > 1)
 	{
 		int *PCIe_Ranks_buffer = (int*)malloc(sizeof(int)*gpus-1);
-		if(m_mygpuID == 0)
+		if(MYGPUID == 0)
 		{
 			//device 0 on the PCIe does know how many gpus are on the board
 			//and also which gpu has which rank -> spread the information
@@ -129,7 +137,7 @@ void ClusterNet::compute_PCIe_ranks()
 		}
 		else
 		{
-			MPI_Recv(PCIe_Ranks_buffer,gpus,MPI_INT,m_myrank - m_mygpuID,17,MPI_COMM_WORLD,&m_status);
+			MPI_Recv(PCIe_Ranks_buffer,gpus,MPI_INT,m_myrank - MYGPUID,17,MPI_COMM_WORLD,&m_status);
 			for(int i = 0; i < gpus; i++)
 				PCIe_RANKS.push_back(PCIe_Ranks_buffer[i]);
 		}
@@ -143,7 +151,7 @@ void ClusterNet::compute_PCIe_ranks()
 
 
 	for(int i = 0; i < gpus; i++)
-			cout << "my rank " << m_myrank << " my gpu id " << m_mygpuID << " PCI ranks " << PCIe_RANKS[i] << endl;
+			cout << "my rank " << m_myrank << " my gpu id " << MYGPUID << " PCI ranks " << PCIe_RANKS[i] << endl;
 }
 
 void ClusterNet::shutdown_MPI()
