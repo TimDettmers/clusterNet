@@ -36,10 +36,10 @@ void ClusterNet::init(int seed)
 	curandSetPseudoRandomGeneratorSeed(m_generator, seed);
 	curandSetGeneratorOffset(m_generator, 100);
 	cublasCreate(&m_handle);
+
 	if(!m_hasMPI)
 	{
 		MYGPUID = 0;
-		cudaSetDevice(0);
 		NODES = 1;
 		PCIe_RANKS.push_back(0);
 		MYRANK = 0;
@@ -51,6 +51,10 @@ void ClusterNet::init(int seed)
 
 void ClusterNet::init_MPI(int argc, char * argv[])
 {
+
+	int local_rank = atoi( getenv("OMPI_COMM_WORLD_LOCAL_RANK"));
+	cudaSetDevice(local_rank);
+	MYGPUID = local_rank;
 	MPI_Init(&argc, &argv);
 	MPI_Comm_rank(MPI_COMM_WORLD, &MYRANK);
 	MPI_Comm_size(MPI_COMM_WORLD, &MPI_SIZE);
@@ -64,54 +68,31 @@ void ClusterNet::init_MPI(int argc, char * argv[])
 
 void ClusterNet::compute_GPUID_and_Nodes()
 {
-	int gpus;
-	cudaGetDeviceCount(&gpus);
-	int your_gpu_id;
-	if(MYRANK == 0)
+	//determine master gpu ranks
+	int recv;
+	for(int i = 0; i < MPI_SIZE; i++)
 	{
-		MYGPUID = 0;
-		NODES = 1;
-		if(gpus > 1)
-			your_gpu_id = 1;
-		else
-			your_gpu_id = 0;
-
-		MPI_Send(&your_gpu_id,1, MPI_INT,1,0,MPI_COMM_WORLD);
-		MPI_Send(&NODES,1, MPI_INT,1,1,MPI_COMM_WORLD);
-	}
-	else
-	{
-		MPI_Recv(&MYGPUID,1,MPI_INT,MYRANK-1,0,MPI_COMM_WORLD,&m_status);
-		MPI_Recv(&NODES,1,MPI_INT,MYRANK-1,1,MPI_COMM_WORLD,&m_status);
-		if(gpus > MYGPUID+1)
-			your_gpu_id = MYGPUID + 1;
-		else
+		if(i == MYRANK)
 		{
-			your_gpu_id = 0;
-			NODES += 1;
+			if(MYGPUID == 0)
+				MASTER_GPU_RANKS.push_back(i);
+			for(int j = 0; j < MPI_SIZE; j++)
+			{
+				if(i != j)
+					MPI_Send(&MYGPUID,1,MPI_INT,j,999,MPI_COMM_WORLD);
+			}
 		}
-
-		if(MYRANK < MPI_SIZE-1)
+		else
 		{
-			MPI_Send(&your_gpu_id,1, MPI_INT,MYRANK+1,0,MPI_COMM_WORLD);
-			MPI_Send(&NODES,1, MPI_INT,MYRANK+1,1,MPI_COMM_WORLD);
+			MPI_Recv(&recv,1,MPI_INT,i,999,MPI_COMM_WORLD,&m_status);
+
+			if(recv == 0)
+				MASTER_GPU_RANKS.push_back(i);
 		}
 	}
 
-	int *nodes_buffer;
-	if(MYRANK == MPI_SIZE -1)
-	{
-		nodes_buffer  = (int*)malloc(sizeof(int)*MPI_SIZE);
-		for(int i =0; i < MPI_SIZE; i++)
-			nodes_buffer[i] = NODES-1;
-	}
-	//scatter total nodes
-	MPI_Scatter(nodes_buffer,1,MPI_INT,&NODES,1,MPI_INT,MPI_SIZE-1,MPI_COMM_WORLD);
-	MPI_Gather(&NODES,1,MPI_INT,nodes_buffer,1,MPI_INT,MPI_SIZE-1,MPI_COMM_WORLD);
-	if(MYRANK == MPI_SIZE -1){ free(nodes_buffer); }
+	NODES = MASTER_GPU_RANKS.size();
 
-
-	cudaSetDevice(MYGPUID);
 }
 
 void ClusterNet::compute_PCIe_ranks()
@@ -195,6 +176,17 @@ void ClusterNet::dot(Matrix *A, Matrix *B, Matrix *out, cublasOperation_t T1, cu
 	if(T1 == CUBLAS_OP_T){ A_rows = A->cols; A_cols = A->rows; }
 	if(T2 == CUBLAS_OP_T){ B_rows = B->cols; B_cols = B->rows; }
 
+	/*
+	cout << "T1: " << T1 << endl;
+	cout << "T2: " << T2 << endl;
+	cout << "A rows: " << A->rows << endl;
+	cout << "A cols: " << A->cols << endl;
+	cout << "B rows: " << B->rows << endl;
+	cout << "B cols: " << B->cols << endl;
+	cout << "out rows: " << out->rows << endl;
+	cout << "out cols: " << out->cols << endl;
+	*/
+
 	status = cublasSgemm(m_handle, T1, T2,
 				A_rows, B_cols, A_cols,
 				&alpha, A->data, A->rows,
@@ -203,8 +195,9 @@ void ClusterNet::dot(Matrix *A, Matrix *B, Matrix *out, cublasOperation_t T1, cu
 
 	if(status != CUBLAS_STATUS_SUCCESS)
 	{
-		std::cout << "CUBLAS ERROR: Status " << status << std::endl;
-		throw "CUBLAS ERROR";
+		//std::cout << "CUBLAS ERROR: Status " << status << std::endl;
+		//printmat(add(A,ones(A->rows,A->cols)));
+		//throw "CUBLAS ERROR";
 	}
 }
 
@@ -388,6 +381,7 @@ void ClusterNet::tock(std::string name)
 	{
 		assert(("No tick event was registered for the name" + name, m_dictTickTock.count(name) > 0));
 		::tock(m_dictTickTock[name], name);
+		m_dictTickTock.erase(name);
 	}
 }
 

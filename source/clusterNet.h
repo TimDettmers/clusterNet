@@ -51,6 +51,7 @@ public:
 	 int MYGPUID;
 	 int MPI_SIZE;
 	 std::vector<int> PCIe_RANKS;
+	 std::vector<int> MASTER_GPU_RANKS;
 private:
 	 cublasHandle_t m_handle;
 	 curandGenerator_t m_generator;

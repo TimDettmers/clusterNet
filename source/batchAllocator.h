@@ -21,6 +21,7 @@ class BatchAllocator
 {
 
 public:
+	 BatchAllocationMethod_t BATCH_METHOD;
 	 Matrix *CURRENT_BATCH;
 	 Matrix *CURRENT_BATCH_Y;
 	 Matrix *CURRENT_BATCH_CV;
@@ -41,6 +42,7 @@ public:
 	 void allocate_next_cv_batch_async();
 	 void replace_current_batch_with_next();
 	 void replace_current_cv_batch_with_next();
+	 void average_weight(Matrix *W);
 
 	 void init(std::string path_X, std::string path_y, float cross_validation_size, int batch_size, int cv_batch_size, ClusterNet cluster, BatchAllocationMethod_t batchmethod);
 	 void init(Matrix *X, Matrix *y, float cross_validation_size, int batch_size, int cv_batch_size, BatchAllocationMethod_t batchmethod);
@@ -56,10 +58,10 @@ private:
 	 Matrix *m_full_y;
 
 
-	 std::vector<Matrix*> m_next_matricies_X;
-	 std::vector<Matrix*> m_next_matricies_y;
-	 std::vector<Matrix*> m_next_matricies_cv_X;
-	 std::vector<Matrix*> m_next_matricies_cv_y;
+	 std::vector<Matrix*> m_next_matrices_X;
+	 std::vector<Matrix*> m_next_matrices_y;
+	 std::vector<Matrix*> m_next_matrices_cv_X;
+	 std::vector<Matrix*> m_next_matrices_cv_y;
 
 	 int m_next_batch_number;
 	 int m_Cols_X;
@@ -68,7 +70,6 @@ private:
 	 int m_mygpuID;
 	 int m_myrank;
 
-	 BatchAllocationMethod_t m_batchmethod;
 	 ClusterNet m_cluster;
 	 MPI_Status m_status;
 
@@ -80,6 +81,9 @@ private:
 	 MPI_Request m_request_send_y;
 	 MPI_Request m_request_send_cv_X;
 	 MPI_Request m_request_send_cv_y;
+
+	 MPI_Request m_request_send_W;
+	 MPI_Request m_request_W;
 
 	 MPI_Request m_request_X;
 	 MPI_Request m_request_y;

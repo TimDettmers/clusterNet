@@ -46,6 +46,7 @@ class DeepNeuralNetwork
 public:
 	DeepNeuralNetwork(Matrix *X, Matrix *y, float cv_size, std::vector<int> lLayersSizes, Networktype_t net_type);
 	DeepNeuralNetwork(Matrix *X, Matrix *y, float cv_size, std::vector<int> lLayerSizes, Networktype_t net_type, int argc, char *argv[]);
+	DeepNeuralNetwork(std::string path_X, std::string path_y, float cv_size, std::vector<int> lLayerSizes, Networktype_t net_type, int argc, char *argv[]);
 	void train();
 
 	float LEARNING_RATE;
@@ -67,6 +68,7 @@ private:
 	std::vector<int> lLayers;
 	std::vector<Unittype_t> lUnits;
 
+	void init_network_layout(std::vector<int> lLayerSizes, Networktype_t net_type);
 	void init_weights();
 	void nesterov_updates();
 	void feedforward(FeedForward_t ff);
