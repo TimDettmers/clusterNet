@@ -255,22 +255,27 @@ Matrix *ClusterNet::dotMPI_batchSlice(Matrix *A, Matrix *B) {
 	return out;
 }
 
-Matrix *ClusterNet::dotMPI_unitSlice(Matrix *A, Matrix *B) {
+Matrix *ClusterNet::dotMPI(Matrix *A, Matrix *B)
+{
 	Matrix *out = empty(A->rows, B->cols);
-	dotMPI_unitSlice(A, B, out);
+	dotMPI(A, B, out);
 	return out;
 }
-void ClusterNet::dotMPI_unitSlice(Matrix *A, Matrix *B, Matrix *out) {
-	int split_size = B->cols / MPI_SIZE;
-	std::string strMatrixName = A->rows + "x" + B->cols;
+void ClusterNet::dotMPI(Matrix *A, Matrix *B, Matrix *out)
+{
+	int col_split_size = (B->isDistributed == 1 ? B->cols_distributed : B->cols) / MPI_SIZE;
+	int remainder = ((B->isDistributed == 1 ? B->cols_distributed : B->cols) % col_split_size);
+	std::string strMatrixName = A->rows + "x" + (B->isDistributed == 1 ? B->cols_distributed : B->cols);
 
-	if (m_matrixCache.count(strMatrixName) == 0) {
+	if (m_matrixCache.count(strMatrixName) == 0)
+	{
 		Matrix** arrOut = (Matrix**) malloc(sizeof(Matrix*) * MPI_SIZE);
-		for (int i = 0; i < MPI_SIZE; i++) {
+		for (int i = 0; i < MPI_SIZE; i++)
+		{
 			if (i == MPI_SIZE - 1)
-				arrOut[i] = empty(A->rows, split_size + (B->cols % split_size));
+				arrOut[i] = empty(A->rows, col_split_size + remainder);
 			else
-				arrOut[i] = empty(A->rows, split_size);
+				arrOut[i] = empty(A->rows, col_split_size);
 		}
 		m_matrixCache[strMatrixName] = arrOut;
 		m_matrixCacheUsage[strMatrixName] = 1;
@@ -281,30 +286,33 @@ void ClusterNet::dotMPI_unitSlice(Matrix *A, Matrix *B, Matrix *out) {
 
 		float **d_arrA;
 		cudaMalloc((void**) &d_arrA, sizeof(float*) * MPI_SIZE);
-		cudaMemcpy(d_arrA, h_arrA, sizeof(float*) * MPI_SIZE,
-				cudaMemcpyDefault);
+		cudaMemcpy(d_arrA, h_arrA, sizeof(float*) * MPI_SIZE, cudaMemcpyDefault);
 
 		m_matrixHStackCache[strMatrixName] = d_arrA;
 		free(h_arrA);
-
 	}
 
 	std::map<std::string, int>::iterator iter;
 	std::vector<std::string> toDecrement;
 	std::vector<std::string> toDelete;
-	for (iter = m_matrixCacheUsage.begin(); iter != m_matrixCacheUsage.end();
-			++iter) {
-		if (iter->first != strMatrixName) {
+	//determine the matices to delete and to decrement
+	for (iter = m_matrixCacheUsage.begin(); iter != m_matrixCacheUsage.end(); ++iter)
+	{
+		if (iter->first != strMatrixName)
+		{
 			toDecrement.push_back(iter->first);
-			if (iter->second < -10)
+			if (iter->second < -20)
 				toDelete.push_back(iter->first);
 		}
 	}
 
+	//decrement matrices
 	for (int i = 0; i < toDecrement.size(); i++)
 		m_matrixCacheUsage[toDecrement[i]] -= 1;
 
-	for (int i = 0; i < toDelete.size(); i++) {
+	//free matrices that were reused not enough
+	for (int i = 0; i < toDelete.size(); i++)
+	{
 		for (int j = 0; j < MPI_SIZE; j++)
 			cudaFree(m_matrixCache[toDelete[i]][i]->data);
 
@@ -319,30 +327,31 @@ void ClusterNet::dotMPI_unitSlice(Matrix *A, Matrix *B, Matrix *out) {
 	toDelete.clear();
 
 	Matrix *B1;
-	if (MYRANK == MPI_SIZE - 1)
-		B1 = slice_cols(B, split_size * MYRANK,
-				split_size * (MYRANK + 1) - 1 + (B->cols % split_size));
+	if(B->isDistributed == 0)
+	{
+		if (MYRANK == MPI_SIZE - 1)
+			B1 = slice_cols(B, col_split_size * MYRANK,	col_split_size * (MYRANK + 1) - 1 + remainder);
+		else
+			B1 = slice_cols(B, col_split_size * MYRANK, col_split_size * (MYRANK + 1) - 1);
+
+		dot(A, B1, m_matrixCache[strMatrixName][MYRANK]);
+	}
 	else
-		B1 = slice_cols(B, split_size * MYRANK, split_size * (MYRANK + 1) - 1);
-	int matrix_idx = 0;
+	{
+		dot(A, B, m_matrixCache[strMatrixName][MYRANK]);
+	}
 
-	dot(A, B1, m_matrixCache[strMatrixName][MYRANK]);
-
-	matrix_idx = MYRANK;
-	for (int i = 0; i < MPI_SIZE - 1; i++) {
-		MPI_Isend(m_matrixCache[strMatrixName][matrix_idx]->data,
-				m_matrixCache[strMatrixName][matrix_idx]->size, MPI_FLOAT,
-				m_destination, 100, MPI_COMM_WORLD, &m_sendrequest);
+	int matrix_idx = MYRANK;
+	for (int i = 0; i < MPI_SIZE - 1; i++)
+	{
+		MPI_Isend(m_matrixCache[strMatrixName][matrix_idx]->data, m_matrixCache[strMatrixName][matrix_idx]->size, MPI_FLOAT, m_destination, 100, MPI_COMM_WORLD, &m_sendrequest);
 		matrix_idx = (matrix_idx - 1) < 0 ? MPI_SIZE - 1 : (matrix_idx - 1);
-		MPI_Irecv(m_matrixCache[strMatrixName][matrix_idx]->data,
-				m_matrixCache[strMatrixName][matrix_idx]->size, MPI_FLOAT,
-				m_source, 100, MPI_COMM_WORLD, &m_requests[i]);
+		MPI_Irecv(m_matrixCache[strMatrixName][matrix_idx]->data, m_matrixCache[strMatrixName][matrix_idx]->size, MPI_FLOAT, m_source, 100, MPI_COMM_WORLD, &m_requests[i]);
 	}
 
 	cudaFree(B1->data);
-	MPI_Waitall(MPI_SIZE - 1, m_requests, MPI_STATUSES_IGNORE );
-	hStackN(m_matrixHStackCache[strMatrixName],
-			m_matrixCache[strMatrixName][0]->size, out, MPI_SIZE);
+	MPI_Waitall(MPI_SIZE - 1, m_requests, MPI_STATUSES_IGNORE);
+	hStackN(m_matrixHStackCache[strMatrixName],	m_matrixCache[strMatrixName][0]->size, out, MPI_SIZE);
 }
 
 //Uniform
@@ -454,6 +463,7 @@ Matrix *ClusterNet::distributed_uniformSqrtWeight(int rows, int cols) {
 		W = rand(rows, split_size + (cols % split_size));
 
 	W->isDistributed = 1;
+	W->cols_distributed = cols;
 	::uniformSqrtWeight(W);
 
 	return W;
@@ -478,6 +488,7 @@ Matrix *ClusterNet::distributed_sparseInitWeight(int rows, int cols) {
 
 
 	W->isDistributed = 1;
+	W->cols_distributed = cols;
 
 	return W;
 }

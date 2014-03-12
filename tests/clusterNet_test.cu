@@ -197,7 +197,7 @@ int run_clusterNet_test(int argc, char *argv[])
 	m1 = gpu.rand(200,400);
 	m2 = gpu.rand(400,800);
 	m3 = gpu.dot(m1,m2);
-	m4 = gpu.dotMPI_unitSlice(m1,m2);
+	m4 = gpu.dotMPI(m1,m2);
 	m3 = to_host(m3);
 	m4 = to_host(m4);
 	if(gpu.MYRANK == 0)

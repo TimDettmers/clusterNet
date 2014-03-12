@@ -19,6 +19,7 @@ Matrix *to_gpu(Matrix *A, int is_col_major)
   out->size = A->size;
   out->data = gpu_data;
   out->isDistributed = 0;
+  out->cols_distributed = 0;
 
   if(is_col_major == 0)
 	  out = to_col_major(out);
@@ -42,6 +43,7 @@ Matrix *to_host(Matrix *A, int is_row_major)
   out->size = row_major->size;
   out->data = cpu_data;
   out->isDistributed = 0;
+  out->cols_distributed = 0;
 
   return out;
 }
@@ -163,6 +165,7 @@ Matrix *empty(int rows, int cols)
   out->size = size;
   out->data = gpu_data;
   out->isDistributed = 0;
+  out->cols_distributed = 0;
 
   return out;
 }

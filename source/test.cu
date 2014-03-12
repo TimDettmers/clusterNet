@@ -535,6 +535,7 @@ void MPI_benchmark(int argc, char *argv[])
 void dotMPI_test(int argc, char *argv[])
 {
 
+	/*
 	ClusterNet gpu = ClusterNet(argc, argv, 123465);
 	int inner = 2000;
 	int outer = 1200;
@@ -556,7 +557,7 @@ void dotMPI_test(int argc, char *argv[])
 	MPI_Status status;
 
 
-	/*
+
 
 	gpu.tick("dot mpi batch");
 	for(int i = 0; i < 100; i++)
@@ -577,7 +578,7 @@ void dotMPI_test(int argc, char *argv[])
 	printf("My rank: %i\n",gpu.MYRANK);
 	//gpu.benchmark_dot();
 
-*/
+
 
 	gpu.tick("dot normal");
 	for(int i = 0; i < 100; i++)
@@ -585,6 +586,7 @@ void dotMPI_test(int argc, char *argv[])
 		gpu.dot(A,B,out);
 	}
 	gpu.tock("dot normal");
+
 
 
 	//std::vector<MPI_Request> requests;
@@ -597,7 +599,8 @@ void dotMPI_test(int argc, char *argv[])
 		requests[i] = request;
 	}
 
-	/*
+
+
 
 	int received_count = 0;
 	for(int i = 0; i < 100; i++)
@@ -656,7 +659,7 @@ void dotMPI_test(int argc, char *argv[])
 	}
 	gpu.tock("all to all custom");
 
-*/
+
 
 	int destination = gpu.MYRANK + 1;
 	int source = gpu.MYRANK - 1;
@@ -728,7 +731,7 @@ void dotMPI_test(int argc, char *argv[])
 
 
 
-
+*/
 }
 
 
@@ -745,14 +748,15 @@ int main(int argc, char *argv[])
 	//dotMPI_test(argc,argv);
 
 	ClusterNet gpu = ClusterNet(argc,argv,12346);
+	Matrix *batch = gpu.rand(128,70000);//34 MB
+	Matrix *out = empty(128,40000);//19 MB
+	Matrix *W = gpu.distributed_uniformSqrtWeight(70000,40000);//10681 MB
 
-	size_t free, total;
-	cudaMemGetInfo(&free,&total);
-	cout << free << endl;
-	gpu.distributed_sparseInitWeight(40000,70000);
+	MPI_Barrier(MPI_COMM_WORLD);
+	gpu.tick();
+	gpu.dotMPI(batch,W,out);
+	gpu.tock();
 
-	cudaMemGetInfo(&free,&total);
-	cout << free << endl;
 
 
 	gpu.shutdown();

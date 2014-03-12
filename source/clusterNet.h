@@ -24,8 +24,8 @@ public:
 	 void dot(Matrix *A, Matrix *B, Matrix *out);
 	 void Tdot(Matrix *A, Matrix *B, Matrix *out);
 	 void dotT(Matrix *A, Matrix *B, Matrix *out);
-	 Matrix *dotMPI_unitSlice(Matrix *A, Matrix *B);
-	 void 	 dotMPI_unitSlice(Matrix *A, Matrix *B, Matrix *out);
+	 Matrix *dotMPI(Matrix *A, Matrix *B);
+	 void 	 dotMPI(Matrix *A, Matrix *B, Matrix *out);
 	 Matrix *dotMPI_batchSlice(Matrix *A, Matrix *B);
 
 	 Matrix *rand(int rows, int cols);
