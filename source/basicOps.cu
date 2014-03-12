@@ -267,7 +267,6 @@ void hStackN(float** arrA, int general_size, Matrix *out, int matrices_count)
 {
 	int blocks = (out->size/THREADS_PER_BLOCKS) + 1;
 	hStackN<<<blocks,THREADS_PER_BLOCKS>>>(arrA, general_size, out->data,  out->size, matrices_count);
-
 }
 
 void hStack(Matrix *A, Matrix *B, Matrix *out)

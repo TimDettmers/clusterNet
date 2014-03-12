@@ -748,16 +748,14 @@ int main(int argc, char *argv[])
 	//dotMPI_test(argc,argv);
 
 	ClusterNet gpu = ClusterNet(argc,argv,12346);
-	Matrix *batch = gpu.rand(128,70000);//34 MB
-	Matrix *out = empty(128,40000);//19 MB
-	Matrix *W = gpu.distributed_uniformSqrtWeight(70000,40000);//10681 MB
+	Matrix *batch = gpu.rand(128,100000);//34 MB
+	Matrix *out1 = empty(128,40000);//19 MB
+	Matrix *out2 = empty(128,20000);//9 MB
+	Matrix *W1 = gpu.distributed_uniformSqrtWeight(100000,40000);//15258 MB
+	Matrix *W2 = gpu.distributed_uniformSqrtWeight(40000,20000);//3051 MB
 
-	MPI_Barrier(MPI_COMM_WORLD);
-	gpu.tick();
-	gpu.dotMPI(batch,W,out);
-	gpu.tock();
-
-
+	gpu.dotMPI(batch,W1,out1);
+	gpu.dotMPI(out1,W2,out2);
 
 	gpu.shutdown();
 	/*
