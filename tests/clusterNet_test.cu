@@ -212,7 +212,7 @@ int run_clusterNet_test(int argc, char *argv[])
 	  assert(test_matrix(m4,200,800));
 	}
 
-	gpu.shutdown_MPI();
+	gpu.shutdown();
 
 
 	//dropout test

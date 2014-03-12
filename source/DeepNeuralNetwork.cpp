@@ -83,14 +83,30 @@ void DeepNeuralNetwork::backprop()
 	  //backprop
 	  Matrix *t = create_t_matrix(m_BA.CURRENT_BATCH_Y,10);
 	  E.push_back(sub(Z.back(), t));
+	  if(m_gpus.MYRANK == 0)
+	  	m_gpus.tick("compute");
 	  for(int i = W.size()-1; i > 0; i--)
 	  {
+		  if(m_gpus.MYRANK == 0)
+		  	m_gpus.tick("compute");
 		  m_gpus.Tdot(Z[i],E.back(),GRAD[i]);
+
+			if(m_gpus.MYRANK == 0)
+				m_gpus.tick("weight avg");
+			  if(m_gpus.MYRANK == 0)
+			  	m_gpus.tick("compute");
 		  if(m_BA.BATCH_METHOD == Batch_split)
 			  m_BA.average_weight(GRAD[i]);
+
+			if(m_gpus.MYRANK == 0)
+				m_gpus.tick("weight avg");
+			  if(m_gpus.MYRANK == 0)
+			  	m_gpus.tick("compute");
 		  derivative_function(i, Z[i]);
 		  E.push_back(m_gpus.dotT(E.back(), W[i]));
 		  mul(E.back(),Z[i],E.back());
+		  if(m_gpus.MYRANK == 0)
+		  	m_gpus.tick("compute");
 	  }
 	  m_gpus.Tdot(Z[0],E.back(),GRAD[0]);
 	  if(m_BA.BATCH_METHOD == Batch_split)
@@ -220,6 +236,8 @@ void DeepNeuralNetwork::train()
 	int device;
 	for(int EPOCH = 0; EPOCH < epochs; EPOCH++)
 	{
+		if(m_gpus.MYRANK == 0)
+			m_gpus.tick("overall");
 		if(m_BA.BATCH_METHOD == Single_GPU || (m_BA.BATCH_METHOD == Batch_split && m_gpus.MYRANK == 0))
 			std::cout << "EPOCH: " << EPOCH + 1 << std::endl;
 		//cudaMemGetInfo(&free, &total);
@@ -230,6 +248,9 @@ void DeepNeuralNetwork::train()
 		{
 		  m_BA.allocate_next_batch_async();
 
+
+			if(m_gpus.MYRANK == 0)
+				m_gpus.tick("compute");
 		  nesterov_updates();
 
 		  feedforward(Dropout);
@@ -238,18 +259,30 @@ void DeepNeuralNetwork::train()
 		  backprop();
 		  if(m_BA.BATCH_METHOD == Batch_split)
 			  m_BA.broadcast_batch_to_PCI();
+		  if(m_gpus.MYRANK == 0)
+		  	m_gpus.tick("compute");
 		  weight_updates();
 		  free_variables();
+		  if(m_gpus.MYRANK == 0)
+		  	m_gpus.tick("compute");
 		  m_BA.replace_current_batch_with_next();
 	  }
 
-		train_error();
+		//train_error();
 		cross_validation_error();
+
+		if(m_gpus.MYRANK == 0)
+			m_gpus.tock("overall");
+		if(m_gpus.MYRANK == 0)
+			m_gpus.tock("weight avg");
+		  if(m_gpus.MYRANK == 0)
+		  	m_gpus.tock("compute");
 	}
 
-	 m_gpus.tock();
+
 	 if(m_BA.BATCH_METHOD == Batch_split)
-		 m_gpus.shutdown_MPI();
+		 m_gpus.shutdown();
+
 
 }
 void DeepNeuralNetwork::train_error()

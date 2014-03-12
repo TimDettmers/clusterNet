@@ -12,6 +12,9 @@
 #define TILE_SIZE (32)
 #define DOT_REPS (4)
 
+#include <cublas_v2.h>
+#include <stdio.h>
+#include <vector>
 
 //working
 //128,16,8
@@ -107,4 +110,5 @@ void vStack(Matrix *A, Matrix *B, Matrix *out);
 Matrix *vStack(Matrix *A, Matrix *B);
 void hStack(Matrix *A, Matrix *B, Matrix *out);
 Matrix *hStack(Matrix *A, Matrix *B);
+void hStackN(float** arrA, int general_size, Matrix *out, int matrices_count);
 #endif

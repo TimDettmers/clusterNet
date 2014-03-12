@@ -1,7 +1,8 @@
 #ifndef clusterKernels
+#define clusterKernels
+
 #include "curand.h"
 #include "curand_kernel.h"
-#define clusterKernels
 __global__ void kFill_with(float *m, float fill_value, int size);
 __global__ void kAdd(float *A,float *B, float *out, int size);
 __global__ void kSub(float *A,float *B, float *out, int size);
@@ -21,6 +22,7 @@ __global__ void slice_rows(float *A, float *out, int size_out, int rows_A, int s
 __global__ void slice_cols(float *A, float *out, int start, int rows, int size_out);
 __global__ void vStack(float *A, float *B, float *out, int size_out, int rows_a, int rows, int cols);
 __global__ void hStack(float *A, float *B, float *out, int size_out, int size_a);
+__global__ void hStackN(float **arrA, int general_size, float *out, int size_out, int matrices_count);
 __global__ void kSoftMax(float* A, float* out, unsigned int rows, unsigned int cols);
 __device__ void reduceToMax(float* sdata, unsigned int tid);
 __device__ void reduceToSumLocal(float* sdata, unsigned int tid);

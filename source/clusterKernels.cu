@@ -113,6 +113,22 @@ __global__ void hStack(float *A, float *B, float *out, int size_out, int size_a)
 
 }
 
+__global__ void hStackN(float **arrA, int general_size, float *out, int size_out, int matrices_count)
+{
+  const unsigned int numThreads = blockDim.x * gridDim.x;
+  const int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
+  int current_matrix = 0;
+
+  for(unsigned int i = idx; i < size_out; i+=numThreads)
+  {
+	  current_matrix = i / general_size;
+	  current_matrix = current_matrix == matrices_count ? current_matrix - 1 : current_matrix;
+	  out[i] = arrA[current_matrix][i - (current_matrix*general_size)];
+  }
+
+}
+
+
 __global__ void kAdd(float *A, float *B, float *out, int size)
 {
   const unsigned int numThreads = blockDim.x * gridDim.x;

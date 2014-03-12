@@ -3,6 +3,8 @@
 #include <clusterKernels.cuh>
 #include <assert.h>
 #include <util.cuh>
+#include <cublas_v2.h>
+#include <vector>
 
 Matrix *to_gpu(Matrix *A){ return to_gpu(A, 0); }
 Matrix *to_gpu(Matrix *A, int is_col_major)
@@ -255,6 +257,13 @@ Matrix *hStack(Matrix *A, Matrix *B)
   hStack<<<block_size,512>>>(A->data, B->data, out->data, out->size, A->size);
 
   return out;
+}
+
+void hStackN(float** arrA, int general_size, Matrix *out, int matrices_count)
+{
+	int blocks = (out->size/THREADS_PER_BLOCKS) + 1;
+	hStackN<<<blocks,THREADS_PER_BLOCKS>>>(arrA, general_size, out->data,  out->size, matrices_count);
+
 }
 
 void hStack(Matrix *A, Matrix *B, Matrix *out)
@@ -650,5 +659,9 @@ void squared_error(Matrix *A, Matrix *targets, Matrix *out)
 	int blocks = (out->size/THREADS_PER_BLOCKS) + 1;
 	kSquaredError<<<blocks,THREADS_PER_BLOCKS>>>(A->data, targets->data, out->data, out->size);
 }
+
+
+
+
 
 

@@ -534,9 +534,29 @@ void MPI_benchmark(int argc, char *argv[])
 
 void dotMPI_test(int argc, char *argv[])
 {
+
 	ClusterNet gpu = ClusterNet(argc, argv, 123465);
-	Matrix *A = gpu.rand(128,1000);
-	Matrix *B = gpu.rand(1000,400);
+	int inner = 2000;
+	int outer = 1200;
+	int batch_size = 128;
+
+
+	int reduced_left = 128;
+	int reduced_right = 400;
+	Matrix *A = gpu.rand(batch_size,inner);
+	Matrix *B = gpu.rand(inner,outer);
+	Matrix *A1 = gpu.rand(reduced_left,inner);
+	Matrix *B1 = gpu.rand(inner,reduced_right);
+
+	Matrix *out = empty(batch_size,outer);
+	Matrix *out1 = empty(reduced_left,reduced_right);
+	Matrix *recv1 = empty(reduced_left,reduced_right);
+	Matrix *recv2 = empty(reduced_left,reduced_right);
+	Matrix *recv3 = empty(reduced_left,reduced_right);
+	MPI_Status status;
+
+
+	/*
 
 	gpu.tick("dot mpi batch");
 	for(int i = 0; i < 100; i++)
@@ -555,21 +575,162 @@ void dotMPI_test(int argc, char *argv[])
 	gpu.tock("dot mpi unit");
 
 	printf("My rank: %i\n",gpu.MYRANK);
-	gpu.benchmark_dot();
+	//gpu.benchmark_dot();
 
-
+*/
 
 	gpu.tick("dot normal");
 	for(int i = 0; i < 100; i++)
 	{
-		gpu.dot(A,B);
+		gpu.dot(A,B,out);
 	}
 	gpu.tock("dot normal");
 
 
+	//std::vector<MPI_Request> requests;
+	MPI_Request *requests = (MPI_Request*)malloc(sizeof(MPI_Request)*gpu.MPI_SIZE-1);
+	MPI_Request request_send;
+	std::vector<Matrix*> recv_buffer;
+	for(int i = 0; i < gpu.MPI_SIZE-1; i++)
+	{
+		MPI_Request request;
+		requests[i] = request;
+	}
 
-	gpu.shutdown_MPI();
+	/*
+
+	int received_count = 0;
+	for(int i = 0; i < 100; i++)
+	{
+		for(int i = 0; i < recv_buffer.size(); i++)
+			cudaFree(recv_buffer[i]->data);
+		recv_buffer.clear();
+		out1 = empty(reduced_left,reduced_right);
+		for(int i = 0; i < gpu.MPI_SIZE; i++)
+		{
+			recv_buffer.push_back(empty(reduced_left,reduced_right));
+		}
+
+		gpu.tick("all to all custom");
+		//cout << "a1 rows" << A1->rows << endl;
+		gpu.dot(A1,B1,out1);
+		recv_buffer[gpu.MYRANK]= out1;
+		for(int i = 0; i < gpu.MPI_SIZE; i++)
+		{
+			if(gpu.MYRANK == i) { continue; }
+			MPI_Isend(out1->data, out1->size, MPI_FLOAT, i, 100, MPI_COMM_WORLD, &request_send);
+		}
+
+		for(int i = 0; i < gpu.MPI_SIZE; i++)
+		{
+			if(gpu.MYRANK == i) { continue; }
+			MPI_Irecv(recv1->data, recv1->size, MPI_FLOAT, i, 100, MPI_COMM_WORLD, &requests[i]);
+
+		}
+
+		for(int i = 0; i < gpu.MPI_SIZE; i++)
+		{
+			if(gpu.MYRANK == i) { continue; }
+			MPI_Wait(&requests[i],MPI_STATUS_IGNORE);
+		}
+
+
+
+		received_count = 0;
+		while(received_count < gpu.MPI_SIZE-1)
+		{
+			for(int i = 0; i < gpu.MPI_SIZE; i++)
+			{
+				int received = 0;
+				if(gpu.MYRANK == i) { continue; }
+				MPI_Test(&requests[i],&received,&status);
+				if(received == 1)
+				{
+					out1 = hStack(out1,recv1);
+					received_count++;
+				}
+			}
+		}
+
+		gpu.tick("all to all custom");
+	}
+	gpu.tock("all to all custom");
+
+*/
+
+	int destination = gpu.MYRANK + 1;
+	int source = gpu.MYRANK - 1;
+	if(destination == gpu.MPI_SIZE){destination = 0; }
+	if(source < 0){ source = gpu.MPI_SIZE - 1;}
+	for(int i = 0; i < 100; i++)
+	{
+		out1 = empty(reduced_left,reduced_right);
+		recv1 = empty(reduced_left,reduced_right);
+		gpu.tick("chain custom");
+		gpu.dot(A1,B1,out1);
+		for(int i = 0; i < gpu.MPI_SIZE-1; i++)
+		{
+			if(i == 0)
+				MPI_Isend(out1->data, out1->size, MPI_FLOAT, destination, 100, MPI_COMM_WORLD, &request_send);
+			else
+				MPI_Isend(recv1->data, recv1->size, MPI_FLOAT, destination, 100, MPI_COMM_WORLD, &request_send);
+
+			MPI_Recv(recv1->data, recv1->size, MPI_FLOAT, source, 100, MPI_COMM_WORLD, &status);
+
+			//MPI_Wait(&requests[i],&status);
+			out1 = hStack(out1,recv1);
+		}
+		gpu.tick("chain custom");
+	}
+	gpu.tock("chain custom");
+
+
+
+	cout << gpu.MYRANK << endl;
+
+
+
+
+	int matrix_idx = gpu.MYRANK;
+	Matrix** arrOut = (Matrix**)malloc(sizeof(Matrix*)*gpu.MPI_SIZE);
+	for(int i = 0; i < gpu.MPI_SIZE; i++)
+		arrOut[i] = empty(reduced_left,reduced_right);
+
+	float **h_arrA = (float**)malloc(sizeof(float*)*gpu.MPI_SIZE);
+		for(int i = 0; i < gpu.MPI_SIZE; i++)
+			h_arrA[i] = arrOut[i]->data;
+
+	float **d_arrA;
+	cudaMalloc((void**) &d_arrA,sizeof(float*)*gpu.MPI_SIZE);
+	cudaMemcpy(d_arrA,h_arrA,sizeof(float*)*gpu.MPI_SIZE,cudaMemcpyDefault);
+
+	gpu.tick("chain matrix array");
+	for(int i = 0; i < 100; i++)
+	{
+		gpu.dot(A1,B1,arrOut[gpu.MYRANK]);
+		matrix_idx = gpu.MYRANK;
+		for(int i = 0; i < gpu.MPI_SIZE-1; i++)
+		{
+			MPI_Isend(arrOut[matrix_idx]->data, arrOut[matrix_idx]->size, MPI_FLOAT, destination, 100, MPI_COMM_WORLD, &request_send);
+			matrix_idx = (matrix_idx - 1) < 0 ? gpu.MPI_SIZE-1 : (matrix_idx - 1);
+			MPI_Irecv(arrOut[matrix_idx]->data, arrOut[matrix_idx]->size, MPI_FLOAT, source, 100, MPI_COMM_WORLD,&requests[i]);
+		}
+
+
+		MPI_Waitall(gpu.MPI_SIZE-1,requests,MPI_STATUSES_IGNORE);
+		//hStackN(d_arrA,arrOut[0]->size, out,gpu.MPI_SIZE);
+
+	}
+	gpu.tock("chain matrix array");
+
+
+	gpu.shutdown();
+
+
+
+
 }
+
 
 
 
@@ -581,11 +742,39 @@ int main(int argc, char *argv[])
 //run_neural_network();
 
 
+	//dotMPI_test(argc,argv);
 
 
 
+	ClusterNet gpu = ClusterNet(argc,argv,12346);
+
+	Matrix *A = gpu.rand(128,20000);
+	Matrix *B = gpu.rand(20000,15000);
+	Matrix *out = gpu.rand(128,15000);
+
+	gpu.tick();
+	for(int i = 0; i < 100; i++)
+		gpu.dot(A,B,out);
+	gpu.tock();
+
+
+	gpu.tick("unit slice");
+	for(int i = 0; i < 100; i++)
+	{
+		gpu.dotMPI_unitSlice(A,B,out);
+	}
+	gpu.tock("unit slice");
+
+	gpu.shutdown();
+
+
+
+
+
+
+/*
 	std::vector<int> layers;
-	layers.push_back(400);
+	layers.push_back(1000);
 	//Matrix *X = read_hdf5("/home/tim/mnist_full_X.hdf5");
 	//Matrix *y = read_hdf5("/home/tim/mnist_full_y.hdf5");
 	//DeepNeuralNetwork net = DeepNeuralNetwork(X,y,0.20,layers,Classification);
@@ -593,7 +782,7 @@ int main(int argc, char *argv[])
 
 	DeepNeuralNetwork net = DeepNeuralNetwork("/home/tim/mnist_full_X.hdf5","/home/tim/mnist_full_y.hdf5",0.20,layers,Classification,argc,argv);
 	net.train();
-
+*/
 
 
 
@@ -623,7 +812,7 @@ int main(int argc, char *argv[])
 
 	cout << "finished!" << endl;
 
-	gpu.shutdown_MPI();
+	gpu.shutdown();
 	*/
 	/*
 	//dotMPI_test(argc, argv);
@@ -646,7 +835,7 @@ int main(int argc, char *argv[])
 	gpu.tock("cluster");
 
 
-	gpu.shutdown_MPI();
+	gpu.shutdown();
 
 	*/
 

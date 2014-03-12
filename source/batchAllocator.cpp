@@ -406,28 +406,35 @@ void BatchAllocator::average_weight(Matrix *W)
 	//then pass the overall results back to the PCIe GPUs
 
 	//calc PCIe average
+
+	if(m_cluster.MYRANK == 0)
+		m_cluster.tick("PCIe");
 	Matrix *recv_buffer = empty(W->rows,W->cols);
 	int destination = m_myrank + 1;
 	int source = m_myrank - 1;
 	if(destination > m_cluster.PCIe_RANKS.back()){ destination =  m_cluster.PCIe_RANKS[0]; }
 	if(source < m_cluster.PCIe_RANKS[0]){ source = m_cluster.PCIe_RANKS.back(); }
 	if(m_cluster.PCIe_RANKS.size() > 1)
-		for(int i = 0; i < m_cluster.PCIe_RANKS.size();i++)
+		for(int i = 0; i < m_cluster.PCIe_RANKS.size()-1;i++)
 		{
 			if(i == 0)
 				MPI_Isend(W->data,W->size,MPI_FLOAT,destination,997,MPI_COMM_WORLD,&m_request_send_W);
 			else
 				MPI_Isend(recv_buffer->data,recv_buffer->size,MPI_FLOAT,destination,997,MPI_COMM_WORLD,&m_request_send_W);
-			MPI_Irecv(recv_buffer->data,recv_buffer->size,MPI_FLOAT,source,997,MPI_COMM_WORLD,&m_request_W);
+			MPI_Recv(recv_buffer->data,recv_buffer->size,MPI_FLOAT,source,997,MPI_COMM_WORLD,&m_status);
 
-			MPI_Wait(&m_request_W,&m_status);
+			//MPI_Wait(&m_request_W,&m_status);
 			add(W,recv_buffer,W);
 
 		}
 
+
+	if(m_cluster.MYRANK == 0)
+			m_cluster.tick("PCIe");
 	//cout << "post PCIe average" << endl;
 
-
+	if(m_cluster.MYRANK == 0)
+			m_cluster.tick("MPI");
 	//calc network average
 	if(m_mygpuID == 0)
 	{
@@ -470,6 +477,8 @@ void BatchAllocator::average_weight(Matrix *W)
 		MPI_Wait(&m_request_W,&m_status);
 	}
 
+	if(m_cluster.MYRANK == 0)
+			m_cluster.tick("MPI");
 
 
 	/*

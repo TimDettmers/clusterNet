@@ -25,6 +25,7 @@ public:
 	 void Tdot(Matrix *A, Matrix *B, Matrix *out);
 	 void dotT(Matrix *A, Matrix *B, Matrix *out);
 	 Matrix *dotMPI_unitSlice(Matrix *A, Matrix *B);
+	 void 	 dotMPI_unitSlice(Matrix *A, Matrix *B, Matrix *out);
 	 Matrix *dotMPI_batchSlice(Matrix *A, Matrix *B);
 
 	 Matrix *rand(int rows, int cols);
@@ -41,7 +42,7 @@ public:
 	 void tock();
 
 	 void benchmark_dot();
-	 void shutdown_MPI();
+	 void shutdown();
 	 Matrix *uniformSqrtWeight(int rows, int cols);
 	 Matrix *sparseInitWeight(int rows, int cols);
 	 Matrix *sparseInitWeight(int rows, int cols, int connections);
@@ -53,12 +54,14 @@ public:
 	 std::vector<int> PCIe_RANKS;
 	 std::vector<int> MASTER_GPU_RANKS;
 private:
-	 cublasHandle_t m_handle;
+	 std::vector<cublasHandle_t> m_handles;
 	 curandGenerator_t m_generator;
 	 std::map<std::string,cudaEvent_t*> m_dictTickTock;
 	 std::map<std::string,float> m_dictTickTockCumulative;
-	 std::list<MPI_Request*> m_requests;
-	 std::map<std::string,Matrix*> m_matrixCache;
+	 MPI_Request* m_requests;
+	 MPI_Request m_sendrequest;
+	 std::map<std::string,Matrix**> m_matrixCache;
+	 std::map<std::string,float**> m_matrixHStackCache;
 	 std::map<std::string,int> m_matrixCacheUsage;
 	 int m_gpucount;
 	 pthread_t *m_threads;
@@ -67,10 +70,12 @@ private:
 	 MPI_Status m_status;
 	 MPI_Comm m_MPIWorld;
 
+	 int m_destination;
+	 int m_source;
+
 	 void dot(Matrix *A, Matrix *B, Matrix *out, cublasOperation_t T1, cublasOperation_t T2);
 	 void init(int seed);
 	 void init_MPI(int argc, char *argv[]);
-	 void waitForAllRequests();
 
 	 void compute_PCIe_ranks();
 	 void compute_GPUID_and_Nodes();
