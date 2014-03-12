@@ -18,6 +18,7 @@ Matrix *to_gpu(Matrix *A, int is_col_major)
   out->bytes = A->bytes;
   out->size = A->size;
   out->data = gpu_data;
+  out->isDistributed = 0;
 
   if(is_col_major == 0)
 	  out = to_col_major(out);
@@ -40,8 +41,7 @@ Matrix *to_host(Matrix *A, int is_row_major)
   out->bytes = row_major->bytes;
   out->size = row_major->size;
   out->data = cpu_data;
-
-
+  out->isDistributed = 0;
 
   return out;
 }
@@ -162,6 +162,7 @@ Matrix *empty(int rows, int cols)
   out->bytes = bytes;
   out->size = size;
   out->data = gpu_data;
+  out->isDistributed = 0;
 
   return out;
 }
@@ -185,7 +186,7 @@ Matrix *fill_matrix(int rows, int cols, float fill_value)
 
 Matrix *add(Matrix *A, Matrix *B)
 {
-  Matrix *out = zeros(A->rows,A->cols);
+  Matrix *out = empty(A->rows,A->cols);
   add(A, B, out);
   checkMatrixOperation(A, B, out, 0);
 
@@ -200,7 +201,7 @@ void add(Matrix *A, Matrix *B, Matrix *out)
 
 Matrix *sub(Matrix *A, Matrix *B)
 {
-  Matrix *out = zeros(A->rows,A->cols);
+  Matrix *out = empty(A->rows,A->cols);
   sub(A, B, out);
   checkMatrixOperation(A, B, out, 0);
 
@@ -286,7 +287,7 @@ void sub(Matrix *A, Matrix *B, Matrix *out)
 
 Matrix *mul(Matrix *A, Matrix *B)
 {
-  Matrix *out = zeros(A->rows,A->cols);
+  Matrix *out = empty(A->rows,A->cols);
   mul(A, B, out);
   checkMatrixOperation(A, B, out, 0);
 
@@ -301,7 +302,7 @@ void mul(Matrix *A, Matrix *B, Matrix *out)
 
 Matrix *div(Matrix *A, Matrix *B)
 {
-  Matrix *out = zeros(A->rows,A->cols);
+  Matrix *out = empty(A->rows,A->cols);
   
   div(A, B, out);
   checkMatrixOperation(A, B, out, 0);
@@ -321,7 +322,7 @@ void div(Matrix *A, Matrix *B, Matrix *out)
 
 Matrix *scalarMul(Matrix *A, float a)
 {
-  Matrix *out = zeros(A->rows,A->cols);
+  Matrix *out = empty(A->rows,A->cols);
   scalarMul(A, a, out);
 
   return out;
@@ -335,7 +336,7 @@ void scalarMul(Matrix *A, float a, Matrix *out)
 
 Matrix *scalarAdd(Matrix *A, float a)
 {
-  Matrix *out = zeros(A->rows,A->cols);
+  Matrix *out = empty(A->rows,A->cols);
   scalarAdd(A, a, out);
 
   return out;
@@ -349,7 +350,7 @@ void scalarAdd(Matrix *A, float a, Matrix *out)
 
 Matrix *gpuExp(Matrix *A)
 {
-  Matrix *out = zeros(A->rows,A->cols);
+  Matrix *out = empty(A->rows,A->cols);
   gpuExp(A, out);
 
   return out;
@@ -363,7 +364,7 @@ void gpuExp(Matrix *A, Matrix *out)
 
 Matrix *logistic(Matrix *A)
 {
-  Matrix *out = zeros(A->rows,A->cols);
+  Matrix *out = empty(A->rows,A->cols);
   logistic(A, out);
 
   return out;
@@ -377,7 +378,7 @@ void logistic(Matrix *A, Matrix *out)
 
 Matrix *logisticGrad(Matrix *A)
 {
-  Matrix *out = zeros(A->rows,A->cols);
+  Matrix *out = empty(A->rows,A->cols);
   logisticGrad(A, out);
 
   return out;
@@ -391,7 +392,7 @@ void logisticGrad(Matrix *A, Matrix *out)
 
 Matrix *gpuLog(Matrix *A)
 {
-  Matrix *out = zeros(A->rows,A->cols);
+  Matrix *out = empty(A->rows,A->cols);
   gpuLog(A, out);
 
   return out;
@@ -405,7 +406,7 @@ void gpuLog(Matrix *A, Matrix *out)
 
 Matrix *gpuSqrt(Matrix *A)
 {
-  Matrix *out = zeros(A->rows,A->cols);
+  Matrix *out = empty(A->rows,A->cols);
   gpuSqrt(A, out);
 
   return out;
@@ -419,7 +420,7 @@ void gpuSqrt(Matrix *A, Matrix *out)
 
 Matrix *square(Matrix *A)
 {
-  Matrix *out = zeros(A->rows,A->cols);
+  Matrix *out = empty(A->rows,A->cols);
   square(A, out);
 
   return out;

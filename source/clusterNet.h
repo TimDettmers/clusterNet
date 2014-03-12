@@ -43,6 +43,8 @@ public:
 
 	 void benchmark_dot();
 	 void shutdown();
+	 Matrix *distributed_uniformSqrtWeight(int rows, int cols);
+	 Matrix *distributed_sparseInitWeight(int rows, int cols);
 	 Matrix *uniformSqrtWeight(int rows, int cols);
 	 Matrix *sparseInitWeight(int rows, int cols);
 	 Matrix *sparseInitWeight(int rows, int cols, int connections);

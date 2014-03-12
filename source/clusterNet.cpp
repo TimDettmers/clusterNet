@@ -264,12 +264,10 @@ void ClusterNet::dotMPI_unitSlice(Matrix *A, Matrix *B, Matrix *out) {
 	int split_size = B->cols / MPI_SIZE;
 	std::string strMatrixName = A->rows + "x" + B->cols;
 
-	if (m_matrixCache.count(strMatrixName) == 0)
-	{
+	if (m_matrixCache.count(strMatrixName) == 0) {
 		Matrix** arrOut = (Matrix**) malloc(sizeof(Matrix*) * MPI_SIZE);
-		for (int i = 0; i < MPI_SIZE; i++)
-		{
-			if(i == MPI_SIZE -1)
+		for (int i = 0; i < MPI_SIZE; i++) {
+			if (i == MPI_SIZE - 1)
 				arrOut[i] = empty(A->rows, split_size + (B->cols % split_size));
 			else
 				arrOut[i] = empty(A->rows, split_size);
@@ -283,7 +281,8 @@ void ClusterNet::dotMPI_unitSlice(Matrix *A, Matrix *B, Matrix *out) {
 
 		float **d_arrA;
 		cudaMalloc((void**) &d_arrA, sizeof(float*) * MPI_SIZE);
-		cudaMemcpy(d_arrA, h_arrA, sizeof(float*) * MPI_SIZE, cudaMemcpyDefault);
+		cudaMemcpy(d_arrA, h_arrA, sizeof(float*) * MPI_SIZE,
+				cudaMemcpyDefault);
 
 		m_matrixHStackCache[strMatrixName] = d_arrA;
 		free(h_arrA);
@@ -305,8 +304,7 @@ void ClusterNet::dotMPI_unitSlice(Matrix *A, Matrix *B, Matrix *out) {
 	for (int i = 0; i < toDecrement.size(); i++)
 		m_matrixCacheUsage[toDecrement[i]] -= 1;
 
-	for (int i = 0; i < toDelete.size(); i++)
-	{
+	for (int i = 0; i < toDelete.size(); i++) {
 		for (int j = 0; j < MPI_SIZE; j++)
 			cudaFree(m_matrixCache[toDelete[i]][i]->data);
 
@@ -321,25 +319,30 @@ void ClusterNet::dotMPI_unitSlice(Matrix *A, Matrix *B, Matrix *out) {
 	toDelete.clear();
 
 	Matrix *B1;
-	if(MYRANK == MPI_SIZE - 1)
-		B1 = slice_cols(B, split_size * MYRANK,	split_size * (MYRANK + 1) - 1 + (B->cols % split_size));
+	if (MYRANK == MPI_SIZE - 1)
+		B1 = slice_cols(B, split_size * MYRANK,
+				split_size * (MYRANK + 1) - 1 + (B->cols % split_size));
 	else
-		B1 = slice_cols(B, split_size * MYRANK,	split_size * (MYRANK + 1) - 1);
+		B1 = slice_cols(B, split_size * MYRANK, split_size * (MYRANK + 1) - 1);
 	int matrix_idx = 0;
 
 	dot(A, B1, m_matrixCache[strMatrixName][MYRANK]);
 
 	matrix_idx = MYRANK;
-	for (int i = 0; i < MPI_SIZE - 1; i++)
-	{
-		MPI_Isend(m_matrixCache[strMatrixName][matrix_idx]->data, m_matrixCache[strMatrixName][matrix_idx]->size, MPI_FLOAT, m_destination, 100, MPI_COMM_WORLD, &m_sendrequest);
+	for (int i = 0; i < MPI_SIZE - 1; i++) {
+		MPI_Isend(m_matrixCache[strMatrixName][matrix_idx]->data,
+				m_matrixCache[strMatrixName][matrix_idx]->size, MPI_FLOAT,
+				m_destination, 100, MPI_COMM_WORLD, &m_sendrequest);
 		matrix_idx = (matrix_idx - 1) < 0 ? MPI_SIZE - 1 : (matrix_idx - 1);
-		MPI_Irecv(m_matrixCache[strMatrixName][matrix_idx]->data, m_matrixCache[strMatrixName][matrix_idx]->size, MPI_FLOAT,m_source, 100, MPI_COMM_WORLD, &m_requests[i]);
+		MPI_Irecv(m_matrixCache[strMatrixName][matrix_idx]->data,
+				m_matrixCache[strMatrixName][matrix_idx]->size, MPI_FLOAT,
+				m_source, 100, MPI_COMM_WORLD, &m_requests[i]);
 	}
 
 	cudaFree(B1->data);
 	MPI_Waitall(MPI_SIZE - 1, m_requests, MPI_STATUSES_IGNORE );
-	hStackN(m_matrixHStackCache[strMatrixName], m_matrixCache[strMatrixName][0]->size, out, MPI_SIZE);
+	hStackN(m_matrixHStackCache[strMatrixName],
+			m_matrixCache[strMatrixName][0]->size, out, MPI_SIZE);
 }
 
 //Uniform
@@ -433,7 +436,48 @@ Matrix *ClusterNet::sparseInitWeight(int rows, int cols, int connections) {
 	Matrix *out = zeros(rows, cols);
 	sparseRdmWeight(rdm, idx, out, connections);
 
+	cudaDeviceSynchronize();
+	cudaFree(rdm->data);
+	cudaFree(idx->data);
+
 	return out;
 
 }
 
+Matrix *ClusterNet::distributed_uniformSqrtWeight(int rows, int cols) {
+	assert(m_hasMPI);
+	Matrix *W;
+	int split_size = cols / MPI_SIZE;
+	if (MYRANK < MPI_SIZE - 1)
+		W = rand(rows, split_size);
+	else
+		W = rand(rows, split_size + (cols % split_size));
+
+	W->isDistributed = 1;
+	::uniformSqrtWeight(W);
+
+	return W;
+}
+
+Matrix *ClusterNet::distributed_sparseInitWeight(int rows, int cols) {
+	assert(m_hasMPI);
+	int split_size = cols / MPI_SIZE;
+	int col_size = MYRANK < MPI_SIZE - 1 ?  split_size + (cols % split_size) : split_size;
+	int connections = 15;
+
+	Matrix *W = zeros(rows, col_size);
+	Matrix *rdm = randn(col_size, connections);
+	Matrix *idx = rand_int(col_size, connections, 0, rows - 1);
+	Matrix *out = zeros(rows, col_size);
+
+	sparseRdmWeight(rdm, idx, out, connections);
+
+	cudaDeviceSynchronize();
+	cudaFree(rdm->data);
+	cudaFree(idx->data);
+
+
+	W->isDistributed = 1;
+
+	return W;
+}

@@ -744,9 +744,19 @@ int main(int argc, char *argv[])
 
 	//dotMPI_test(argc,argv);
 
-
-
 	ClusterNet gpu = ClusterNet(argc,argv,12346);
+
+	size_t free, total;
+	cudaMemGetInfo(&free,&total);
+	cout << free << endl;
+	gpu.distributed_sparseInitWeight(40000,70000);
+
+	cudaMemGetInfo(&free,&total);
+	cout << free << endl;
+
+
+	gpu.shutdown();
+	/*
 
 	Matrix *A = gpu.rand(128,20000);
 	Matrix *B = gpu.rand(20000,15000);
@@ -765,7 +775,8 @@ int main(int argc, char *argv[])
 	}
 	gpu.tock("unit slice");
 
-	gpu.shutdown();
+
+	*/
 
 
 

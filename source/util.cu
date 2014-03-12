@@ -46,6 +46,7 @@ Matrix *read_csv (const char* filename)
   out->bytes = bytes;
   out->size = columns*rows;
   out->data = data;
+  out->isDistributed = 0;
 
   return out;
 }
@@ -75,6 +76,7 @@ Matrix *read_hdf5(const char * filepath)
 	   out->bytes = bytes;
 	   out->data = data;
 	   out->size = dims[0]*dims[1];
+	   out->isDistributed = 0;
 
 	   return out;
 }
