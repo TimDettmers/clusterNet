@@ -372,17 +372,12 @@ int run_basicOps_test(int argc, char *argv[])
   m1 = ones(10,1);
   m2 = ones(1,10);
 
-  m1 = to_host(sum(m1));
-  assert(test_matrix(m1,1,1));
-  ASSERT(m1->data[0] == 10.0f, "Vector sum test");
-  m1 = to_host(sum(m2));
-  ASSERT(m1->data[0]  == 10.0f, "Vector sum test");
+  ASSERT(sum(m1) == 10.0f, "Vector sum test");
+  ASSERT(sum(m2)  == 10.0f, "Vector sum test");
   m1 = ones(10,10);
-  m1 = to_host(sum(m1));
-  ASSERT(m1->data[0]  == 100.0f, "Vector sum test");
-  m1 = to_host(sum(scalarMul(m2,1.73)));
-  ASSERT(m1->data[0] > 17.29f, "Vector sum test");
-  ASSERT(m1->data[0] < 17.31f, "Vector sum test");
+  ASSERT(sum(m1)  == 100.0f, "Vector sum test");
+  ASSERT(sum(scalarMul(m2,1.73)) > 17.29f, "Vector sum test");
+  ASSERT(sum(scalarMul(m2,1.73)) < 17.31f, "Vector sum test");
 
   //logistic test
   m1 = zeros(2,2);

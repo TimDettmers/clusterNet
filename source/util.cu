@@ -72,11 +72,11 @@ Matrix *read_hdf5(const char * filepath)
 	   H5Fclose(file_id);
 
 	   Matrix *out = (Matrix*)malloc(sizeof(Matrix));
-	   out->rows = dims[0];
-	   out->cols= dims[1];
+	   out->rows = (int)dims[0];
+	   out->cols= (int)dims[1];
 	   out->bytes = bytes;
 	   out->data = data;
-	   out->size = dims[0]*dims[1];
+	   out->size = (int)(dims[0]*dims[1]);
 	   out->isDistributed = 0;
 	   out->cols_distributed = 0;
 

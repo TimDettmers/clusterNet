@@ -19,6 +19,7 @@ DeepNeuralNetwork::DeepNeuralNetwork(std::string path_X, std::string path_y, flo
 		                             int argc, char *argv[], BatchAllocationMethod_t batchmethod)
 {
 	m_gpus = ClusterNet(argc, argv, 12345);
+
 	m_BA = BatchAllocator();
 	m_BA.init(path_X,path_y,cv_size,64,512,m_gpus,batchmethod);
 
@@ -26,16 +27,17 @@ DeepNeuralNetwork::DeepNeuralNetwork(std::string path_X, std::string path_y, flo
 	MOMENTUM = 0.5;
 
 	init_network_layout(lLayerSizes,net_type);
-
 }
 void DeepNeuralNetwork::init(Matrix *X, Matrix *y, float cv_size, std::vector<int> lLayerSizes, Networktype_t net_type, int argc, char *argv[])
 {
 	m_BA = BatchAllocator();
 	m_BA.init(X,y,cv_size,64,512);
+
 	if(argc == -1)
 		m_gpus = ClusterNet(12354);
 	else
 		m_gpus = ClusterNet(argc, argv, 12354);//TODO: not working yet!
+
 
 	LEARNING_RATE = 0.003;
 	MOMENTUM = 0.5;
@@ -64,21 +66,28 @@ void DeepNeuralNetwork::init_weights()
 {
 	if(m_BA.BATCH_METHOD == Distributed_weights)
 	{
+		cout << "myrank " << m_gpus.MYRANK << " 1 cols: " << m_BA.CURRENT_BATCH->cols << endl;
 		W.push_back(m_gpus.distributed_uniformSqrtWeight(m_BA.CURRENT_BATCH->cols,lLayers[0]));
-		M.push_back(m_gpus.distributed_Zeros(m_BA.CURRENT_BATCH->cols,lLayers[0]));
-		MS.push_back(m_gpus.distributed_Zeros(m_BA.CURRENT_BATCH->cols,lLayers[0]));
-		GRAD.push_back(m_gpus.distributed_Zeros(m_BA.CURRENT_BATCH->cols,lLayers[0]));
+		cout << "myrank " << m_gpus.MYRANK << " 2 cols: " << m_BA.CURRENT_BATCH->cols << endl;
+		M.push_back(m_gpus.distributed_zeros(m_BA.CURRENT_BATCH->cols,lLayers[0]));
+		cout << "myrank " << m_gpus.MYRANK << " 3 cols: " << m_BA.CURRENT_BATCH->cols << endl;
+		MS.push_back(m_gpus.distributed_zeros(m_BA.CURRENT_BATCH->cols,lLayers[0]));
+		cout << "myrank " << m_gpus.MYRANK << " 4 cols: " << m_BA.CURRENT_BATCH->cols << endl;
+		GRAD.push_back(m_gpus.distributed_zeros(m_BA.CURRENT_BATCH->cols,lLayers[0]));
+		cout << "myrank " << m_gpus.MYRANK << " 5 cols: " << m_BA.CURRENT_BATCH->cols << endl;
 		for(int i = 0;i < (lLayers.size()-1); i++)
 		{
+			cout << "layers: " << lLayers[i]<< endl;
 			W.push_back(m_gpus.distributed_uniformSqrtWeight(lLayers[i],lLayers[i+1]));
-			M.push_back(m_gpus.distributed_Zeros(lLayers[i],lLayers[i+1]));
-			MS.push_back(m_gpus.distributed_Zeros(lLayers[i],lLayers[i+1]));
-			GRAD.push_back(m_gpus.distributed_Zeros(lLayers[i],lLayers[i+1]));
+			M.push_back(m_gpus.distributed_zeros(lLayers[i],lLayers[i+1]));
+			MS.push_back(m_gpus.distributed_zeros(lLayers[i],lLayers[i+1]));
+			GRAD.push_back(m_gpus.distributed_zeros(lLayers[i],lLayers[i+1]));
 		}
+		cout << "layers.back: " << lLayers.back()<< endl;
 		W.push_back(m_gpus.distributed_uniformSqrtWeight(lLayers.back(),10));
-		M.push_back(m_gpus.distributed_Zeros(lLayers.back(),10));
-		MS.push_back(m_gpus.distributed_Zeros(lLayers.back(),10));
-		GRAD.push_back(m_gpus.distributed_Zeros(lLayers.back(),10));
+		M.push_back(m_gpus.distributed_zeros(lLayers.back(),10));
+		MS.push_back(m_gpus.distributed_zeros(lLayers.back(),10));
+		GRAD.push_back(m_gpus.distributed_zeros(lLayers.back(),10));
 	}
 	else
 	{
@@ -98,6 +107,55 @@ void DeepNeuralNetwork::init_weights()
 		MS.push_back(zeros(lLayers.back(),10));
 		GRAD.push_back(zeros(lLayers.back(),10));
 	}
+}
+
+void DeepNeuralNetwork::train()
+{
+
+
+	init_weights();
+	printmat(m_BA.CURRENT_BATCH_CV_Y);
+
+	float error = 0;
+	int epochs = 100;
+	//size_t free, total;
+	int device;
+	for(int EPOCH = 0; EPOCH < epochs; EPOCH++)
+	{
+		if(m_BA.BATCH_METHOD == Single_GPU || (m_BA.BATCH_METHOD != Single_GPU && m_gpus.MYRANK == 0))
+			std::cout << "EPOCH: " << EPOCH + 1 << std::endl;
+		//cudaMemGetInfo(&free, &total);
+		//std::cout << free << std::endl;
+		MOMENTUM += 0.01;
+		if(MOMENTUM > 0.95) MOMENTUM = 0.95;
+		for(int i = 0; i < m_BA.TOTAL_ITERATIONS; i++)
+		{
+			cout << i << endl;
+		  m_BA.allocate_next_batch_async();
+			cout << "post batch async" << endl;
+
+		  nesterov_updates();
+			cout << "post nesterov" << endl;
+		  feedforward(Dropout);
+			cout << "post feedforward async" << endl;
+		  backprop();
+			cout << "post backprop async" << endl;
+
+		  if(m_BA.BATCH_METHOD == Batch_split)
+			  m_BA.broadcast_batch_to_PCI();
+		  weight_updates();
+		  free_variables();
+		  m_BA.replace_current_batch_with_next();
+	  }
+
+		train_error();
+		cross_validation_error();
+	}
+
+
+	 if(m_BA.BATCH_METHOD != Single_GPU)
+		 m_gpus.shutdown();
+
 }
 
 void DeepNeuralNetwork::backprop()
@@ -150,6 +208,7 @@ void DeepNeuralNetwork::feedforward(FeedForward_t ff)
 		Z.push_back(m_BA.CURRENT_BATCH);
 		for(int i = 0; i < W.size(); i++)
 		{
+			cout << "W i: " << i << endl;
 		  D.push_back(m_gpus.dropout(Z.back(),lDropout[i]));
 		  Z.push_back(m_gpus.dot(D.back(), W[i]));
 		  activation_function(i, Z.back());
@@ -176,13 +235,11 @@ int DeepNeuralNetwork::get_classification_errors(Batchtype_t batch_t)
 	  if(batch_t == Train){	eq = equal(result,m_BA.CURRENT_BATCH_Y);}
 	  else{	eq = equal(result,m_BA.CURRENT_BATCH_CV_Y);}
 
-	  Matrix *sum_mat = sum(eq);
-	  float sum_value = to_host(sum_mat)->data[0];
+	  float sum_value = sum(eq);
 	  int errors = (Z.back()->rows  - sum_value);
 
 	  cudaFree(result->data);
 	  cudaFree(eq->data);
-	  cudaFree(sum_mat->data);
 
 	  return errors;
 }
@@ -231,50 +288,6 @@ void DeepNeuralNetwork::nesterov_updates()
 	}
 }
 
-void DeepNeuralNetwork::train()
-{
-
-	init_weights();
-	float error = 0;
-	int epochs = 100;
-
-	//size_t free, total;
-	m_gpus.tick();
-	int device;
-	for(int EPOCH = 0; EPOCH < epochs; EPOCH++)
-	{
-		if(m_BA.BATCH_METHOD == Single_GPU || (m_BA.BATCH_METHOD == Batch_split && m_gpus.MYRANK == 0))
-			std::cout << "EPOCH: " << EPOCH + 1 << std::endl;
-		//cudaMemGetInfo(&free, &total);
-		//std::cout << free << std::endl;
-		MOMENTUM += 0.01;
-		if(MOMENTUM > 0.95) MOMENTUM = 0.95;
-		for(int i = 0; i < m_BA.TOTAL_ITERATIONS; i++)
-		{
-		  m_BA.allocate_next_batch_async();
-		  nesterov_updates();
-
-		  feedforward(Dropout);
-
-
-		  backprop();
-		  if(m_BA.BATCH_METHOD == Batch_split)
-			  m_BA.broadcast_batch_to_PCI();
-		  weight_updates();
-		  free_variables();
-		  m_BA.replace_current_batch_with_next();
-	  }
-
-		train_error();
-		cross_validation_error();
-	}
-
-
-	 if(m_BA.BATCH_METHOD == Batch_split)
-		 m_gpus.shutdown();
-
-
-}
 void DeepNeuralNetwork::train_error()
 {
 	  int errors = 0;

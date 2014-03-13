@@ -60,6 +60,8 @@ void BatchAllocator::init(Matrix *X, Matrix *y, float cross_validation_size, int
 	m_full_y = y;
 	BATCH_METHOD = batchmethod;
 
+	cout << "my gpu id: " << m_cluster.MYGPUID  << " and my rank: " << m_cluster.MYRANK << endl;
+
 	if(BATCH_METHOD != Single_GPU)
 		MPI_get_dataset_dimensions(X,y);
 	else
@@ -118,12 +120,13 @@ void BatchAllocator::init(Matrix *X, Matrix *y, float cross_validation_size, int
 	CURRENT_BATCH_CV_Y = empty(BATCH_SIZE_CV,m_Cols_y);
 	m_next_matrices_cv_y.push_back(empty(BATCH_SIZE_CV,m_Cols_y));
 
-
+	cout << m_mygpuID << endl;
 	if(m_mygpuID == 0)
 	{
 		int pci_count = 1;
 		m_myrank = 0;
 		if(batchmethod == Batch_split){ pci_count = m_cluster.PCIe_RANKS.size(); m_myrank = m_cluster.MYRANK; }
+		if(batchmethod == Distributed_weights){ m_myrank = m_cluster.MYRANK; }
 
 		for(int i = 1; i < pci_count; i++)
 		{
@@ -159,10 +162,13 @@ void BatchAllocator::init(Matrix *X, Matrix *y, float cross_validation_size, int
 
 			//overwrite and send all batches away
 			//but keep the last one
+
 			to_col_major(m_next_matrices_X[i], CURRENT_BATCH);
 			to_col_major(m_next_matrices_y[i], CURRENT_BATCH_Y);
 			to_col_major(m_next_matrices_cv_X[i], CURRENT_BATCH_CV);
 			to_col_major(m_next_matrices_cv_y[i], CURRENT_BATCH_CV_Y);
+
+			cudaDeviceSynchronize();
 			if(batchmethod == Batch_split && i < pci_count -1)
 			{
 				MPI_Send(CURRENT_BATCH->data,CURRENT_BATCH->size, MPI_FLOAT,m_cluster.PCIe_RANKS[i+1],999,MPI_COMM_WORLD);
@@ -176,13 +182,13 @@ void BatchAllocator::init(Matrix *X, Matrix *y, float cross_validation_size, int
 		{
 			for(int i = 0; i < m_cluster.PCIe_RANKS.size()-1; i++)
 			{
+				cout << "send distributed i: " << i << endl;
 
 				MPI_Send(CURRENT_BATCH->data,CURRENT_BATCH->size, MPI_FLOAT,m_cluster.PCIe_RANKS[i+1],999,MPI_COMM_WORLD);
 				MPI_Send(CURRENT_BATCH_Y->data,CURRENT_BATCH_Y->size, MPI_FLOAT,m_cluster.PCIe_RANKS[i+1],998,MPI_COMM_WORLD);
 				MPI_Send(CURRENT_BATCH_CV->data,CURRENT_BATCH_CV->size, MPI_FLOAT,m_cluster.PCIe_RANKS[i+1],997,MPI_COMM_WORLD);
 				MPI_Send(CURRENT_BATCH_CV_Y->data,CURRENT_BATCH_CV_Y->size, MPI_FLOAT,m_cluster.PCIe_RANKS[i+1],996,MPI_COMM_WORLD);
 			}
-
 		}
 	}
 	else
@@ -192,6 +198,7 @@ void BatchAllocator::init(Matrix *X, Matrix *y, float cross_validation_size, int
 		MPI_Recv(CURRENT_BATCH_Y->data,CURRENT_BATCH_Y->size,MPI_FLOAT,m_cluster.PCIe_RANKS[0],998,MPI_COMM_WORLD,&m_status);
 		MPI_Recv(CURRENT_BATCH_CV->data,CURRENT_BATCH_CV->size,MPI_FLOAT,m_cluster.PCIe_RANKS[0],997,MPI_COMM_WORLD,&m_status);
 		MPI_Recv(CURRENT_BATCH_CV_Y->data,CURRENT_BATCH_CV_Y->size,MPI_FLOAT,m_cluster.PCIe_RANKS[0],996,MPI_COMM_WORLD,&m_status);
+		cout << "received data, rank: " << m_myrank << endl;
 	}
 
 	if(batchmethod == Batch_split )

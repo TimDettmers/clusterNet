@@ -51,7 +51,7 @@ Matrix *mul(Matrix *A, Matrix *B);
 void mul(Matrix *A, Matrix *B, Matrix *out);
 Matrix *div(Matrix *A, Matrix *B);
 void div(Matrix *A, Matrix *B, Matrix *out);
-Matrix *sum(Matrix *v);
+float sum(Matrix *v);
 
 Matrix *to_host(Matrix *A);
 Matrix *to_host(Matrix *A, int is_row_major);

@@ -52,14 +52,6 @@ public:
 	float LEARNING_RATE;
 	float MOMENTUM;
 
-protected:
-	std::vector<Matrix*> W;
-	std::vector<Matrix*> M;
-	std::vector<Matrix*> GRAD;
-	std::vector<Matrix*> MS;
-	std::vector<int> lLayers;
-	ClusterNet m_gpus;
-	BatchAllocator m_BA;
 private:
 	Costfunction_t m_costFunction;
 	std::vector<Matrix*> D;
@@ -67,6 +59,13 @@ private:
 	std::vector<Matrix*> E;
 	std::vector<float> lDropout;
 	std::vector<Unittype_t> lUnits;
+	BatchAllocator m_BA;
+	std::vector<Matrix*> W;
+	std::vector<Matrix*> M;
+	std::vector<Matrix*> GRAD;
+	std::vector<Matrix*> MS;
+	std::vector<int> lLayers;
+	ClusterNet m_gpus;
 
 	void init_network_layout(std::vector<int> lLayerSizes, Networktype_t net_type);
 	void init_weights();

@@ -101,8 +101,7 @@ void run_miniMNIST_test(int argc, char *argv[])
 		  Matrix *out = softmax(a2);
 		  Matrix *result = argmax(out);
 		  Matrix *eq = equal(result,b.CURRENT_BATCH_Y);
-		  Matrix *sum_mat = sum(eq);
-		  float sum_value = to_host(sum_mat)->data[0];
+		  float sum_value = sum(eq);
 
 		  train_error += (b.CURRENT_BATCH->rows - sum_value)/ (1.0f * b.CURRENT_BATCH->rows *b.TOTAL_BATCHES) ;
 
@@ -111,7 +110,6 @@ void run_miniMNIST_test(int argc, char *argv[])
 		  cudaFree(out->data);
 		  cudaFree(result->data);
 		  cudaFree(eq->data);
-		  cudaFree(sum_mat->data);
 
 		  b.replace_current_batch_with_next();
 	  }
@@ -131,8 +129,7 @@ void run_miniMNIST_test(int argc, char *argv[])
 		  Matrix *out = softmax(a2);
 		  Matrix *result = argmax(out);
 		  Matrix *eq = equal(result,b.CURRENT_BATCH_CV_Y);
-		  Matrix *sum_mat = sum(eq);
-		  float sum_value = to_host(sum_mat)->data[0];
+		  float sum_value = sum(eq);
 
 		  cv_error += (b.CURRENT_BATCH_CV->rows  - sum_value)/ (1.0f * b.CURRENT_BATCH_CV->rows *b.TOTAL_BATCHES_CV) ;
 
@@ -141,7 +138,6 @@ void run_miniMNIST_test(int argc, char *argv[])
 		  cudaFree(out->data);
 		  cudaFree(result->data);
 		  cudaFree(eq->data);
-		  cudaFree(sum_mat->data);
 
 		  b.replace_current_cv_batch_with_next();
 	  }

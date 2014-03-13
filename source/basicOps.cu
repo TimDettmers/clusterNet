@@ -179,6 +179,7 @@ Matrix *empty(int rows, int cols)
 
 Matrix *fill_matrix(int rows, int cols, float fill_value)
 {
+	printf("rows: %i, cols: %i, fillvalue %f\n",rows,cols,fill_value);
   if(rows < 1 || cols < 1)
   {
     printf("Error: Dimensions must be greater than zero!\n");
@@ -603,14 +604,18 @@ void equal(Matrix *A, Matrix *B, Matrix *out)
 	kEqual<<<blocks,THREADS_PER_BLOCKS>>>(A->data, B->data, out->data, A->size);
 }
 
-Matrix *sum(Matrix *v)
+float sum(Matrix *v)
 {
 
 	Matrix *out = empty(1,1);
 	int blocks = (v->size/THREADS_PER_BLOCKS) + 1;
 	kSum<<<blocks,THREADS_PER_BLOCKS>>>(v->data, out->data, v->size);
-
-	return out;
+	Matrix *host = to_host(out);
+	float out_value = host->data[0];
+	cudaFree(out);
+	free(host->data);
+	free(host);
+	return out_value;
 }
 
 void dropout(Matrix *A, Matrix *rdm, float dropout_rate)

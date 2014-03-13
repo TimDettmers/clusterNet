@@ -54,16 +54,7 @@ void ClusterNet::init(int seed)
 	curandCreateGenerator(&m_generator, CURAND_RNG_PSEUDO_DEFAULT);
 	curandSetPseudoRandomGeneratorSeed(m_generator, seed);
 	curandSetGeneratorOffset(m_generator, 100);
-	int gpus;
-	cudaGetDeviceCount(&gpus);
-	for (int i = 0; i < gpus; i++)
-	{
-		cudaSetDevice(i);
-		cublasHandle_t handle;
-		cublasCreate(&handle);
-		m_handles.push_back(handle);
-	}
-	cudaSetDevice(MYGPUID);
+	m_cublasInitialized = false;
 
 	if (!m_hasMPI)
 	{
@@ -71,7 +62,7 @@ void ClusterNet::init(int seed)
 		NODES = 1;
 		PCIe_RANKS.push_back(0);
 		MYRANK = 0;
-		m_hasMPI = false;
+		//cudaSetDevice(MYGPUID);
 	}
 }
 
@@ -180,37 +171,88 @@ void ClusterNet::shutdown()
 
 Matrix *ClusterNet::dot(Matrix *A, Matrix *B)
 {
-	Matrix *out = zeros(A->rows, B->cols);
-	dot(A, B, out);
+
+	cout << "isdistributed: " << B->isDistributed << endl;
+	Matrix *out;
+	if(B->isDistributed == 1)
+	{
+		cout << "sum A: " << sum(A) << endl;
+		cout << "sum B: " << sum(A) << endl;
+		out = dotMPI(A,B);
+	}
+	else
+	{
+		out = zeros(A->rows, B->cols);
+		dot(A, B, out);
+	}
 
 	return out;
 }
 
 Matrix *ClusterNet::Tdot(Matrix *A, Matrix *B)
 {
-	//if(m_hasMPI){ return dotMPI(A,B);}
-	Matrix *out = zeros(A->cols, B->cols);
-	Tdot(A, B, out);
+	Matrix *out;
+	if(B->isDistributed == 1)
+	{
+		out = TdotMPI(A,B);
+	}
+	else
+	{
+		out = zeros(A->cols, B->cols);
+		Tdot(A, B, out);
+	}
 
 	return out;
 }
 
 Matrix *ClusterNet::dotT(Matrix *A, Matrix *B)
 {
-	//if(m_hasMPI){ return dotMPI(A,B);}
-	Matrix *out = zeros(A->rows, B->rows);
-	dotT(A, B, out);
+	Matrix *out;
+	if(B->isDistributed  == 1)
+	{
+		out = dotTMPI(A,B);
+	}
+	else
+	{
+		out =  zeros(A->rows, B->rows);
+		dotT(A, B, out);
+	}
 
 	return out;
 }
 
-void ClusterNet::dotT(Matrix *A, Matrix *B, Matrix *out){ dot(A, B, out, CUBLAS_OP_N, CUBLAS_OP_T); }
-void ClusterNet::Tdot(Matrix *A, Matrix *B, Matrix *out){ dot(A, B, out, CUBLAS_OP_T, CUBLAS_OP_N); }
-void ClusterNet::dot(Matrix *A, Matrix *B, Matrix *out){ dot(A, B, out, CUBLAS_OP_N, CUBLAS_OP_N); }
+void ClusterNet::dotT(Matrix *A, Matrix *B, Matrix *out)
+{
+	if(B->isDistributed == 1 || out->isDistributed == 1)
+		dotMPI(A,B,out, true);
+	else
+		dot(A, B, out, CUBLAS_OP_N, CUBLAS_OP_T);
+}
+void ClusterNet::Tdot(Matrix *A, Matrix *B, Matrix *out)
+{
+	if(B->isDistributed == 1 || out->isDistributed == 1)
+		dotMPI(A,B,out, false);
+	else
+		dot(A, B, out, CUBLAS_OP_T, CUBLAS_OP_N);
+}
+void ClusterNet::dot(Matrix *A, Matrix *B, Matrix *out)
+{
+	if(B->isDistributed ==1 || out->isDistributed == 1)
+		dotMPI(A,B,out, false);
+	else
+		dot(A, B, out, CUBLAS_OP_N, CUBLAS_OP_N);
+}
 void ClusterNet::dot(Matrix *A, Matrix *B, Matrix *out, cublasOperation_t T1, cublasOperation_t T2)
 {
 	//if(checkMatrixOperation(A, B, out, 1) == 1){ throw "Matrix *size error:\n"; }
 	cublasStatus_t status;
+
+	if(!m_cublasInitialized)
+		cublasCreate_v2(&m_handle);
+
+	int gpu;
+	cudaGetDevice(&gpu);
+	cout << "current gpu: " << gpu << endl;
 
 	const float alpha = 1.0f;
 	const float beta = 0.0f;
@@ -226,12 +268,6 @@ void ClusterNet::dot(Matrix *A, Matrix *B, Matrix *out, cublasOperation_t T1, cu
 		B_cols = B->rows;
 	}
 
-	int current_device;
-	cudaGetDevice(&current_device);
-
-	//cout << "current device: " << current_device << endl;
-
-	/*
 	 cout << "T1: " << T1 << endl;
 	 cout << "T2: " << T2 << endl;
 	 cout << "A rows: " << A->rows << endl;
@@ -240,16 +276,21 @@ void ClusterNet::dot(Matrix *A, Matrix *B, Matrix *out, cublasOperation_t T1, cu
 	 cout << "B cols: " << B->cols << endl;
 	 cout << "out rows: " << out->rows << endl;
 	 cout << "out cols: " << out->cols << endl;
-	 */
+	 cout << "sum A: " << sum(A) << endl;
+	 cout << "sum B: "  << sum(B) << endl;
+	 cout << "sum out: " << sum(out) << endl;
 
-	status = cublasSgemm(m_handles[current_device], T1, T2, A_rows, B_cols,
+
+	status = cublasSgemm(m_handle, T1, T2, A_rows, B_cols,
 			A_cols, &alpha, A->data, A->rows, B->data, B->rows, &beta,
 			out->data, out->rows);
 
 	if (status != CUBLAS_STATUS_SUCCESS)
 	{
+		//printmat(out);
 		std::cout << "CUBLAS ERROR: Status " << status << std::endl;
 		throw "CUBLAS ERROR";
+
 	}
 }
 
@@ -257,7 +298,7 @@ void ClusterNet::dot(Matrix *A, Matrix *B, Matrix *out, cublasOperation_t T1, cu
 
 Matrix *ClusterNet::dotMPI(Matrix *A, Matrix *B)
 {
-	Matrix *out = empty(A->rows, B->cols);
+	Matrix *out = empty(A->rows, B->isDistributed == 0 ? B->cols : B->cols_distributed);
 	dotMPI(A, B, out);
 	return out;
 }
@@ -268,14 +309,26 @@ Matrix *ClusterNet::dotTMPI(Matrix *A, Matrix *B)
 	dotMPI(A, B, out, true);
 	return out;
 }
+Matrix *ClusterNet::TdotMPI(Matrix *A, Matrix *B)
+{
+	Matrix *out = empty(A->cols, B->isDistributed == 0 ? B->cols : B->cols_distributed);
+	dotMPI(A, B, out, true);
+	return out;
+}
 void ClusterNet::dotMPI(Matrix *A, Matrix *B, Matrix *out){ dotMPI(A,B,out,false); }
 void ClusterNet::TdotMPI(Matrix *A, Matrix *B, Matrix *out){ dotMPI(A,B,out,false); }
 void ClusterNet::dotTMPI(Matrix *A, Matrix *B, Matrix *out){ dotMPI(A,B,out,true); }
 void ClusterNet::dotMPI(Matrix *A, Matrix *B, Matrix *out, bool applyTranspose_B)
 {
+	cout << "dotMPI entered" << endl;
 	int col_split_size = (B->isDistributed == 1 ? B->cols_distributed : B->cols) / MPI_SIZE;
 	int remainder = ((B->isDistributed == 1 ? B->cols_distributed : B->cols) % col_split_size);
 	std::string strMatrixName = SSTR(A->rows) + "x" + SSTR((B->isDistributed == 1 ? B->cols_distributed : B->cols));
+
+
+	cout << MYRANK << " rank and mpi size: " << MPI_SIZE << endl;
+
+	MPI_Barrier(MPI_COMM_WORLD);
 
 	if(out->isDistributed == 0 && !applyTranspose_B)
 	{
@@ -288,6 +341,9 @@ void ClusterNet::dotMPI(Matrix *A, Matrix *B, Matrix *out, bool applyTranspose_B
 					arrOut[i] = empty(A->rows, col_split_size + remainder);
 				else
 					arrOut[i] = empty(A->rows, col_split_size);
+
+
+				cout << MYRANK << " rank and mpi size: " << MPI_SIZE << endl;
 			}
 			m_matrixCache[strMatrixName] = arrOut;
 			m_matrixCacheUsage[strMatrixName] = 1;
@@ -348,16 +404,19 @@ void ClusterNet::dotMPI(Matrix *A, Matrix *B, Matrix *out, bool applyTranspose_B
 			B1 = slice_cols(B, col_split_size * MYRANK,	col_split_size * (MYRANK + 1) - 1);
 
 		if(out->isDistributed == 1)
-			Tdot(A, B1, out);
+			dot(A, B1, out, CUBLAS_OP_T, CUBLAS_OP_N);
 		else
-			dot(A, B1, m_matrixCache[strMatrixName][MYRANK]);
+			dot(A, B1, m_matrixCache[strMatrixName][MYRANK], CUBLAS_OP_N, CUBLAS_OP_N);
+
 
 	}
 	else
 	{
 		if(!applyTranspose_B)
 		{
-			dot(A, B, m_matrixCache[strMatrixName][MYRANK]);
+			cout << "correct dot" << endl;
+			cout << MYRANK << endl;
+			dot(A, B, m_matrixCache[strMatrixName][MYRANK], CUBLAS_OP_N, CUBLAS_OP_N);
 		}
 		else
 		{
@@ -366,7 +425,7 @@ void ClusterNet::dotMPI(Matrix *A, Matrix *B, Matrix *out, bool applyTranspose_B
 			else
 				A1 = slice_cols(A, col_split_size * MYRANK,	col_split_size * (MYRANK + 1) - 1);
 
-			dotT(A1,B,out);
+			dot(A1,B,out, CUBLAS_OP_N, CUBLAS_OP_T);
 		}
 	}
 
@@ -542,10 +601,11 @@ Matrix *ClusterNet::distributed_uniformSqrtWeight(int rows, int cols)
 	return W;
 }
 
-Matrix *ClusterNet::distributed_Zeros(int rows, int cols)
+Matrix *ClusterNet::distributed_zeros(int rows, int cols)
 {
 	assert(m_hasMPI);
 	Matrix *W;
+	cout << "distributed zeros: " << rows << endl;
 	int split_size = cols / MPI_SIZE;
 	if (MYRANK < MPI_SIZE - 1)
 		W = zeros(rows, split_size);

@@ -26,6 +26,7 @@ public:
 	 void Tdot(Matrix *A, Matrix *B, Matrix *out);
 	 void dotT(Matrix *A, Matrix *B, Matrix *out);
 	 Matrix *dotTMPI(Matrix *A, Matrix *B);
+	 Matrix *TdotMPI(Matrix *A, Matrix *B);
 	 Matrix *dotMPI(Matrix *A, Matrix *B);
 	 void dotMPI(Matrix *A, Matrix *B, Matrix *out);
 	 void TdotMPI(Matrix *A, Matrix *B, Matrix *out);
@@ -48,7 +49,7 @@ public:
 	 void shutdown();
 	 Matrix *distributed_uniformSqrtWeight(int rows, int cols);
 	 Matrix *distributed_sparseInitWeight(int rows, int cols);
-	 Matrix *distributed_Zeros(int rows, int cols);
+	 Matrix *distributed_zeros(int rows, int cols);
 	 Matrix *uniformSqrtWeight(int rows, int cols);
 	 Matrix *sparseInitWeight(int rows, int cols);
 	 Matrix *sparseInitWeight(int rows, int cols, int connections);
@@ -60,7 +61,7 @@ public:
 	 std::vector<int> PCIe_RANKS;
 	 std::vector<int> MASTER_GPU_RANKS;
 private:
-	 std::vector<cublasHandle_t> m_handles;
+	 cublasHandle_t m_handle;
 	 curandGenerator_t m_generator;
 	 std::map<std::string,cudaEvent_t*> m_dictTickTock;
 	 std::map<std::string,float> m_dictTickTockCumulative;
@@ -73,6 +74,7 @@ private:
 	 pthread_t *m_threads;
 
 	 bool m_hasMPI;
+	 bool m_cublasInitialized;
 	 MPI_Status m_status;
 	 MPI_Comm m_MPIWorld;
 
