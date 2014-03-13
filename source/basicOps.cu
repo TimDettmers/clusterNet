@@ -142,6 +142,12 @@ void uniformSqrtWeight(Matrix * uniform_rdm)
 	kCreateRdmSqrtWeight_Logistic<<<block_size,THREADS_PER_BLOCKS>>>(uniform_rdm->data, uniform_rdm->rows, uniform_rdm->cols);
 }
 
+void uniformSqrtWeight(Matrix * uniform_rdm, int in, int out)
+{
+	int block_size = (uniform_rdm->size/THREADS_PER_BLOCKS) + 1;
+	kCreateRdmSqrtWeight_Logistic<<<block_size,THREADS_PER_BLOCKS>>>(uniform_rdm->data, in, out);
+}
+
 Matrix *arange(int rows, int cols){	return arange(0, rows, cols); }
 Matrix *arange(int start, int rows, int cols)
 {

@@ -46,26 +46,26 @@ class DeepNeuralNetwork
 public:
 	DeepNeuralNetwork(Matrix *X, Matrix *y, float cv_size, std::vector<int> lLayersSizes, Networktype_t net_type);
 	DeepNeuralNetwork(Matrix *X, Matrix *y, float cv_size, std::vector<int> lLayerSizes, Networktype_t net_type, int argc, char *argv[]);
-	DeepNeuralNetwork(std::string path_X, std::string path_y, float cv_size, std::vector<int> lLayerSizes, Networktype_t net_type, int argc, char *argv[]);
+	DeepNeuralNetwork(std::string path_X, std::string path_y, float cv_size, std::vector<int> lLayerSizes, Networktype_t net_type, int argc, char *argv[], BatchAllocationMethod_t batchmethod);
 	void train();
 
 	float LEARNING_RATE;
 	float MOMENTUM;
 
-private:
-	BatchAllocator m_BA;
-	ClusterNet m_gpus;
-	Costfunction_t m_costFunction;
+protected:
 	std::vector<Matrix*> W;
 	std::vector<Matrix*> M;
 	std::vector<Matrix*> GRAD;
 	std::vector<Matrix*> MS;
+	std::vector<int> lLayers;
+	ClusterNet m_gpus;
+	BatchAllocator m_BA;
+private:
+	Costfunction_t m_costFunction;
 	std::vector<Matrix*> D;
 	std::vector<Matrix*> Z;
 	std::vector<Matrix*> E;
-
 	std::vector<float> lDropout;
-	std::vector<int> lLayers;
 	std::vector<Unittype_t> lUnits;
 
 	void init_network_layout(std::vector<int> lLayerSizes, Networktype_t net_type);

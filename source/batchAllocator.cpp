@@ -60,7 +60,7 @@ void BatchAllocator::init(Matrix *X, Matrix *y, float cross_validation_size, int
 	m_full_y = y;
 	BATCH_METHOD = batchmethod;
 
-	if(BATCH_METHOD == Batch_split)
+	if(BATCH_METHOD != Single_GPU)
 		MPI_get_dataset_dimensions(X,y);
 	else
 	{
@@ -133,10 +133,19 @@ void BatchAllocator::init(Matrix *X, Matrix *y, float cross_validation_size, int
 			m_next_matrices_cv_y.push_back(empty(BATCH_SIZE_CV,m_Cols_y));
 		}
 
-		//there needs to be a offset for each master gpu
-		//this offset is simply the rank of the
-		m_next_batch_number = m_myrank;
-		m_next_batch_number_cv = m_myrank;
+		if(batchmethod == Batch_split)
+		{
+			//there needs to be a offset for each master gpu
+			//this offset is simply the rank of the
+			m_next_batch_number = m_myrank;
+			m_next_batch_number_cv = m_myrank;
+		}
+		else
+		{
+			m_next_batch_number = 0;
+			m_next_batch_number_cv = 0;
+		}
+
 		for(int i = 0; i < pci_count; i++)
 		{
 			cudaMemcpy(&m_next_matrices_X[i]->data[0],&m_full_X->data[(m_full_X->cols * (m_next_batch_number+i) * BATCH_SIZE)],
@@ -161,6 +170,19 @@ void BatchAllocator::init(Matrix *X, Matrix *y, float cross_validation_size, int
 				MPI_Send(CURRENT_BATCH_CV->data,CURRENT_BATCH_CV->size, MPI_FLOAT,m_cluster.PCIe_RANKS[i+1],997,MPI_COMM_WORLD);
 				MPI_Send(CURRENT_BATCH_CV_Y->data,CURRENT_BATCH_CV_Y->size, MPI_FLOAT,m_cluster.PCIe_RANKS[i+1],996,MPI_COMM_WORLD);
 			}
+		}
+
+		if(batchmethod == Distributed_weights)
+		{
+			for(int i = 0; i < m_cluster.PCIe_RANKS.size()-1; i++)
+			{
+
+				MPI_Send(CURRENT_BATCH->data,CURRENT_BATCH->size, MPI_FLOAT,m_cluster.PCIe_RANKS[i+1],999,MPI_COMM_WORLD);
+				MPI_Send(CURRENT_BATCH_Y->data,CURRENT_BATCH_Y->size, MPI_FLOAT,m_cluster.PCIe_RANKS[i+1],998,MPI_COMM_WORLD);
+				MPI_Send(CURRENT_BATCH_CV->data,CURRENT_BATCH_CV->size, MPI_FLOAT,m_cluster.PCIe_RANKS[i+1],997,MPI_COMM_WORLD);
+				MPI_Send(CURRENT_BATCH_CV_Y->data,CURRENT_BATCH_CV_Y->size, MPI_FLOAT,m_cluster.PCIe_RANKS[i+1],996,MPI_COMM_WORLD);
+			}
+
 		}
 	}
 	else
@@ -337,7 +359,10 @@ void BatchAllocator::replace_current_batch_with_next()
 	if(m_next_batch_number >= TOTAL_BATCHES)
 	{
 		//reset to the intial state
-		m_next_batch_number = m_myrank;
+		if(BATCH_METHOD == Batch_split)
+			m_next_batch_number = m_myrank;
+		else
+			m_next_batch_number = 0;
 		if(CURRENT_BATCH->rows != BATCH_SIZE)
 		{
 			cudaFree(m_next_matrices_X[0]->data);
@@ -379,7 +404,11 @@ void BatchAllocator::replace_current_cv_batch_with_next()
 	if(m_next_batch_number_cv >= TOTAL_BATCHES_CV)
 	{
 		//reset to the intial state
-		m_next_batch_number_cv = m_myrank;
+
+		if(BATCH_METHOD == Batch_split)
+			m_next_batch_number_cv = m_myrank;
+		else
+			m_next_batch_number_cv = 0;
 		if(CURRENT_BATCH_CV->rows != BATCH_SIZE_CV)
 		{
 			cudaFree(m_next_matrices_cv_X[0]->data);

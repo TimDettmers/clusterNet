@@ -14,7 +14,8 @@
 typedef enum BatchAllocationMethod_t
 {
 	Single_GPU = 0,
-	Batch_split = 1
+	Batch_split = 1,
+	Distributed_weights = 2
 } BatchAllocationMethod_t;
 
 class BatchAllocator

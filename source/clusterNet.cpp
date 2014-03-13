@@ -30,7 +30,12 @@ ClusterNet::ClusterNet(int seed)
 ClusterNet::ClusterNet(int argc, char* argv[], int seed)
 {
 	init_MPI(argc, argv);
-	init(seed);
+	init(seed + (10000*MYRANK+12345));
+}
+ClusterNet::ClusterNet(int argc, char* argv[])
+{
+	init_MPI(argc, argv);
+	init((int) (time(0) % (10000*MYRANK+12345)));
 }
 void ClusterNet::init(int seed)
 {
@@ -199,20 +204,10 @@ Matrix *ClusterNet::dotT(Matrix *A, Matrix *B)
 	return out;
 }
 
-void ClusterNet::dotT(Matrix *A, Matrix *B, Matrix *out)
-{
-	dot(A, B, out, CUBLAS_OP_N, CUBLAS_OP_T);
-}
-void ClusterNet::Tdot(Matrix *A, Matrix *B, Matrix *out)
-{
-	dot(A, B, out, CUBLAS_OP_T, CUBLAS_OP_N);
-}
-void ClusterNet::dot(Matrix *A, Matrix *B, Matrix *out)
-{
-	dot(A, B, out, CUBLAS_OP_N, CUBLAS_OP_N);
-}
-void ClusterNet::dot(Matrix *A, Matrix *B, Matrix *out, cublasOperation_t T1,
-		cublasOperation_t T2)
+void ClusterNet::dotT(Matrix *A, Matrix *B, Matrix *out){ dot(A, B, out, CUBLAS_OP_N, CUBLAS_OP_T); }
+void ClusterNet::Tdot(Matrix *A, Matrix *B, Matrix *out){ dot(A, B, out, CUBLAS_OP_T, CUBLAS_OP_N); }
+void ClusterNet::dot(Matrix *A, Matrix *B, Matrix *out){ dot(A, B, out, CUBLAS_OP_N, CUBLAS_OP_N); }
+void ClusterNet::dot(Matrix *A, Matrix *B, Matrix *out, cublasOperation_t T1, cublasOperation_t T2)
 {
 	//if(checkMatrixOperation(A, B, out, 1) == 1){ throw "Matrix *size error:\n"; }
 	cublasStatus_t status;
@@ -258,43 +253,7 @@ void ClusterNet::dot(Matrix *A, Matrix *B, Matrix *out, cublasOperation_t T1,
 	}
 }
 
-Matrix *ClusterNet::dotMPI_batchSlice(Matrix *A, Matrix *B)
-{
-	int split_size = A->rows / MPI_SIZE;
-	Matrix *out = empty(split_size, B->cols);
-	Matrix *out_rev = empty(split_size, B->cols);
 
-	Matrix *A1 = slice_rows(A, split_size * MYRANK,
-			split_size * (MYRANK + 1) - 1);
-	dot(A1, B, out);
-	for (int i = 0; i < MPI_SIZE; i++)
-	{
-		if (MYRANK == i)
-		{
-			continue;
-		}
-		MPI_Request *request = (MPI_Request*) malloc(sizeof(MPI_Request));
-		MPI_Isend(out->data, out->size, MPI_FLOAT, i, 100, MPI_COMM_WORLD,
-				request);
-	}
-
-	for (int i = 0; i < MPI_SIZE; i++)
-	{
-		if (MYRANK == i)
-		{
-			continue;
-		}
-		MPI_Request *request = (MPI_Request*) malloc(sizeof(MPI_Request));
-		//m_receiveRequests[i].push_back(request);
-		MPI_Recv(out_rev->data, out_rev->size, MPI_FLOAT, i, 100,
-				MPI_COMM_WORLD, &m_status);
-		out = vStack(out, out_rev);
-	}
-
-	//waitForAllRequests();
-
-	return out;
-}
 
 Matrix *ClusterNet::dotMPI(Matrix *A, Matrix *B)
 {
@@ -302,71 +261,85 @@ Matrix *ClusterNet::dotMPI(Matrix *A, Matrix *B)
 	dotMPI(A, B, out);
 	return out;
 }
-void ClusterNet::dotMPI(Matrix *A, Matrix *B, Matrix *out)
+
+Matrix *ClusterNet::dotTMPI(Matrix *A, Matrix *B)
+{
+	Matrix *out = empty(A->rows, B->rows);
+	dotMPI(A, B, out, true);
+	return out;
+}
+void ClusterNet::dotMPI(Matrix *A, Matrix *B, Matrix *out){ dotMPI(A,B,out,false); }
+void ClusterNet::TdotMPI(Matrix *A, Matrix *B, Matrix *out){ dotMPI(A,B,out,false); }
+void ClusterNet::dotTMPI(Matrix *A, Matrix *B, Matrix *out){ dotMPI(A,B,out,true); }
+void ClusterNet::dotMPI(Matrix *A, Matrix *B, Matrix *out, bool applyTranspose_B)
 {
 	int col_split_size = (B->isDistributed == 1 ? B->cols_distributed : B->cols) / MPI_SIZE;
 	int remainder = ((B->isDistributed == 1 ? B->cols_distributed : B->cols) % col_split_size);
 	std::string strMatrixName = SSTR(A->rows) + "x" + SSTR((B->isDistributed == 1 ? B->cols_distributed : B->cols));
 
-	if (m_matrixCache.count(strMatrixName) == 0)
+	if(out->isDistributed == 0 && !applyTranspose_B)
 	{
-		Matrix** arrOut = (Matrix**) malloc(sizeof(Matrix*) * MPI_SIZE);
-		for (int i = 0; i < MPI_SIZE; i++)
+		if (m_matrixCache.count(strMatrixName) == 0)
 		{
-			if (i == MPI_SIZE - 1)
-				arrOut[i] = empty(A->rows, col_split_size + remainder);
-			else
-				arrOut[i] = empty(A->rows, col_split_size);
+			Matrix** arrOut = (Matrix**) malloc(sizeof(Matrix*) * MPI_SIZE);
+			for (int i = 0; i < MPI_SIZE; i++)
+			{
+				if (i == MPI_SIZE - 1)
+					arrOut[i] = empty(A->rows, col_split_size + remainder);
+				else
+					arrOut[i] = empty(A->rows, col_split_size);
+			}
+			m_matrixCache[strMatrixName] = arrOut;
+			m_matrixCacheUsage[strMatrixName] = 1;
+
+			float **h_arrA = (float**) malloc(sizeof(float*) * MPI_SIZE);
+			for (int i = 0; i < MPI_SIZE; i++)
+				h_arrA[i] = m_matrixCache[strMatrixName][i]->data;
+
+			float **d_arrA;
+			cudaMalloc((void**) &d_arrA, sizeof(float*) * MPI_SIZE);
+			cudaMemcpy(d_arrA, h_arrA, sizeof(float*) * MPI_SIZE,cudaMemcpyDefault);
+			m_matrixHStackCache[strMatrixName] = d_arrA;
+			free(h_arrA);
 		}
-		m_matrixCache[strMatrixName] = arrOut;
-		m_matrixCacheUsage[strMatrixName] = 1;
 
-		float **h_arrA = (float**) malloc(sizeof(float*) * MPI_SIZE);
-		for (int i = 0; i < MPI_SIZE; i++)
-			h_arrA[i] = m_matrixCache[strMatrixName][i]->data;
-
-		float **d_arrA;
-		cudaMalloc((void**) &d_arrA, sizeof(float*) * MPI_SIZE);
-		cudaMemcpy(d_arrA, h_arrA, sizeof(float*) * MPI_SIZE,cudaMemcpyDefault);
-		m_matrixHStackCache[strMatrixName] = d_arrA;
-		free(h_arrA);
-	}
-
-	std::map<std::string, int>::iterator iter;
-	std::vector<std::string> toDecrement;
-	std::vector<std::string> toDelete;
-	//determine the matices to delete and to decrement
-	for (iter = m_matrixCacheUsage.begin(); iter != m_matrixCacheUsage.end();++iter)
-	{
-		if (iter->first != strMatrixName)
+		std::map<std::string, int>::iterator iter;
+		std::vector<std::string> toDecrement;
+		std::vector<std::string> toDelete;
+		//determine the matices to delete and to decrement
+		for (iter = m_matrixCacheUsage.begin(); iter != m_matrixCacheUsage.end();++iter)
 		{
-			toDecrement.push_back(iter->first);
-			if (iter->second < -20)
-				toDelete.push_back(iter->first);
+			if (iter->first != strMatrixName)
+			{
+				toDecrement.push_back(iter->first);
+				if (iter->second < -20)
+					toDelete.push_back(iter->first);
+			}
 		}
+
+		//decrement matrices
+		for (int i = 0; i < toDecrement.size(); i++)
+			m_matrixCacheUsage[toDecrement[i]] -= 1;
+
+		//free matrices that were reused not enough
+		for (int i = 0; i < toDelete.size(); i++)
+		{
+			for (int j = 0; j < MPI_SIZE; j++)
+				cudaFree(m_matrixCache[toDelete[i]][i]->data);
+
+			m_matrixCache.erase(toDelete[i]);
+			m_matrixCacheUsage.erase(toDelete[i]);
+			m_matrixHStackCache.erase(toDelete[i]);
+		}
+
+		m_matrixCacheUsage[strMatrixName] = 0;
+
+		toDecrement.clear();
+		toDelete.clear();
 	}
-
-	//decrement matrices
-	for (int i = 0; i < toDecrement.size(); i++)
-		m_matrixCacheUsage[toDecrement[i]] -= 1;
-
-	//free matrices that were reused not enough
-	for (int i = 0; i < toDelete.size(); i++)
-	{
-		for (int j = 0; j < MPI_SIZE; j++)
-			cudaFree(m_matrixCache[toDelete[i]][i]->data);
-
-		m_matrixCache.erase(toDelete[i]);
-		m_matrixCacheUsage.erase(toDelete[i]);
-		m_matrixHStackCache.erase(toDelete[i]);
-	}
-
-	m_matrixCacheUsage[strMatrixName] = 0;
-
-	toDecrement.clear();
-	toDelete.clear();
 
 	Matrix *B1;
+	Matrix *A1;
 	if (B->isDistributed == 0)
 	{
 		if (MYRANK == MPI_SIZE - 1)
@@ -374,27 +347,63 @@ void ClusterNet::dotMPI(Matrix *A, Matrix *B, Matrix *out)
 		else
 			B1 = slice_cols(B, col_split_size * MYRANK,	col_split_size * (MYRANK + 1) - 1);
 
-		dot(A, B1, m_matrixCache[strMatrixName][MYRANK]);
+		if(out->isDistributed == 1)
+			Tdot(A, B1, out);
+		else
+			dot(A, B1, m_matrixCache[strMatrixName][MYRANK]);
+
 	}
 	else
 	{
-		dot(A, B, m_matrixCache[strMatrixName][MYRANK]);
+		if(!applyTranspose_B)
+		{
+			dot(A, B, m_matrixCache[strMatrixName][MYRANK]);
+		}
+		else
+		{
+			if (MYRANK == MPI_SIZE - 1)
+				A1 = slice_cols(A, col_split_size * MYRANK,	col_split_size * (MYRANK + 1) - 1 + remainder);
+			else
+				A1 = slice_cols(A, col_split_size * MYRANK,	col_split_size * (MYRANK + 1) - 1);
+
+			dotT(A1,B,out);
+		}
 	}
 
-	int matrix_idx = MYRANK;
-	for (int i = 0; i < MPI_SIZE - 1; i++)
+	if(out->isDistributed == 0 && !applyTranspose_B)
 	{
-		MPI_Isend(m_matrixCache[strMatrixName][matrix_idx]->data,
-				m_matrixCache[strMatrixName][matrix_idx]->size, MPI_FLOAT,
-				m_destination, 100, MPI_COMM_WORLD, &m_sendrequest);
-		matrix_idx = (matrix_idx - 1) < 0 ? MPI_SIZE - 1 : (matrix_idx - 1);
-		MPI_Irecv(m_matrixCache[strMatrixName][matrix_idx]->data, m_matrixCache[strMatrixName][matrix_idx]->size, MPI_FLOAT, m_source, 100, MPI_COMM_WORLD, &m_requests[i]);
-	}
+		int matrix_idx = MYRANK;
+		for (int i = 0; i < MPI_SIZE - 1; i++)
+		{
+			MPI_Isend(m_matrixCache[strMatrixName][matrix_idx]->data,
+					m_matrixCache[strMatrixName][matrix_idx]->size, MPI_FLOAT,
+					m_destination, 100, MPI_COMM_WORLD, &m_sendrequest);
+			matrix_idx = (matrix_idx - 1) < 0 ? MPI_SIZE - 1 : (matrix_idx - 1);
+			MPI_Recv(m_matrixCache[strMatrixName][matrix_idx]->data, m_matrixCache[strMatrixName][matrix_idx]->size, MPI_FLOAT, m_source, 100, MPI_COMM_WORLD, &m_status);
+		}
 
-	if(B->isDistributed == 0)
-		cudaFree(B1->data);
-	MPI_Waitall(MPI_SIZE - 1, m_requests, MPI_STATUSES_IGNORE );
-	hStackN(m_matrixHStackCache[strMatrixName],	m_matrixCache[strMatrixName][0]->size, out, MPI_SIZE);
+		if(B->isDistributed == 0)
+			cudaFree(B1->data);
+		hStackN(m_matrixHStackCache[strMatrixName],	m_matrixCache[strMatrixName][0]->size, out, MPI_SIZE);
+	}
+	else if(out->isDistributed == 0 && applyTranspose_B)
+	{
+		int matrix_idx = MYRANK;
+		Matrix *recv = zeros(out->rows,out->cols);
+		for (int i = 0; i < MPI_SIZE - 1; i++)
+		{
+			if(i == 0)
+				MPI_Isend(out->data,out->size, MPI_FLOAT, m_destination, 100, MPI_COMM_WORLD, &m_sendrequest);
+			else
+				MPI_Isend(recv->data,recv->size, MPI_FLOAT, m_destination, 100, MPI_COMM_WORLD, &m_sendrequest);
+			matrix_idx = (matrix_idx - 1) < 0 ? MPI_SIZE - 1 : (matrix_idx - 1);
+			MPI_Recv(recv->data, recv->size, MPI_FLOAT, m_source, 100, MPI_COMM_WORLD, &m_status);
+			add(out,recv,out);
+		}
+
+		cudaFree(A1->data);
+		cudaFree(recv->data);
+	}
 }
 
 //Uniform
@@ -409,7 +418,6 @@ Matrix *ClusterNet::rand(int rows, int cols)
 void ClusterNet::rand(int rows, int cols, Matrix *out)
 {
 	curandGenerateUniform(m_generator, out->data, rows * cols);
-	//print_gpu_matrix(*out);
 }
 
 //Gaussian
@@ -528,8 +536,24 @@ Matrix *ClusterNet::distributed_uniformSqrtWeight(int rows, int cols)
 
 	W->isDistributed = 1;
 	W->cols_distributed = cols;
-	::uniformSqrtWeight(W);
+	::uniformSqrtWeight(W,W->rows,W->cols_distributed);
 
+
+	return W;
+}
+
+Matrix *ClusterNet::distributed_Zeros(int rows, int cols)
+{
+	assert(m_hasMPI);
+	Matrix *W;
+	int split_size = cols / MPI_SIZE;
+	if (MYRANK < MPI_SIZE - 1)
+		W = zeros(rows, split_size);
+	else
+		W = zeros(rows, split_size + (cols % split_size));
+
+	W->isDistributed = 1;
+	W->cols_distributed = cols;
 
 	return W;
 }

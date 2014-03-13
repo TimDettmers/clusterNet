@@ -747,17 +747,28 @@ int main(int argc, char *argv[])
 
 	//dotMPI_test(argc,argv);
 
-	ClusterNet gpu = ClusterNet(argc,argv,12346);
-	Matrix *batch = gpu.rand(128,100000);//34 MB
-	Matrix *out1 = empty(128,40000);//19 MB
-	Matrix *out2 = empty(128,20000);//9 MB
-	Matrix *W1 = gpu.distributed_uniformSqrtWeight(100000,40000);//15258 MB
-	Matrix *W2 = gpu.distributed_uniformSqrtWeight(40000,20000);//3051 MB
+
+	ClusterNet gpu = ClusterNet(argc,argv,12345);
+	Matrix *batch = gpu.rand(3,6);//34 MB
+	Matrix *out1 = empty(3,8);//19 MB
+	Matrix *out2 = empty(3,4);//9 MB
+	Matrix *W1 = gpu.distributed_uniformSqrtWeight(6,8);//15258 MB
+	Matrix *W2 = gpu.distributed_uniformSqrtWeight(8,4);//3051 MB
 
 	gpu.dotMPI(batch,W1,out1);
 	gpu.dotMPI(out1,W2,out2);
+	gpu.TdotMPI(out1,out2,W2);
+
+	gpu.TdotMPI(batch,out1,W1);
+	gpu.dotTMPI(out2,W2,out1);
+
+
+	//printmat(batch);
+	//printmat(W1);
+	printmat(out1);
 
 	gpu.shutdown();
+
 	/*
 
 	Matrix *A = gpu.rand(128,20000);
@@ -785,7 +796,8 @@ int main(int argc, char *argv[])
 
 
 
-/*
+	/*
+	ClusterNet gpu = ClusterNet(argc,argv,12346);
 	std::vector<int> layers;
 	layers.push_back(1000);
 	//Matrix *X = read_hdf5("/home/tim/mnist_full_X.hdf5");
@@ -793,9 +805,10 @@ int main(int argc, char *argv[])
 	//DeepNeuralNetwork net = DeepNeuralNetwork(X,y,0.20,layers,Classification);
 
 
-	DeepNeuralNetwork net = DeepNeuralNetwork("/home/tim/mnist_full_X.hdf5","/home/tim/mnist_full_y.hdf5",0.20,layers,Classification,argc,argv);
+	DeepNeuralNetwork net = DeepNeuralNetwork("/home/tim/mnist_full_X.hdf5","/home/tim/mnist_full_y.hdf5",0.20,layers,Classification,argc,argv, Distributed_weights);
 	net.train();
-*/
+	*/
+
 
 
 

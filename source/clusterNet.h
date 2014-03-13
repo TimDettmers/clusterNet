@@ -16,6 +16,7 @@ class ClusterNet
 public:
 	 ClusterNet();
 	 ClusterNet(int seed);
+	 ClusterNet(int argc, char* argv[]);
 	 ClusterNet(int argc, char *argv[], int seed);
 
 	 Matrix *dot(Matrix *A, Matrix *B);
@@ -24,9 +25,11 @@ public:
 	 void dot(Matrix *A, Matrix *B, Matrix *out);
 	 void Tdot(Matrix *A, Matrix *B, Matrix *out);
 	 void dotT(Matrix *A, Matrix *B, Matrix *out);
+	 Matrix *dotTMPI(Matrix *A, Matrix *B);
 	 Matrix *dotMPI(Matrix *A, Matrix *B);
-	 void 	 dotMPI(Matrix *A, Matrix *B, Matrix *out);
-	 Matrix *dotMPI_batchSlice(Matrix *A, Matrix *B);
+	 void dotMPI(Matrix *A, Matrix *B, Matrix *out);
+	 void TdotMPI(Matrix *A, Matrix *B, Matrix *out);
+	 void dotTMPI(Matrix *A, Matrix *B, Matrix *out);
 
 	 Matrix *rand(int rows, int cols);
 	 void rand(int rows, int cols, Matrix *out);
@@ -45,6 +48,7 @@ public:
 	 void shutdown();
 	 Matrix *distributed_uniformSqrtWeight(int rows, int cols);
 	 Matrix *distributed_sparseInitWeight(int rows, int cols);
+	 Matrix *distributed_Zeros(int rows, int cols);
 	 Matrix *uniformSqrtWeight(int rows, int cols);
 	 Matrix *sparseInitWeight(int rows, int cols);
 	 Matrix *sparseInitWeight(int rows, int cols, int connections);
@@ -76,6 +80,7 @@ private:
 	 int m_source;
 
 	 void dot(Matrix *A, Matrix *B, Matrix *out, cublasOperation_t T1, cublasOperation_t T2);
+	 void dotMPI(Matrix *A, Matrix *B, Matrix *out, bool isTranspose_B);
 	 void init(int seed);
 	 void init_MPI(int argc, char *argv[]);
 
