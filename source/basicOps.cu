@@ -139,13 +139,13 @@ void rand_int(Matrix *uniform_rdm,int low, int high)
 void uniformSqrtWeight(Matrix * uniform_rdm)
 {
 	int block_size = (uniform_rdm->size/THREADS_PER_BLOCKS) + 1;
-	kCreateRdmSqrtWeight_Logistic<<<block_size,THREADS_PER_BLOCKS>>>(uniform_rdm->data, uniform_rdm->rows, uniform_rdm->cols);
+	kCreateRdmSqrtWeight_Logistic<<<block_size,THREADS_PER_BLOCKS>>>(uniform_rdm->data, uniform_rdm->rows, uniform_rdm->cols,uniform_rdm->size);
 }
 
 void uniformSqrtWeight(Matrix * uniform_rdm, int in, int out)
 {
 	int block_size = (uniform_rdm->size/THREADS_PER_BLOCKS) + 1;
-	kCreateRdmSqrtWeight_Logistic<<<block_size,THREADS_PER_BLOCKS>>>(uniform_rdm->data, in, out);
+	kCreateRdmSqrtWeight_Logistic<<<block_size,THREADS_PER_BLOCKS>>>(uniform_rdm->data, in, out, uniform_rdm->size);
 }
 
 Matrix *arange(int rows, int cols){	return arange(0, rows, cols); }
@@ -179,7 +179,6 @@ Matrix *empty(int rows, int cols)
 
 Matrix *fill_matrix(int rows, int cols, float fill_value)
 {
-	printf("rows: %i, cols: %i, fillvalue %f\n",rows,cols,fill_value);
   if(rows < 1 || cols < 1)
   {
     printf("Error: Dimensions must be greater than zero!\n");

@@ -13,14 +13,13 @@ __global__ void kFill_with(float *m, float fill_value, int size)
        m[i] = fill_value;
 }
 
-__global__ void kCreateRdmSqrtWeight_Logistic(float *A, int in, int out)
+__global__ void kCreateRdmSqrtWeight_Logistic(float *A, int in, int out, int size)
 {
   const unsigned int numThreads = blockDim.x * gridDim.x;
   const int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
   const float lower_limit = -4.0f*sqrtf(6.0f/((float)in + out));
   const float upper_limit =  4.0f*sqrtf(6.0f/((float)in + out));
   const float range = upper_limit-lower_limit;
-  const int size = in * out;
 
   for (unsigned int i = idx;i < size; i += numThreads)
   {
