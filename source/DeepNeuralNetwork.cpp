@@ -126,19 +126,19 @@ void DeepNeuralNetwork::train()
 
 		  nesterov_updates();
 		  feedforward(Dropout);
-		  //backprop();
+		  backprop();
 		  if(m_BA.BATCH_METHOD != Single_GPU)
 			  m_BA.broadcast_batch_to_PCI();
 
-		  //weight_updates();
+		  weight_updates();
 		  free_variables();
 		  //cout << "post free_variables " << m_gpus.MYRANK << endl;
 		  m_BA.replace_current_batch_with_next();
 		 // cout << "post replace_current_batch_with_next "<< m_gpus.MYRANK << endl;
 		}
 
-		//train_error();
-		//cross_validation_error();
+		train_error();
+		cross_validation_error();
 	}
 
 

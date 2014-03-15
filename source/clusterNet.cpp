@@ -242,7 +242,10 @@ void ClusterNet::dot(Matrix *A, Matrix *B, Matrix *out, cublasOperation_t T1, cu
 	cublasStatus_t status;
 
 	if(!m_cublasInitialized)
+	{
+		m_cublasInitialized = true;
 		cublasCreate_v2(&m_handle);
+	}
 
 	const float alpha = 1.0f;
 	const float beta = 0.0f;
@@ -258,19 +261,21 @@ void ClusterNet::dot(Matrix *A, Matrix *B, Matrix *out, cublasOperation_t T1, cu
 		B_cols = B->rows;
 	}
 
-/*
+
+	/*
 	 cout << "T1: " << T1 << endl;
 	 cout << "T2: " << T2 << endl;
-	 cout << "A rows: " << A->rows << endl;
-	 cout << "A cols: " << A->cols << endl;
+	 cout << "A rows: " << A_rows << endl;
+	 cout << "A cols: " << B_cols << endl;
 	 cout << "B rows: " << B->rows << endl;
-	 cout << "B cols: " << B->cols << endl;
+	 cout << "B cols: " << A_cols << endl;
 	 cout << "out rows: " << out->rows << endl;
 	 cout << "out cols: " << out->cols << endl;
 	 cout << "sum A: " << sum(A) << endl;
 	 cout << "sum B: "  << sum(B) << endl;
 	 cout << "sum out: " << sum(out) << endl;
-*/
+	*/
+
 
 
 	status = cublasSgemm(m_handle, T1, T2, A_rows, B_cols,
@@ -313,7 +318,7 @@ void ClusterNet::dotTMPI(Matrix *A, Matrix *B, Matrix *out){ dotMPI(A,B,out,true
 void ClusterNet::dotMPI(Matrix *A, Matrix *B, Matrix *out, bool applyTranspose_B)
 {
 	int col_split_size = (B->isDistributed == 1 ? B->cols_distributed : B->cols) / MPI_SIZE;
-	int remainder = ((B->isDistributed == 1 ? B->cols_distributed : B->cols) % col_split_size);
+	int remainder = (B->isDistributed == 1 ? B->cols_distributed : B->cols) - (col_split_size*MPI_SIZE);
 	std::string strMatrixName = SSTR(A->rows) + "x" + SSTR((B->isDistributed == 1 ? B->cols_distributed : B->cols)) + "T" +
 								SSTR((applyTranspose_B ? 1 : 0));
 
@@ -352,8 +357,6 @@ void ClusterNet::dotMPI(Matrix *A, Matrix *B, Matrix *out, bool applyTranspose_B
 				m_matrixCache[strMatrixName] = arrOut;
 				m_matrixCacheUsage[strMatrixName] = 1;
 			}
-
-			//cout << "added: " << strMatrixName << endl;
 		}
 
 		std::map<std::string, int>::iterator iter;
@@ -377,13 +380,20 @@ void ClusterNet::dotMPI(Matrix *A, Matrix *B, Matrix *out, bool applyTranspose_B
 		//free matrices that were reused not enough
 		for (int i = 0; i < toDelete.size(); i++)
 		{
-			for (int j = 0; j < MPI_SIZE; j++)
-				cudaFree(m_matrixCache[toDelete[i]][i]->data);
+			if(m_matrixHStackCache.count(toDelete[i]) > 0)
+			{
+				for (int j = 0; j < MPI_SIZE; j++)
+					cudaFree(m_matrixCache[toDelete[i]][j]->data);
 
+				cudaFree(m_matrixHStackCache[toDelete[i]]);
+				m_matrixHStackCache.erase(toDelete[i]);
+			}
+			else
+			{
+				cudaFree(m_matrixCache[toDelete[i]][0]->data);
+			}
 			m_matrixCache.erase(toDelete[i]);
 			m_matrixCacheUsage.erase(toDelete[i]);
-			if(m_matrixHStackCache.count(toDelete[i]) > 0)
-				m_matrixHStackCache.erase(toDelete[i]);
 		}
 
 		m_matrixCacheUsage[strMatrixName] = 0;
@@ -391,6 +401,7 @@ void ClusterNet::dotMPI(Matrix *A, Matrix *B, Matrix *out, bool applyTranspose_B
 		toDecrement.clear();
 		toDelete.clear();
 	}
+
 
 	Matrix *B1;
 	Matrix *A1;
@@ -421,7 +432,9 @@ void ClusterNet::dotMPI(Matrix *A, Matrix *B, Matrix *out, bool applyTranspose_B
 		}
 	}
 
-	MPI_Barrier(MPI_COMM_WORLD);
+
+
+
 
 	if(out->isDistributed == 0 && !applyTranspose_B)
 	{
@@ -433,7 +446,7 @@ void ClusterNet::dotMPI(Matrix *A, Matrix *B, Matrix *out, bool applyTranspose_B
 					m_matrixCache[strMatrixName][matrix_idx]->size, MPI_FLOAT,
 					m_destination, 100, MPI_COMM_WORLD, &m_sendrequest);
 			matrix_idx = (matrix_idx - 1) < 0 ? MPI_SIZE - 1 : (matrix_idx - 1);
-			MPI_Recv(m_matrixCache[strMatrixName][matrix_idx]->data, m_matrixCache[strMatrixName][matrix_idx]->size, MPI_FLOAT, m_source, 100, MPI_COMM_WORLD, &m_status);
+			MPI_Recv(&m_matrixCache[strMatrixName][matrix_idx]->data[0], m_matrixCache[strMatrixName][matrix_idx]->size, MPI_FLOAT, m_source, 100, MPI_COMM_WORLD, &m_status);
 		}
 		//cout << "post send, myrank: " << MYRANK << endl;
 
@@ -457,10 +470,9 @@ void ClusterNet::dotMPI(Matrix *A, Matrix *B, Matrix *out, bool applyTranspose_B
 		cudaFree(A1->data);
 	}
 
+	if(out->isDistributed == 1)
+		cudaFree(B1->data);
 
-	//size_t free1, total;
-	//cudaMemGetInfo(&free1,&total);
-	//cout << "free memory: " << free1 << endl;
 
 }
 
