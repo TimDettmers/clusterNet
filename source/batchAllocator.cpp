@@ -166,7 +166,6 @@ void BatchAllocator::init(Matrix *X, Matrix *y, float cross_validation_size, int
 			to_col_major(m_next_matrices_cv_X[i], CURRENT_BATCH_CV);
 			to_col_major(m_next_matrices_cv_y[i], CURRENT_BATCH_CV_Y);
 
-			cudaDeviceSynchronize();
 			if(batchmethod == Batch_split && i < pci_count -1)
 			{
 				MPI_Send(CURRENT_BATCH->data,CURRENT_BATCH->size, MPI_FLOAT,m_cluster.PCIe_RANKS[i+1],999,MPI_COMM_WORLD);
@@ -239,14 +238,15 @@ void BatchAllocator::broadcast_batch_to_PCI()
 		cudaStreamSynchronize(m_streamNext_batch_y);
 		for(int i = 1; i < m_cluster.PCIe_RANKS.size(); i++)
 		{
-			MPI_Isend(m_next_matrices_X[i]->data,m_next_matrices_X[i]->size,MPI_FLOAT,m_cluster.PCIe_RANKS[i],999,MPI_COMM_WORLD,&m_request_send_X);
-			MPI_Isend(m_next_matrices_y[i]->data,m_next_matrices_y[i]->size,MPI_FLOAT,m_cluster.PCIe_RANKS[i],998,MPI_COMM_WORLD,&m_request_send_y);
+			MPI_Isend(m_next_matrices_X[0]->data,m_next_matrices_X[0]->size,MPI_FLOAT,m_cluster.PCIe_RANKS[i],999,MPI_COMM_WORLD,&m_request_send_X);
+			MPI_Isend(m_next_matrices_y[0]->data,m_next_matrices_y[0]->size,MPI_FLOAT,m_cluster.PCIe_RANKS[i],998,MPI_COMM_WORLD,&m_request_send_y);
 		}
 	}
 	else
 	{
-		MPI_Irecv(m_next_matrices_X[0]->data,m_next_matrices_X[0]->size,MPI_FLOAT,m_cluster.PCIe_RANKS[0],999,MPI_COMM_WORLD,&m_request_X);
-		MPI_Irecv(m_next_matrices_y[0]->data,m_next_matrices_y[0]->size,MPI_FLOAT,m_cluster.PCIe_RANKS[0],998,MPI_COMM_WORLD,&m_request_y);
+		//cout << "broadcast pci myrank: " << m_myrank << endl;
+		MPI_Recv(m_next_matrices_X[0]->data,m_next_matrices_X[0]->size,MPI_FLOAT,m_cluster.PCIe_RANKS[0],999,MPI_COMM_WORLD,&m_status);
+		MPI_Recv(m_next_matrices_y[0]->data,m_next_matrices_y[0]->size,MPI_FLOAT,m_cluster.PCIe_RANKS[0],998,MPI_COMM_WORLD,&m_status);
 	}
 }
 
@@ -258,71 +258,70 @@ void BatchAllocator::broadcast_cv_batch_to_PCI()
 		cudaStreamSynchronize(m_streamNext_batch_cv_y);
 		for(int i = 1; i < m_cluster.PCIe_RANKS.size(); i++)
 		{
-			MPI_Isend(m_next_matrices_cv_X[i]->data,m_next_matrices_cv_X[i]->size,MPI_FLOAT,m_cluster.PCIe_RANKS[i],999,MPI_COMM_WORLD,&m_request_send_cv_X);
-			MPI_Isend(m_next_matrices_cv_y[i]->data,m_next_matrices_cv_y[i]->size,MPI_FLOAT,m_cluster.PCIe_RANKS[i],998,MPI_COMM_WORLD,&m_request_send_cv_y);
+			MPI_Isend(m_next_matrices_cv_X[0]->data,m_next_matrices_cv_X[0]->size,MPI_FLOAT,m_cluster.PCIe_RANKS[i],999,MPI_COMM_WORLD,&m_request_send_cv_X);
+			MPI_Isend(m_next_matrices_cv_y[0]->data,m_next_matrices_cv_y[0]->size,MPI_FLOAT,m_cluster.PCIe_RANKS[i],998,MPI_COMM_WORLD,&m_request_send_cv_y);
 		}
 	}
 	else
 	{
-		MPI_Irecv(m_next_matrices_cv_X[0]->data,m_next_matrices_cv_X[0]->size,MPI_FLOAT,m_cluster.PCIe_RANKS[0],999,MPI_COMM_WORLD,&m_request_cv_X);
-		MPI_Irecv(m_next_matrices_cv_y[0]->data,m_next_matrices_cv_y[0]->size,MPI_FLOAT,m_cluster.PCIe_RANKS[0],998,MPI_COMM_WORLD,&m_request_cv_y);
+		MPI_Recv(m_next_matrices_cv_X[0]->data,m_next_matrices_cv_X[0]->size,MPI_FLOAT,m_cluster.PCIe_RANKS[0],999,MPI_COMM_WORLD,&m_status);
+		MPI_Recv(m_next_matrices_cv_y[0]->data,m_next_matrices_cv_y[0]->size,MPI_FLOAT,m_cluster.PCIe_RANKS[0],998,MPI_COMM_WORLD,&m_status);
 	}
 }
 
 void BatchAllocator::allocate_next_batch_async()
 {
-	if(m_mygpuID == 0)
+	int pci_count = 1;
+	if(BATCH_METHOD == Batch_split){ pci_count = m_cluster.PCIe_RANKS.size();  }
+	for(int i = 0; i < pci_count; i++)
 	{
-		int pci_count = 1;
-		if(BATCH_METHOD == Batch_split){ pci_count = m_cluster.PCIe_RANKS.size();  }
-		for(int i = 0; i < pci_count; i++)
+		int copy_range_bytes_X = m_next_matrices_X[i]->bytes;
+		int copy_range_bytes_y = m_next_matrices_y[i]->bytes;
+		if((BATCH_SIZE * (m_next_batch_number + 1 + i)) > TRAIN_SET_SIZE)
 		{
-			int copy_range_bytes_X = m_next_matrices_X[i]->bytes;
-			int copy_range_bytes_y = m_next_matrices_y[i]->bytes;
-			if((BATCH_SIZE * (m_next_batch_number + 1 + i)) > TRAIN_SET_SIZE)
-			{
-				//the next batch is smaller than the given standard batch size
-				int partial_batch_size = TRAIN_SET_SIZE % BATCH_SIZE;
-				copy_range_bytes_X = partial_batch_size*m_full_X->cols*sizeof(float);
-				copy_range_bytes_y = partial_batch_size*m_full_y->cols*sizeof(float);
-				cudaFree(m_next_matrices_X[i]->data);
-				cudaFree(m_next_matrices_y[i]->data);
-				m_next_matrices_X[i] = empty(partial_batch_size, m_full_X->cols);
-				m_next_matrices_y[i] = empty(partial_batch_size, m_full_y->cols);
-			}
+			//the next batch is smaller than the given standard batch size
+			int partial_batch_size = TRAIN_SET_SIZE % BATCH_SIZE;
+			copy_range_bytes_X = partial_batch_size*m_Cols_X*sizeof(float);
+			copy_range_bytes_y = partial_batch_size*m_Cols_y*sizeof(float);
+			cudaFree(m_next_matrices_X[i]->data);
+			cudaFree(m_next_matrices_y[i]->data);
+			m_next_matrices_X[i] = empty(partial_batch_size, m_Cols_X);
+			m_next_matrices_y[i] = empty(partial_batch_size, m_Cols_y);
+		}
 
+		if(m_mygpuID == 0)
+		{
 			cudaMemcpyAsync(&m_next_matrices_X[i]->data[0],&m_full_X->data[(m_full_X->cols * (m_next_batch_number+i) * BATCH_SIZE)],
 							copy_range_bytes_X, cudaMemcpyHostToDevice,m_streamNext_batch_X);
 			cudaMemcpyAsync(&m_next_matrices_y[i]->data[0],&m_full_y->data[(m_full_y->cols * (m_next_batch_number+i) * BATCH_SIZE)],
 							copy_range_bytes_y, cudaMemcpyHostToDevice,m_streamNext_batch_y);
 		}
 	}
-
 }
 
 void BatchAllocator::allocate_next_cv_batch_async()
 {
-	if(m_mygpuID == 0)
+	int pci_count = 1;
+	if(BATCH_METHOD == Batch_split){ pci_count = m_cluster.PCIe_RANKS.size();  }
+	for(int i = 0; i < pci_count; i++)
 	{
-		int pci_count = 1;
-		if(BATCH_METHOD == Batch_split){ pci_count = m_cluster.PCIe_RANKS.size();  }
-		for(int i = 0; i < pci_count; i++)
+		int copy_range_bytes_X = m_next_matrices_cv_X[i]->bytes;
+		int copy_range_bytes_y = m_next_matrices_cv_y[i]->bytes;
+
+		if((BATCH_SIZE_CV * (m_next_batch_number_cv + 1 + i)) > (m_Rows - TRAIN_SET_SIZE))
 		{
-			int copy_range_bytes_X = m_next_matrices_cv_X[i]->bytes;
-			int copy_range_bytes_y = m_next_matrices_cv_y[i]->bytes;
+			//the next batch is smaller than the given standard batch size
+			int partial_batch_size = (m_Rows - TRAIN_SET_SIZE) % BATCH_SIZE_CV;
+			copy_range_bytes_X = partial_batch_size*m_Cols_X*sizeof(float);
+			copy_range_bytes_y = partial_batch_size*m_Cols_y*sizeof(float);
+			cudaFree(m_next_matrices_cv_X[i]->data);
+			cudaFree(m_next_matrices_cv_y[i]->data);
+			m_next_matrices_cv_X[i] = empty(partial_batch_size, m_Cols_X);
+			m_next_matrices_cv_y[i] = empty(partial_batch_size, m_Cols_y);
+		}
 
-			if((BATCH_SIZE_CV * (m_next_batch_number_cv + 1 + i)) > (m_full_X->rows - TRAIN_SET_SIZE))
-			{
-				//the next batch is smaller than the given standard batch size
-				int partial_batch_size = (m_full_X->rows - TRAIN_SET_SIZE) % BATCH_SIZE_CV;
-				copy_range_bytes_X = partial_batch_size*m_full_X->cols*sizeof(float);
-				copy_range_bytes_y = partial_batch_size*m_full_y->cols*sizeof(float);
-				cudaFree(m_next_matrices_cv_X[i]->data);
-				cudaFree(m_next_matrices_cv_y[i]->data);
-				m_next_matrices_cv_X[i] = empty(partial_batch_size, m_full_X->cols);
-				m_next_matrices_cv_y[i] = empty(partial_batch_size, m_full_y->cols);
-			}
-
+		if(m_mygpuID == 0)
+		{
 			cudaMemcpyAsync(&m_next_matrices_cv_X[i]->data[0],&m_full_X->data[(TRAIN_SET_SIZE * m_full_X->cols)  + ((m_next_batch_number_cv + i) * BATCH_SIZE_CV * m_full_X->cols)],
 							copy_range_bytes_X, cudaMemcpyHostToDevice,m_streamNext_batch_cv_X);
 			cudaMemcpyAsync(&m_next_matrices_cv_y[i]->data[0],&m_full_y->data[(TRAIN_SET_SIZE * m_full_y->cols)  + ((m_next_batch_number_cv + i) * BATCH_SIZE_CV * m_full_y->cols)],
@@ -333,12 +332,18 @@ void BatchAllocator::allocate_next_cv_batch_async()
 
 void BatchAllocator::replace_current_batch_with_next()
 {
+	//cout << "enter batcho" << endl;
+	/*
 	if(m_mygpuID != 0)
 	{
+		cout << "wait it!" << endl;
+		cout << "myrank: " << m_myrank << endl;
 		MPI_Wait(&m_request_X,&m_status);
 		MPI_Wait(&m_request_y,&m_status);
 	}
+	*/
 
+	//cout << "post wait it" << endl;
 	if(m_next_matrices_X[0]->rows != CURRENT_BATCH->rows)
 	{
 		cudaFree(CURRENT_BATCH->data);
@@ -347,12 +352,17 @@ void BatchAllocator::replace_current_batch_with_next()
 		CURRENT_BATCH_Y = empty(m_next_matrices_y[0]->rows,m_next_matrices_y[0]->cols);
 	}
 
+	//cout << "post batch quier" << endl;
+
 	if(BATCH_METHOD == Single_GPU)
 		cudaStreamSynchronize(m_streamNext_batch_X);
 	to_col_major(m_next_matrices_X[0], CURRENT_BATCH);
 	if(BATCH_METHOD == Single_GPU)
 		cudaStreamSynchronize(m_streamNext_batch_y);
 	to_col_major(m_next_matrices_y[0], CURRENT_BATCH_Y);
+
+
+	//cout << "post tranpose" << endl;
 
 	if(BATCH_METHOD == Batch_split )
 		m_next_batch_number += m_cluster.MPI_SIZE;
@@ -378,11 +388,13 @@ void BatchAllocator::replace_current_batch_with_next()
 
 void BatchAllocator::replace_current_cv_batch_with_next()
 {
+	/*
 	if(m_mygpuID != 0)
 	{
 		MPI_Wait(&m_request_cv_X,&m_status);
 		MPI_Wait(&m_request_cv_y,&m_status);
 	}
+	*/
 
 	if(m_next_matrices_cv_X[0]->rows != CURRENT_BATCH_CV->rows)
 	{

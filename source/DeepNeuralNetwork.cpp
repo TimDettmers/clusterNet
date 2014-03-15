@@ -109,15 +109,15 @@ void DeepNeuralNetwork::train()
 	init_weights();
 
 	float error = 0;
-	int epochs = 100;
-	//size_t free, total;
+	int epochs = 10;
+	size_t free, total;
 	int device;
 	for(int EPOCH = 0; EPOCH < epochs; EPOCH++)
 	{
 		if(m_BA.BATCH_METHOD == Single_GPU || (m_BA.BATCH_METHOD != Single_GPU && m_gpus.MYRANK == 0))
 			std::cout << "EPOCH: " << EPOCH + 1 << std::endl;
-		//cudaMemGetInfo(&free, &total);
-		//std::cout << free << std::endl;
+		cudaMemGetInfo(&free, &total);
+		std::cout << free << std::endl;
 		MOMENTUM += 0.01;
 		if(MOMENTUM > 0.95) MOMENTUM = 0.95;
 		for(int i = 0; i < m_BA.TOTAL_ITERATIONS; i++)
@@ -126,19 +126,19 @@ void DeepNeuralNetwork::train()
 
 		  nesterov_updates();
 		  feedforward(Dropout);
-			cout << "pre backprop" << endl;
-		  backprop();
-			cout << "post backprop" << endl;
-
+		  //backprop();
 		  if(m_BA.BATCH_METHOD != Single_GPU)
 			  m_BA.broadcast_batch_to_PCI();
-		  weight_updates();
-		  free_variables();
-		  m_BA.replace_current_batch_with_next();
-	  }
 
-		train_error();
-		cross_validation_error();
+		  //weight_updates();
+		  free_variables();
+		  //cout << "post free_variables " << m_gpus.MYRANK << endl;
+		  m_BA.replace_current_batch_with_next();
+		 // cout << "post replace_current_batch_with_next "<< m_gpus.MYRANK << endl;
+		}
+
+		//train_error();
+		//cross_validation_error();
 	}
 
 
@@ -160,17 +160,10 @@ void DeepNeuralNetwork::backprop()
 
 		  derivative_function(i, Z[i]);
 		  E.push_back(m_gpus.dotT(E.back(), W[i]));
-		  cout << "pre mul" << endl;
 		  mul(E.back(),Z[i],E.back());
-		  cout << "post mul" << endl;
 	  }
-	  cout << "pre grad 0" << endl;
 	  m_gpus.Tdot(Z[0],E.back(),GRAD[0]);
-	  if(m_BA.BATCH_METHOD == Batch_split)
-		  m_BA.average_weight(GRAD[0]);
 	  cudaFree(t->data);
-
-	  cout << "post grad 0" << endl;
 }
 
 void DeepNeuralNetwork::free_variables()
@@ -184,6 +177,7 @@ void DeepNeuralNetwork::free_variables()
 	  for(int i = 0; i < E.size(); i++)
 			cudaFree(E[i]->data);
 	  E.clear();
+
 }
 
 void DeepNeuralNetwork::weight_updates()
@@ -299,7 +293,7 @@ void DeepNeuralNetwork::train_error()
 		  m_BA.replace_current_batch_with_next();
 	  }
 
-	  if(m_BA.BATCH_METHOD == Single_GPU || (m_BA.BATCH_METHOD == Batch_split && m_gpus.MYRANK == 0))
+	  if(m_BA.BATCH_METHOD == Single_GPU || (m_BA.BATCH_METHOD != Single_GPU && m_gpus.MYRANK == 0))
 		  std::cout << "Train error: " << errors/(float)m_BA.TRAIN_SET_SIZE << std::endl;
 }
 
@@ -307,7 +301,7 @@ void DeepNeuralNetwork::train_error()
 void DeepNeuralNetwork::cross_validation_error()
 {
 	  int errors = 0;
-	  for(int i = 0; i < m_BA.TOTAL_BATCHES_CV; i++)
+	  for(int i = 0; i < m_BA.TOTAL_ITERATIONS_CV; i++)
 	  {
 		  m_BA.allocate_next_cv_batch_async();
 		  feedforward(CV_error);
@@ -320,6 +314,6 @@ void DeepNeuralNetwork::cross_validation_error()
 		  m_BA.replace_current_cv_batch_with_next();
 	  }
 
-	  if(m_BA.BATCH_METHOD == Single_GPU || (m_BA.BATCH_METHOD == Batch_split && m_gpus.MYRANK == 0))
+	  if(m_BA.BATCH_METHOD == Single_GPU || (m_BA.BATCH_METHOD != Single_GPU && m_gpus.MYRANK == 0))
 		  std::cout << "Cross validation error: " << errors/(float)m_BA.CV_SET_SIZE << std::endl;
 }
