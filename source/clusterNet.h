@@ -82,7 +82,7 @@ private:
 	 int m_source;
 
 	 void dot(Matrix *A, Matrix *B, Matrix *out, cublasOperation_t T1, cublasOperation_t T2);
-	 void dotMPI(Matrix *A, Matrix *B, Matrix *out, bool isTranspose_B);
+	 void dotMPI(Matrix *A, Matrix *B, Matrix *out, bool applyTranspose_A, bool applyTranspose_B);
 	 void init(int seed);
 	 void init_MPI(int argc, char *argv[]);
 

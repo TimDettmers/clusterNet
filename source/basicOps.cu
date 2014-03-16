@@ -197,13 +197,13 @@ Matrix *add(Matrix *A, Matrix *B)
 {
   Matrix *out = empty(A->rows,A->cols);
   add(A, B, out);
-  checkMatrixOperation(A, B, out, 0);
 
   return out;
 }
 
 void add(Matrix *A, Matrix *B, Matrix *out)
 {
+  checkMatrixOperation(A, B, out, 0);
   int block_size = (A->size/THREADS_PER_BLOCKS) + 1;
   kAdd<<<block_size,THREADS_PER_BLOCKS>>>(A->data, B->data, out->data, A->size);
 }

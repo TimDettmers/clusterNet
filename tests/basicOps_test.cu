@@ -328,7 +328,7 @@ int run_basicOps_test(int argc, char *argv[])
   for(int i = 0; i < 10; i++)
   {
 	  //expectation is 205.6 each;
-	  ASSERT((counts[i] > 150) && (counts[i] < 270), "Argmax value test");
+	  ASSERT((counts[i] > 140) && (counts[i] < 280), "Argmax value test");
   }
 
   //create t matrix test

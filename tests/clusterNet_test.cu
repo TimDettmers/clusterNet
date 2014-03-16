@@ -194,14 +194,94 @@ int run_clusterNet_test(int argc, char *argv[])
 	  assert(test_matrix(m4,200,800));
 	}
 
-	gpu.shutdown();
+	int count = 0;
+	//distributed weights test
+	m_host = to_host(gpu.distributed_uniformSqrtWeight(10000,1000));
+	assert(test_matrix(m_host,10000,1000/gpu.MPI_SIZE));
+	count = 0;
+	for(int i = 0; i < m_host->size; i++)
+	{
+	  ASSERT((m_host->data[i] > -4.0f*sqrt(6.0f/(10000.0+1000.0))) && (m_host->data[i] < 4.0f*sqrt(6.0f/(10000.0+1000.0))),"Distributed RdmSqrtWeight test");
+	  if(m_host->data[i] == 0)
+		  count++;
+	}
+	ASSERT(count < 10,"Distributed RdmSqrtWeight test");
 
+	m1 = gpu.distributed_uniformSqrtWeight(7833,83);
+	test_eq(m1->rows,7833,"distributed rdmsqrt split size test");
+	if(gpu.MYRANK < gpu.MPI_SIZE-1)
+		test_eq(m1->cols,83/gpu.MPI_SIZE,"distributed rdmsqrt split size test");
+	else
+		test_eq(m1->cols,83-((83/gpu.MPI_SIZE)*(gpu.MPI_SIZE-1)),"distributed rdmsqrt split size test");
+
+
+	//distributed zeros test
+	m_host = to_host(gpu.distributed_zeros(10000,1000));
+	assert(test_matrix(m_host,10000,1000/gpu.MPI_SIZE));
+	for(int i = 0; i < m_host->size; i++)
+	{
+	  ASSERT(m_host->data[i] == 0.0f,"Distributed zeros test");
+	}
+
+	//dotMPI test for distributed weights
+	m1 = gpu.distributed_zeros(8783,317);
+	scalarAdd(m1,1.0,m1);
+	m2 = ones(111,8783);
+	m3 = ones(17,317);
+	m4 = ones(8783,17);
+	m_host = to_host(m1);
+	for(int i = 0; i < m_host->size; i++)
+	{
+		assert(test_eq(m_host->data[i],1.0f,"dotMPI test"));
+	}
+	//indirect dotMPIs
+	m_host = to_host(gpu.dot(m2,m1));
+	assert(test_matrix(m_host,111,317));
+	for(int i = 0; i < m_host->size; i++)
+	{
+		assert(test_eq(m_host->data[i],8783.0f,"dotMPI test"));
+	}
+	m_host = to_host(gpu.dotT(m3,m1));
+	assert(test_matrix(m_host,17,8783));
+	for(int i = 0; i < m_host->size; i++)
+	{
+		assert(test_eq(m_host->data[i],317.0f,"dotMPI test"));
+	}
+	gpu.dot(m4,m3,m1);
+	m_host = to_host(m1);
+	for(int i = 0; i < m_host->size; i++)
+	{
+		assert(test_eq(m_host->data[i],17.0f,"dotMPI test"));
+	}
+	//direct dotMPIs
+	m1 = gpu.distributed_zeros(8783,317);
+	scalarAdd(m1,1.0,m1);
+	m_host = to_host(gpu.dotMPI(m2,m1));
+	assert(test_matrix(m_host,111,317));
+	for(int i = 0; i < m_host->size; i++)
+	{
+		assert(test_eq(m_host->data[i],8783.0f,"dotMPI test"));
+	}
+	m_host = to_host(gpu.dotTMPI(m3,m1));
+	assert(test_matrix(m_host,17,8783));
+	for(int i = 0; i < m_host->size; i++)
+	{
+		assert(test_eq(m_host->data[i],317.0f,"dotMPI test"));
+	}
+	gpu.dotMPI(m4,m3,m1);
+	m_host = to_host(m1);
+	for(int i = 0; i < m_host->size; i++)
+	{
+		assert(test_eq(m_host->data[i],17.0f,"dotMPI test"));
+	}
+
+	gpu.shutdown();
 
 	//dropout test
 	m1 = gpu.rand(1000,1000);
 	m_host = to_host(gpu.dropout(m1,0.5));
 	assert(test_matrix(m_host,1000,1000));
-	int count = 0;
+	count = 0;
 	for(int i = 0; i < m1->size; i++)
 	{
 	   if(m_host->data[i] == 0.0f)

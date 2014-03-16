@@ -138,7 +138,7 @@ void DeepNeuralNetwork::train()
 		}
 
 		train_error();
-		cross_validation_error();
+		//cross_validation_error();
 	}
 
 
