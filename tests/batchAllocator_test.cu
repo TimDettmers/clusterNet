@@ -6,29 +6,41 @@
 #include <batchAllocator.h>
 #include <basicOps.cuh>
 
+using std::cout;
+using std::endl;
 
-int run_batchAllocator_test(int argc, char *argv[])
+int run_batchAllocator_test(ClusterNet gpus)
 {
-  Matrix *m1;
-  Matrix *m2;
-  Matrix *m_host;
+	Matrix *m1;
+	Matrix *m2;
+	Matrix *m_host;
 
-  //batch allocator test
-  m1 = to_host(arange(10000,784));
-  m2 = to_host(arange(10000,1));
-  BatchAllocator b = BatchAllocator();
-  b.init(m1,m2,0.20,128,256);
-  assert(test_matrix(b.CURRENT_BATCH,128,784));
-  assert(test_matrix(b.CURRENT_BATCH_Y,128,1));
-  assert(test_matrix(b.CURRENT_BATCH_CV,256,784));
-  assert(test_matrix(b.CURRENT_BATCH_CV_Y,256,1));
-  Matrix *m_host2;
-  int value = 0;
-  int value_y = 0;
-  for(int epoch = 0; epoch < 2; epoch++)
-  {
+	//batch allocator test
+	m1 = to_host(arange(10000,784));
+	m2 = to_host(arange(10000,1));
+	BatchAllocator b = BatchAllocator();
+	b.init(m1,m2,0.20,128,256);
+	assert(test_matrix(b.CURRENT_BATCH,128,784));
+	assert(test_matrix(b.CURRENT_BATCH_Y,128,1));
+	assert(test_matrix(b.CURRENT_BATCH_CV,256,784));
+	assert(test_matrix(b.CURRENT_BATCH_CV_Y,256,1));
+
+	BatchAllocator b_distributed = BatchAllocator();
+	//b_distributed.init(m1,m2,0.2,128,256,gpus,Distributed_weights);
+	/*
+	assert(test_matrix(b_distributed.CURRENT_BATCH,128,784));
+	assert(test_matrix(b_distributed.CURRENT_BATCH_Y,128,1));
+	assert(test_matrix(b_distributed.CURRENT_BATCH_CV,256,784));
+	assert(test_matrix(b_distributed.CURRENT_BATCH_CV_Y,256,1));
+	*/
+
+	Matrix *m_host2;
+	int value = 0;
+	int value_y = 0;
+	for(int epoch = 0; epoch < 2; epoch++)
+	{
 	  value = 0;
-  	  value_y = 0;
+	  value_y = 0;
 	  for(int batchno = 0; batchno < b.TOTAL_BATCHES; batchno++)
 	  {
 		  m_host = to_host(b.CURRENT_BATCH);
@@ -37,6 +49,7 @@ int run_batchAllocator_test(int argc, char *argv[])
 
 
 		  //std::cout << "bachtsize X: " << gpu.CURRENT_BATCHSIZE << std::endl;
+		  cout << batchno << endl;
 
 		  for(int i = 0; i <  b.CURRENT_BATCH->rows*784; i++)
 		  {
@@ -76,7 +89,7 @@ int run_batchAllocator_test(int argc, char *argv[])
 
 		  b.replace_current_cv_batch_with_next();
 	  }
-  }
+	}
 
 
 	   assert(test_eq(value,7840000,"Batch test"));
@@ -144,6 +157,12 @@ int run_batchAllocator_test(int argc, char *argv[])
 		assert(test_eq(value,54880000,"Batch test"));
 		assert(test_eq(value_y,700000,"Batch test"));
 	  }
+
+
+
+
+
+
 
   return 0;
 }

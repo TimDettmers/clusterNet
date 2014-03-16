@@ -7,7 +7,7 @@
 #include <batchAllocator.h>
 
 
-int run_clusterNet_test(int argc, char *argv[])
+int run_clusterNet_test(ClusterNet gpus)
 {
 	ClusterNet gpu = ClusterNet();
 	ClusterNet ticktock_test = ClusterNet();
@@ -174,15 +174,15 @@ int run_clusterNet_test(int argc, char *argv[])
 	assert(m_host->bytes==r1->size*sizeof(float));
 
 	//dotMPI test
-	gpu = ClusterNet(argc,argv, 12345);
+
 	m1 = scalarMul(ones(200,400),0.3);
 	m2 = scalarAdd(ones(400,800),0.1748345);
 
-	m3 = gpu.dot(m1,m2);
-	Matrix *m4 = gpu.dotMPI(m1,m2);
+	m3 = gpus.dot(m1,m2);
+	Matrix *m4 = gpus.dotMPI(m1,m2);
 	m3 = to_host(m3);
 	m4 = to_host(m4);
-	if(gpu.MYRANK == 0)
+	if(gpus.MYRANK == 0)
 	{
 
 	  for (int i = 0; i < m3->size; ++i)
@@ -196,8 +196,11 @@ int run_clusterNet_test(int argc, char *argv[])
 
 	int count = 0;
 	//distributed weights test
-	m_host = to_host(gpu.distributed_uniformSqrtWeight(10000,1000));
-	assert(test_matrix(m_host,10000,1000/gpu.MPI_SIZE));
+	m_host = to_host(gpus.distributed_uniformSqrtWeight(10000,1000));
+	if(gpus.MYRANK < gpus.MPI_SIZE-1)
+		assert(test_matrix(m_host,10000,1000/gpus.MPI_SIZE));
+	else
+		assert(test_matrix(m_host,10000,1000-((1000/gpus.MPI_SIZE)*(gpus.MPI_SIZE-1))));
 	count = 0;
 	for(int i = 0; i < m_host->size; i++)
 	{
@@ -207,24 +210,27 @@ int run_clusterNet_test(int argc, char *argv[])
 	}
 	ASSERT(count < 10,"Distributed RdmSqrtWeight test");
 
-	m1 = gpu.distributed_uniformSqrtWeight(7833,83);
+	m1 = gpus.distributed_uniformSqrtWeight(7833,83);
 	test_eq(m1->rows,7833,"distributed rdmsqrt split size test");
-	if(gpu.MYRANK < gpu.MPI_SIZE-1)
-		test_eq(m1->cols,83/gpu.MPI_SIZE,"distributed rdmsqrt split size test");
+	if(gpus.MYRANK < gpus.MPI_SIZE-1)
+		test_eq(m1->cols,83/gpus.MPI_SIZE,"distributed rdmsqrt split size test");
 	else
-		test_eq(m1->cols,83-((83/gpu.MPI_SIZE)*(gpu.MPI_SIZE-1)),"distributed rdmsqrt split size test");
+		test_eq(m1->cols,83-((83/gpus.MPI_SIZE)*(gpus.MPI_SIZE-1)),"distributed rdmsqrt split size test");
 
 
 	//distributed zeros test
-	m_host = to_host(gpu.distributed_zeros(10000,1000));
-	assert(test_matrix(m_host,10000,1000/gpu.MPI_SIZE));
+	m_host = to_host(gpus.distributed_zeros(10000,1000));
+	if(gpus.MYRANK < gpus.MPI_SIZE-1)
+		assert(test_matrix(m_host,10000,1000/gpus.MPI_SIZE));
+	else
+		assert(test_matrix(m_host,10000,1000-((1000/gpus.MPI_SIZE)*(gpus.MPI_SIZE-1))));
 	for(int i = 0; i < m_host->size; i++)
 	{
 	  ASSERT(m_host->data[i] == 0.0f,"Distributed zeros test");
 	}
 
 	//dotMPI test for distributed weights
-	m1 = gpu.distributed_zeros(8783,317);
+	m1 = gpus.distributed_zeros(8783,317);
 	scalarAdd(m1,1.0,m1);
 	m2 = ones(111,8783);
 	m3 = ones(17,317);
@@ -234,48 +240,53 @@ int run_clusterNet_test(int argc, char *argv[])
 	{
 		assert(test_eq(m_host->data[i],1.0f,"dotMPI test"));
 	}
-	//indirect dotMPIs
-	m_host = to_host(gpu.dot(m2,m1));
-	assert(test_matrix(m_host,111,317));
-	for(int i = 0; i < m_host->size; i++)
+	for(int epoch = 0; epoch < 5; epoch++)
 	{
-		assert(test_eq(m_host->data[i],8783.0f,"dotMPI test"));
-	}
-	m_host = to_host(gpu.dotTMPI(m3,m1));
-	assert(test_matrix(m_host,17,8783));
-	for(int i = 0; i < m_host->size; i++)
-	{
-		assert(test_eq(m_host->data[i],317.0f,"dotMPI test"));
-	}
-	gpu.dot(m4,m3,m1);
-	m_host = to_host(m1);
-	for(int i = 0; i < m_host->size; i++)
-	{
-		assert(test_eq(m_host->data[i],17.0f,"dotMPI test"));
-	}
-	//direct dotMPIs
-	m1 = gpu.distributed_zeros(8783,317);
-	scalarAdd(m1,1.0,m1);
-	m_host = to_host(gpu.dotMPI(m2,m1));
-	assert(test_matrix(m_host,111,317));
-	for(int i = 0; i < m_host->size; i++)
-	{
-		assert(test_eq(m_host->data[i],8783.0f,"dotMPI test"));
-	}
-	m_host = to_host(gpu.dotTMPI(m3,m1));
-	assert(test_matrix(m_host,17,8783));
-	for(int i = 0; i < m_host->size; i++)
-	{
-		assert(test_eq(m_host->data[i],317.0f,"dotMPI test"));
-	}
-	gpu.dotMPI(m4,m3,m1);
-	m_host = to_host(m1);
-	for(int i = 0; i < m_host->size; i++)
-	{
-		assert(test_eq(m_host->data[i],17.0f,"dotMPI test"));
+		//indirect dotMPIs
+		m_host = to_host(gpus.dot(m2,m1));
+		assert(test_matrix(m_host,111,317));
+		for(int i = 0; i < m_host->size; i++)
+		{
+			assert(test_eq(m_host->data[i],8783.0f,"dotMPI test"));
+		}
+		m_host = to_host(gpus.dotTMPI(m3,m1));
+		assert(test_matrix(m_host,17,8783));
+		for(int i = 0; i < m_host->size; i++)
+		{
+			assert(test_eq(m_host->data[i],317.0f,"dotMPI test"));
+		}
+		gpus.dot(m4,m3,m1);
+		m_host = to_host(m1);
+		for(int i = 0; i < m_host->size; i++)
+		{
+			assert(test_eq(m_host->data[i],17.0f,"dotMPI test"));
+		}
+		//direct dotMPIs
+		m1 = gpus.distributed_zeros(8783,317);
+		scalarAdd(m1,1.0,m1);
+		m_host = to_host(gpus.dotMPI(m2,m1));
+		assert(test_matrix(m_host,111,317));
+		for(int i = 0; i < m_host->size; i++)
+		{
+			assert(test_eq(m_host->data[i],8783.0f,"dotMPI test"));
+		}
+		m_host = to_host(gpus.dotTMPI(m3,m1));
+		assert(test_matrix(m_host,17,8783));
+		for(int i = 0; i < m_host->size; i++)
+		{
+			assert(test_eq(m_host->data[i],317.0f,"dotMPI test"));
+		}
+		gpus.dotMPI(m4,m3,m1);
+		m_host = to_host(m1);
+		for(int i = 0; i < m_host->size; i++)
+		{
+			assert(test_eq(m_host->data[i],17.0f,"dotMPI test"));
+		}
+		m1 = gpus.distributed_zeros(8783,317);
+		scalarAdd(m1,1.0,m1);
 	}
 
-	gpu.shutdown();
+
 
 	//dropout test
 	m1 = gpu.rand(1000,1000);

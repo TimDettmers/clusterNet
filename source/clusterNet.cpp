@@ -162,7 +162,7 @@ void ClusterNet::compute_PCIe_ranks()
 	}
 }
 
-void ClusterNet::shutdown()
+void ClusterNet::shutdown_MPI()
 {
 	MPI_Finalize();
 }

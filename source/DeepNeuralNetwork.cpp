@@ -143,7 +143,7 @@ void DeepNeuralNetwork::train()
 
 
 	 if(m_BA.BATCH_METHOD != Single_GPU)
-		 m_gpus.shutdown();
+		 m_gpus.shutdown_MPI();
 
 }
 

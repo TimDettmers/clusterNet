@@ -45,6 +45,7 @@ public:
 	 void replace_current_cv_batch_with_next();
 	 void average_weight(Matrix *W);
 
+	 void init(Matrix *X, Matrix *y, float cross_validation_size, int batch_size, int cv_batch_size, ClusterNet cluster, BatchAllocationMethod_t batchmethod);
 	 void init(std::string path_X, std::string path_y, float cross_validation_size, int batch_size, int cv_batch_size, ClusterNet cluster, BatchAllocationMethod_t batchmethod);
 	 void init(Matrix *X, Matrix *y, float cross_validation_size, int batch_size, int cv_batch_size, BatchAllocationMethod_t batchmethod);
 	 void init(Matrix *X, Matrix *y, float cross_validation_size, int batch_size, int cv_batch_size);

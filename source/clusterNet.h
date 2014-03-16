@@ -46,7 +46,7 @@ public:
 	 void tock();
 
 	 void benchmark_dot();
-	 void shutdown();
+	 void shutdown_MPI();
 	 Matrix *distributed_uniformSqrtWeight(int rows, int cols);
 	 Matrix *distributed_sparseInitWeight(int rows, int cols);
 	 Matrix *distributed_zeros(int rows, int cols);

@@ -289,8 +289,9 @@ void hStack(Matrix *A, Matrix *B, Matrix *out)
 
 void sub(Matrix *A, Matrix *B, Matrix *out)
 {
-  int block_size = (A->size/THREADS_PER_BLOCKS) + 1;
-  kSub<<<block_size,THREADS_PER_BLOCKS>>>(A->data, B->data, out->data, A->size);
+	checkMatrixOperation(A, B, out, 0);
+	int block_size = (A->size/THREADS_PER_BLOCKS) + 1;
+	kSub<<<block_size,THREADS_PER_BLOCKS>>>(A->data, B->data, out->data, A->size);
 }
 
 Matrix *mul(Matrix *A, Matrix *B)
@@ -304,8 +305,9 @@ Matrix *mul(Matrix *A, Matrix *B)
 
 void mul(Matrix *A, Matrix *B, Matrix *out)
 {
-  int block_size = (A->size/THREADS_PER_BLOCKS) + 1;
-  kMul<<<block_size,THREADS_PER_BLOCKS>>>(A->data, B->data, out->data, A->size);
+	checkMatrixOperation(A, B, out, 0);
+	int block_size = (A->size/THREADS_PER_BLOCKS) + 1;
+	kMul<<<block_size,THREADS_PER_BLOCKS>>>(A->data, B->data, out->data, A->size);
 }
 
 Matrix *div(Matrix *A, Matrix *B)
@@ -320,13 +322,10 @@ Matrix *div(Matrix *A, Matrix *B)
 
 void div(Matrix *A, Matrix *B, Matrix *out)
 {
-  int block_size = (A->size/THREADS_PER_BLOCKS) + 1;
-  kDiv<<<block_size,THREADS_PER_BLOCKS>>>(A->data, B->data, out->data, A->size);
+	checkMatrixOperation(A, B, out, 0);
+	int block_size = (A->size/THREADS_PER_BLOCKS) + 1;
+	kDiv<<<block_size,THREADS_PER_BLOCKS>>>(A->data, B->data, out->data, A->size);
 }
-
-
-
-
 
 Matrix *scalarMul(Matrix *A, float a)
 {

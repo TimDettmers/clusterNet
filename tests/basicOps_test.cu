@@ -6,7 +6,7 @@
 #include <util.cuh>
 #include <clusterNet.h>
 
-int run_basicOps_test(int argc, char *argv[])
+int run_basicOps_test()
 {
 
   ClusterNet gpu = ClusterNet();

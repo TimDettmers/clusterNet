@@ -18,6 +18,21 @@ using std::endl;
 
 void BatchAllocator::init(Matrix *X, Matrix *y, float cross_validation_size, int batch_size, int batch_size_cv)
 { m_mygpuID = 0; init(X,y,cross_validation_size,batch_size,batch_size_cv,Single_GPU); }
+void BatchAllocator::init(Matrix *X, Matrix *y, float cross_validation_size, int batch_size, int cv_batch_size, ClusterNet cluster, BatchAllocationMethod_t batchmethod)
+{
+	m_cluster = cluster;
+
+	m_mygpuID = m_cluster.MYGPUID;
+	if(m_cluster.MYGPUID != 0)
+	{
+		cudaFree(X->data);
+		cudaFree(y->data);
+		X = zeros(1,1);
+		y = zeros(1,1);
+	}
+
+	init(X,y,cross_validation_size,batch_size,cv_batch_size, batchmethod);
+}
 void BatchAllocator::init(std::string path_X, std::string path_y, float cross_validation_size, int batch_size, int cv_batch_size, ClusterNet cluster, BatchAllocationMethod_t batchmethod)
 {
 	m_cluster = cluster;
@@ -289,11 +304,11 @@ void BatchAllocator::allocate_next_batch_async()
 			m_next_matrices_y[i] = empty(partial_batch_size, m_Cols_y);
 		}
 
-		if(m_mygpuID == 0)
+		if(!(BATCH_METHOD == Distributed_weights && m_mygpuID != 0))
 		{
-			cudaMemcpyAsync(&m_next_matrices_X[i]->data[0],&m_full_X->data[(m_full_X->cols * (m_next_batch_number+i) * BATCH_SIZE)],
+			cudaMemcpyAsync(m_next_matrices_X[i]->data,&m_full_X->data[(m_full_X->cols * (m_next_batch_number+i) * BATCH_SIZE)],
 							copy_range_bytes_X, cudaMemcpyHostToDevice,m_streamNext_batch_X);
-			cudaMemcpyAsync(&m_next_matrices_y[i]->data[0],&m_full_y->data[(m_full_y->cols * (m_next_batch_number+i) * BATCH_SIZE)],
+			cudaMemcpyAsync(m_next_matrices_y[i]->data,&m_full_y->data[(m_full_y->cols * (m_next_batch_number+i) * BATCH_SIZE)],
 							copy_range_bytes_y, cudaMemcpyHostToDevice,m_streamNext_batch_y);
 		}
 	}
@@ -320,11 +335,11 @@ void BatchAllocator::allocate_next_cv_batch_async()
 			m_next_matrices_cv_y[i] = empty(partial_batch_size, m_Cols_y);
 		}
 
-		if(m_mygpuID == 0)
+		if(!(BATCH_METHOD == Distributed_weights && m_mygpuID != 0))
 		{
-			cudaMemcpyAsync(&m_next_matrices_cv_X[i]->data[0],&m_full_X->data[(TRAIN_SET_SIZE * m_full_X->cols)  + ((m_next_batch_number_cv + i) * BATCH_SIZE_CV * m_full_X->cols)],
+			cudaMemcpyAsync(m_next_matrices_cv_X[i]->data,&m_full_X->data[(TRAIN_SET_SIZE * m_full_X->cols)  + ((m_next_batch_number_cv + i) * BATCH_SIZE_CV * m_full_X->cols)],
 							copy_range_bytes_X, cudaMemcpyHostToDevice,m_streamNext_batch_cv_X);
-			cudaMemcpyAsync(&m_next_matrices_cv_y[i]->data[0],&m_full_y->data[(TRAIN_SET_SIZE * m_full_y->cols)  + ((m_next_batch_number_cv + i) * BATCH_SIZE_CV * m_full_y->cols)],
+			cudaMemcpyAsync(m_next_matrices_cv_y[i]->data,&m_full_y->data[(TRAIN_SET_SIZE * m_full_y->cols)  + ((m_next_batch_number_cv + i) * BATCH_SIZE_CV * m_full_y->cols)],
 							copy_range_bytes_y, cudaMemcpyHostToDevice,m_streamNext_batch_cv_y);
 		}
 	}
