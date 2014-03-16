@@ -241,7 +241,7 @@ int run_clusterNet_test(int argc, char *argv[])
 	{
 		assert(test_eq(m_host->data[i],8783.0f,"dotMPI test"));
 	}
-	m_host = to_host(gpu.dotT(m3,m1));
+	m_host = to_host(gpu.dotTMPI(m3,m1));
 	assert(test_matrix(m_host,17,8783));
 	for(int i = 0; i < m_host->size; i++)
 	{

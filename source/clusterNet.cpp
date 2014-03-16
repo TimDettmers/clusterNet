@@ -455,7 +455,7 @@ void ClusterNet::dotMPI(Matrix *A, Matrix *B, Matrix *out, bool applyTranspose_A
 			MPI_Recv(m_matrixCache[strMatrixName][matrix_idx]->data, m_matrixCache[strMatrixName][matrix_idx]->size, MPI_FLOAT, m_source, 100, MPI_COMM_WORLD, &m_status);
 		}
 
-		scalarMul(out,0.0f,out);
+		cudaMemset(out->data,0,out->bytes);
 		for(int i= 0; i < MPI_SIZE; i++)
 			add(out,m_matrixCache[strMatrixName][i],out);
 
