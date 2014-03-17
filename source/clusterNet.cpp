@@ -130,36 +130,8 @@ void ClusterNet::compute_PCIe_ranks()
 {
 	int gpus;
 	cudaGetDeviceCount(&gpus);
-	if (gpus > 1)
-	{
-		int *PCIe_Ranks_buffer = (int*) malloc(sizeof(int) * gpus - 1);
-		if (MYGPUID == 0)
-		{
-			//device 0 on the PCIe does know how many gpus are on the board
-			//and also which gpu has which rank -> spread the information
-			for (int i = 0; i < gpus; i++)
-				PCIe_Ranks_buffer[i] = MYRANK + i;
-
-			for (int i = 0; i < gpus; i++)
-			{
-				if (i > 0 && PCIe_Ranks_buffer[i] < MPI_SIZE)
-					MPI_Send(PCIe_Ranks_buffer, gpus, MPI_INT,
-							PCIe_Ranks_buffer[i], 17, MPI_COMM_WORLD );
-				PCIe_RANKS.push_back(PCIe_Ranks_buffer[i]);
-			}
-		} else
-		{
-			MPI_Recv(PCIe_Ranks_buffer, gpus, MPI_INT, MYRANK - MYGPUID, 17,
-					MPI_COMM_WORLD, &m_status);
-			for (int i = 0; i < gpus; i++)
-				PCIe_RANKS.push_back(PCIe_Ranks_buffer[i]);
-		}
-		free(PCIe_Ranks_buffer);
-	} else
-	{
-		//no sends and receives
-		PCIe_RANKS.push_back(MYRANK);
-	}
+	for(int i = 0; i < gpus; i++)
+		PCIe_RANKS.push_back(MYRANK-MYGPUID + i);
 }
 
 void ClusterNet::shutdown_MPI()

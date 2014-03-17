@@ -23,6 +23,7 @@ void BatchAllocator::init(Matrix *X, Matrix *y, float cross_validation_size, int
 	m_cluster = cluster;
 
 	m_mygpuID = m_cluster.MYGPUID;
+	m_myrank = m_cluster.MYRANK;
 	if(m_cluster.MYGPUID != 0)
 	{
 		cudaFree(X->data);
@@ -31,7 +32,12 @@ void BatchAllocator::init(Matrix *X, Matrix *y, float cross_validation_size, int
 		y = zeros(1,1);
 	}
 
+	//for(int i = 0; i < m_cluster.PCIe_RANKS.size(); i++)
+	//	cout << "myrank: " << m_myrank << " pcie rank: " << m_cluster.PCIe_RANKS[i] << endl;
+
+	//cout << "myrank: " << m_myrank << endl;;
 	init(X,y,cross_validation_size,batch_size,cv_batch_size, batchmethod);
+
 }
 void BatchAllocator::init(std::string path_X, std::string path_y, float cross_validation_size, int batch_size, int cv_batch_size, ClusterNet cluster, BatchAllocationMethod_t batchmethod)
 {
@@ -39,6 +45,7 @@ void BatchAllocator::init(std::string path_X, std::string path_y, float cross_va
 	Matrix *X;
 	Matrix *y;
 	m_mygpuID = m_cluster.MYGPUID;
+	m_myrank = m_cluster.MYRANK;
 	if(m_cluster.MYGPUID == 0)
 	{
 		if(path_X.find("cvs") != std::string::npos)
@@ -83,6 +90,7 @@ void BatchAllocator::init(Matrix *X, Matrix *y, float cross_validation_size, int
 		m_Cols_X = X->cols;
 		m_Cols_y = y->cols;
 	}
+
 
 	BATCH_SIZE = batch_size;
 	if(batchmethod == Batch_split)
@@ -259,10 +267,10 @@ void BatchAllocator::broadcast_batch_to_PCI()
 	}
 	else
 	{
-		//cout << "broadcast pci myrank: " << m_myrank << endl;
 		MPI_Recv(m_next_matrices_X[0]->data,m_next_matrices_X[0]->size,MPI_FLOAT,m_cluster.PCIe_RANKS[0],999,MPI_COMM_WORLD,&m_status);
 		MPI_Recv(m_next_matrices_y[0]->data,m_next_matrices_y[0]->size,MPI_FLOAT,m_cluster.PCIe_RANKS[0],998,MPI_COMM_WORLD,&m_status);
 	}
+	MPI_Barrier(MPI_COMM_WORLD);
 }
 
 void BatchAllocator::broadcast_cv_batch_to_PCI()
