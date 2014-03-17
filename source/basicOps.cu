@@ -470,7 +470,7 @@ int blnFaultyMatrixProductSizes(Matrix *A, Matrix *B, Matrix *C)
 
 void printFaultySizeError(Matrix *A, Matrix *B, Matrix *C)
 {
-  printf("Error: Faulty Matrix *sizes:\n");
+  printf("Error: Faulty element-wise matrix operation: \n");
   if(A->rows != B->rows || A->cols != B->cols)
   {
     printf("Matrix *A is of size %ix%i while Matrix *B is of size %ix%i.\n",
@@ -487,7 +487,7 @@ void printFaultySizeError(Matrix *A, Matrix *B, Matrix *C)
 }
 void printFaultyMatrixProductSizeError(Matrix *A, Matrix *B, Matrix *C)
 {
-    printf("Error: Faulty Matrix *sizes:\n");  
+    printf("Error: Faulty dot product matrix operation:\n");
   if(A->cols != B->rows)
   {
     printf("Matrix *A is of size %ix%i while Matrix *B is of size %ix%i.\n",

@@ -12,7 +12,7 @@ int main(int argc, char *argv[])
   run_basicOps_test();
   run_clusterNet_test(gpus);
   run_batchAllocator_test(gpus);
-  //run_miniMNIST_test(argc, argv);
+  run_miniMNIST_test(gpus);
 
   printf("----------------------\n");
   printf("All tests passed successfully!\n");
