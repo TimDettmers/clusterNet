@@ -290,6 +290,7 @@ void BatchAllocator::broadcast_cv_batch_to_PCI()
 		MPI_Recv(m_next_matrices_cv_X[0]->data,m_next_matrices_cv_X[0]->size,MPI_FLOAT,m_cluster.PCIe_RANKS[0],999,MPI_COMM_WORLD,&m_status);
 		MPI_Recv(m_next_matrices_cv_y[0]->data,m_next_matrices_cv_y[0]->size,MPI_FLOAT,m_cluster.PCIe_RANKS[0],998,MPI_COMM_WORLD,&m_status);
 	}
+	MPI_Barrier(MPI_COMM_WORLD);
 }
 
 void BatchAllocator::allocate_next_batch_async()
