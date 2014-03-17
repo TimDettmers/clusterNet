@@ -21,7 +21,7 @@ DeepNeuralNetwork::DeepNeuralNetwork(std::string path_X, std::string path_y, flo
 	m_gpus = ClusterNet(argc, argv, 12345);
 
 	m_BA = BatchAllocator();
-	m_BA.init(path_X,path_y,cv_size,64,512,m_gpus,batchmethod);
+	m_BA.init(path_X,path_y,cv_size,128,512,m_gpus,batchmethod);
 
 	LEARNING_RATE = 0.003;
 	MOMENTUM = 0.5;
