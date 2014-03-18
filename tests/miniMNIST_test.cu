@@ -5,6 +5,7 @@
 #include <clusterNet.h>
 #include <batchAllocator.h>
 #include <string>
+#include <DeepNeuralNetwork.h>
 
 using std::cout;
 using std::endl;
@@ -38,7 +39,7 @@ void run_miniMNIST_test(ClusterNet gpus)
 
 	BatchAllocator b = BatchAllocator();
 	b.init(X, y, 0.2, 32, 64);
-	int epochs  = 10;
+	int epochs  = 11;
 	float learning_rate = 0.003;
 	float momentum = 0.5;
 	for(int EPOCH = 1; EPOCH < epochs; EPOCH++)
@@ -145,8 +146,8 @@ void run_miniMNIST_test(ClusterNet gpus)
 	}
 
 
-	ASSERT(train_error < 0.01f,"mini-MNIST train error 10 epochs < 0.01.");
-	ASSERT(cv_error < 0.1825f, "mini-MNIST train error 10 epochs < 0.1825.");
+	ASSERT(train_error < 0.01f,"mini-MNIST train error 11 epochs < 0.01.");
+	ASSERT(cv_error < 0.19f, "mini-MNIST train error 11 epochs < 0.19.");
 
 	b.finish_batch_allocator();
 
@@ -274,10 +275,26 @@ void run_miniMNIST_test(ClusterNet gpus)
 	}
 
 
-	ASSERT(train_error < 0.01f,"mini-MNIST train error 10 epochs < 0.01.");
-	ASSERT(cv_error < 0.1825f, "mini-MNIST train error 10 epochs < 0.1825.");
+	ASSERT(train_error < 0.01f,"mini-MNIST train error 11 epochs < 0.01.");
+	ASSERT(cv_error < 0.19f, "mini-MNIST train error 11 epochs < 0.19.");
 
 	b_dist.finish_batch_allocator();
+
+
+	std::vector<int> layers;
+	layers.push_back(500);
+
+	DeepNeuralNetwork net = DeepNeuralNetwork(X,y,0.20,layers,Classification,gpus, Distributed_weights);
+	net.train();
+
+	if(gpus.MYRANK == 0)
+	{
+		cout << endl;
+		cout << "Train error should be: 0.0025" << endl;
+		cout << "Cross validation error should be: 0.15" << endl;
+	}
+
+
 
 
 

@@ -802,7 +802,8 @@ int main(int argc, char *argv[])
 	//DeepNeuralNetwork net = DeepNeuralNetwork(X,y,0.20,layers,Classification);
 
 
-	DeepNeuralNetwork net = DeepNeuralNetwork("/home/tim/mnist_full_X.hdf5","/home/tim/mnist_full_y.hdf5",0.20,layers,Classification,argc,argv, Distributed_weights);
+	ClusterNet gpus = ClusterNet(argc,argv,12345);
+	DeepNeuralNetwork net = DeepNeuralNetwork("/home/tim/mnist_full_X.hdf5","/home/tim/mnist_full_y.hdf5",0.20,layers,Classification,gpus, Distributed_weights);
 	net.train();
 
 

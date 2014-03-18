@@ -43,6 +43,9 @@ int run_batchAllocator_test(ClusterNet gpus)
 	  value_y = 0;
 	  for(int batchno = 0; batchno < b.TOTAL_ITERATIONS; batchno++)
 	  {
+		  assert(b.CURRENT_BATCH->rows == 128 || b.CURRENT_BATCH->rows == 8000%128);
+		  assert(b_dist.CURRENT_BATCH->rows == 128 || b_dist.CURRENT_BATCH->rows == 8000%128);
+
 		  m_host = to_host(b.CURRENT_BATCH);
 		  m_host2 = to_host(b.CURRENT_BATCH_Y);
 		  b.allocate_next_batch_async();
@@ -75,6 +78,8 @@ int run_batchAllocator_test(ClusterNet gpus)
 
 	  for(int batchno = 0; batchno < b.TOTAL_ITERATIONS_CV; batchno++)
 	  {
+		  assert(b.CURRENT_BATCH_CV->rows == 256 || b.CURRENT_BATCH_CV->rows == 2000%256);
+		  assert(b_dist.CURRENT_BATCH_CV->rows == 256 || b_dist.CURRENT_BATCH_CV->rows == 2000%256);
 		  m_host = to_host(b.CURRENT_BATCH_CV);
 		  m_host2 = to_host(b.CURRENT_BATCH_CV_Y);
 		  b.allocate_next_cv_batch_async();
@@ -130,6 +135,8 @@ int run_batchAllocator_test(ClusterNet gpus)
 		   value_y = 0;
 		   for(int batchno = 0; batchno < b.TOTAL_BATCHES; batchno++)
 		   {
+			  assert(b.CURRENT_BATCH->rows == 128 || b.CURRENT_BATCH->rows == 56000%128);
+			  assert(b_dist.CURRENT_BATCH->rows == 128 || b_dist.CURRENT_BATCH->rows == 56000%128);
 			  m_host = to_host(b.CURRENT_BATCH);
 			  m_host2 = to_host(b.CURRENT_BATCH_Y);
 			  b.allocate_next_batch_async();
@@ -163,6 +170,8 @@ int run_batchAllocator_test(ClusterNet gpus)
 
 		for(int batchno = 0; batchno < b.TOTAL_BATCHES_CV; batchno++)
 		{
+		  assert(b.CURRENT_BATCH_CV->rows == 512 || b.CURRENT_BATCH_CV->rows == 14000%512);
+		  assert(b_dist.CURRENT_BATCH_CV->rows == 512 || b_dist.CURRENT_BATCH_CV->rows == 14000%512);
 		  m_host = to_host(b.CURRENT_BATCH_CV);
 		  m_host2 = to_host(b.CURRENT_BATCH_CV_Y);
 		  b.allocate_next_cv_batch_async();

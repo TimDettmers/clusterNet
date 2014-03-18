@@ -210,6 +210,21 @@ int run_clusterNet_test(ClusterNet gpus)
 	}
 	ASSERT(count < 10,"Distributed RdmSqrtWeight test");
 
+	count = 0;
+	m_host = to_host(gpus.distributed_uniformSqrtWeight(100,10));
+	if(gpus.MYRANK < gpus.MPI_SIZE-1)
+		assert(test_matrix(m_host,100,10/gpus.MPI_SIZE));
+	else
+		assert(test_matrix(m_host,100,10-((10/gpus.MPI_SIZE)*(gpus.MPI_SIZE-1))));
+	count = 0;
+	for(int i = 0; i < m_host->size; i++)
+	{
+	  ASSERT((m_host->data[i] > -4.0f*sqrt(6.0f/(100.0+10.0))) && (m_host->data[i] < 4.0f*sqrt(6.0f/(100.0+10.0))),"Distributed RdmSqrtWeight test");
+	  if(m_host->data[i] == 0)
+		  count++;
+	}
+	ASSERT(count < 10,"Distributed RdmSqrtWeight test");
+
 	m1 = gpus.distributed_uniformSqrtWeight(7833,83);
 	test_eq(m1->rows,7833,"distributed rdmsqrt split size test");
 	if(gpus.MYRANK < gpus.MPI_SIZE-1)
@@ -224,6 +239,16 @@ int run_clusterNet_test(ClusterNet gpus)
 		assert(test_matrix(m_host,10000,1000/gpus.MPI_SIZE));
 	else
 		assert(test_matrix(m_host,10000,1000-((1000/gpus.MPI_SIZE)*(gpus.MPI_SIZE-1))));
+	for(int i = 0; i < m_host->size; i++)
+	{
+	  ASSERT(m_host->data[i] == 0.0f,"Distributed zeros test");
+	}
+
+	m_host = to_host(gpus.distributed_zeros(100,10));
+	if(gpus.MYRANK < gpus.MPI_SIZE-1)
+		assert(test_matrix(m_host,100,10/gpus.MPI_SIZE));
+	else
+		assert(test_matrix(m_host,100,10-((10/gpus.MPI_SIZE)*(gpus.MPI_SIZE-1))));
 	for(int i = 0; i < m_host->size; i++)
 	{
 	  ASSERT(m_host->data[i] == 0.0f,"Distributed zeros test");

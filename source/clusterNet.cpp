@@ -137,6 +137,7 @@ void ClusterNet::compute_PCIe_ranks()
 void ClusterNet::shutdown_MPI()
 {
 	MPI_Finalize();
+
 }
 
 Matrix *ClusterNet::dot(Matrix *A, Matrix *B)
@@ -287,8 +288,9 @@ void ClusterNet::dotMPI(Matrix *A, Matrix *B, Matrix *out, bool applyTranspose_A
 {
 	int col_split_size = (B->isDistributed == 1 ? B->cols_distributed : B->cols) / MPI_SIZE;
 	int remainder = (B->isDistributed == 1 ? B->cols_distributed : B->cols) - (col_split_size*MPI_SIZE);
-	std::string strMatrixName = SSTR(A->rows) + "x" + SSTR((B->isDistributed == 1 ? B->cols_distributed : B->cols)) + "T" +
-								SSTR((applyTranspose_B ? 1 : 0));
+	std::string strMatrixName = SSTR(A->rows) + "x" + SSTR(A->cols) + " * " +
+								SSTR(B->rows) + SSTR((B->isDistributed == 1 ? B->cols_distributed : B->cols)) +
+								"T" + SSTR((applyTranspose_B ? 1 : 0));
 
 	if(out->isDistributed == 0)
 	{
@@ -396,6 +398,7 @@ void ClusterNet::dotMPI(Matrix *A, Matrix *B, Matrix *out, bool applyTranspose_A
 				A1 = slice_cols(A, col_split_size * MYRANK,	col_split_size * (MYRANK + 1) - 1 + remainder);
 			else
 				A1 = slice_cols(A, col_split_size * MYRANK,	col_split_size * (MYRANK + 1) - 1);
+
 
 			dot(A1,B,m_matrixCache[strMatrixName][MYRANK], CUBLAS_OP_N, CUBLAS_OP_T);
 		}
@@ -564,10 +567,11 @@ Matrix *ClusterNet::distributed_uniformSqrtWeight(int rows, int cols)
 	assert(m_hasMPI);
 	Matrix *W;
 	int split_size = cols / MPI_SIZE;
+	int remainder = cols - (split_size * MPI_SIZE);
 	if (MYRANK < MPI_SIZE - 1)
 		W = rand(rows, split_size);
 	else
-		W = rand(rows, split_size + (cols % split_size));
+		W = rand(rows, split_size + remainder);
 
 	W->isDistributed = 1;
 	W->cols_distributed = cols;
@@ -581,10 +585,11 @@ Matrix *ClusterNet::distributed_zeros(int rows, int cols)
 	assert(m_hasMPI);
 	Matrix *W;
 	int split_size = cols / MPI_SIZE;
+	int remainder = cols - (split_size * MPI_SIZE);
 	if (MYRANK < MPI_SIZE - 1)
 		W = zeros(rows, split_size);
 	else
-		W = zeros(rows, split_size + (cols % split_size));
+		W = zeros(rows, split_size + remainder);
 
 	W->isDistributed = 1;
 	W->cols_distributed = cols;
@@ -596,9 +601,10 @@ Matrix *ClusterNet::distributed_sparseInitWeight(int rows, int cols)
 {
 	assert(m_hasMPI);
 	int split_size = cols / MPI_SIZE;
+	int remainder = cols - (split_size * MPI_SIZE);
 	int col_size =
 			MYRANK < MPI_SIZE - 1 ?
-					split_size + (cols % split_size) : split_size;
+					split_size + remainder : split_size;
 	int connections = 15;
 
 	Matrix *W = zeros(rows, col_size);

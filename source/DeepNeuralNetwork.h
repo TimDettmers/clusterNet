@@ -44,9 +44,9 @@ typedef enum Costfunction_t
 class DeepNeuralNetwork
 {
 public:
-	DeepNeuralNetwork(Matrix *X, Matrix *y, float cv_size, std::vector<int> lLayersSizes, Networktype_t net_type);
-	DeepNeuralNetwork(Matrix *X, Matrix *y, float cv_size, std::vector<int> lLayerSizes, Networktype_t net_type, int argc, char *argv[]);
-	DeepNeuralNetwork(std::string path_X, std::string path_y, float cv_size, std::vector<int> lLayerSizes, Networktype_t net_type, int argc, char *argv[], BatchAllocationMethod_t batchmethod);
+	DeepNeuralNetwork(Matrix *X, Matrix *y, float cv_size, std::vector<int> lLayerSizes, Networktype_t net_type, ClusterNet gpus);
+	DeepNeuralNetwork(Matrix *X, Matrix *y, float cv_size, std::vector<int> lLayerSizes, Networktype_t net_type, ClusterNet gpus, BatchAllocationMethod_t batchmethod);
+	DeepNeuralNetwork(std::string path_X, std::string path_y, float cv_size, std::vector<int> lLayerSizes, Networktype_t net_type, ClusterNet gpus, BatchAllocationMethod_t batchmethod);
 	void train();
 
 	float LEARNING_RATE;
@@ -80,7 +80,7 @@ private:
 
 	void activation_function(int layer, Matrix *A);
 	void derivative_function(int layer, Matrix *A);
-	void init(Matrix *X, Matrix *y, float cv_size, std::vector<int> lLayerSizes, Networktype_t net_type, int argc, char *argv[]);
+	void init(Matrix *X, Matrix *y, float cv_size, std::vector<int> lLayerSizes, Networktype_t net_type, ClusterNet gpus);
 
 };
 

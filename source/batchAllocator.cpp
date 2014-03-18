@@ -32,10 +32,6 @@ void BatchAllocator::init(Matrix *X, Matrix *y, float cross_validation_size, int
 		y = zeros(1,1);
 	}
 
-	//for(int i = 0; i < m_cluster.PCIe_RANKS.size(); i++)
-	//	cout << "myrank: " << m_myrank << " pcie rank: " << m_cluster.PCIe_RANKS[i] << endl;
-
-	//cout << "myrank: " << m_myrank << endl;;
 	init(X,y,cross_validation_size,batch_size,cv_batch_size, batchmethod);
 
 }
