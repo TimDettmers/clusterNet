@@ -807,7 +807,7 @@ int main(int argc, char *argv[])
 	net.train();
 
 
-
+	gpus.shutdown_MPI();
 
 
 

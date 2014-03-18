@@ -263,8 +263,8 @@ void BatchAllocator::broadcast_batch_to_PCI()
 	}
 	else
 	{
-		MPI_Recv(m_next_matrices_X[0]->data,m_next_matrices_X[0]->size,MPI_FLOAT,m_cluster.PCIe_RANKS[0],999,MPI_COMM_WORLD,&m_status);
-		MPI_Recv(m_next_matrices_y[0]->data,m_next_matrices_y[0]->size,MPI_FLOAT,m_cluster.PCIe_RANKS[0],998,MPI_COMM_WORLD,&m_status);
+		MPI_Irecv(m_next_matrices_X[0]->data,m_next_matrices_X[0]->size,MPI_FLOAT,m_cluster.PCIe_RANKS[0],999,MPI_COMM_WORLD,&m_request_X);
+		MPI_Irecv(m_next_matrices_y[0]->data,m_next_matrices_y[0]->size,MPI_FLOAT,m_cluster.PCIe_RANKS[0],998,MPI_COMM_WORLD,&m_request_y);
 	}
 	MPI_Barrier(MPI_COMM_WORLD);
 }
@@ -283,8 +283,8 @@ void BatchAllocator::broadcast_cv_batch_to_PCI()
 	}
 	else
 	{
-		MPI_Recv(m_next_matrices_cv_X[0]->data,m_next_matrices_cv_X[0]->size,MPI_FLOAT,m_cluster.PCIe_RANKS[0],999,MPI_COMM_WORLD,&m_status);
-		MPI_Recv(m_next_matrices_cv_y[0]->data,m_next_matrices_cv_y[0]->size,MPI_FLOAT,m_cluster.PCIe_RANKS[0],998,MPI_COMM_WORLD,&m_status);
+		MPI_Irecv(m_next_matrices_cv_X[0]->data,m_next_matrices_cv_X[0]->size,MPI_FLOAT,m_cluster.PCIe_RANKS[0],999,MPI_COMM_WORLD,&m_request_cv_X);
+		MPI_Irecv(m_next_matrices_cv_y[0]->data,m_next_matrices_cv_y[0]->size,MPI_FLOAT,m_cluster.PCIe_RANKS[0],998,MPI_COMM_WORLD,&m_request_cv_y);
 	}
 	MPI_Barrier(MPI_COMM_WORLD);
 }
@@ -353,16 +353,15 @@ void BatchAllocator::allocate_next_cv_batch_async()
 void BatchAllocator::replace_current_batch_with_next()
 {
 	//cout << "enter batcho" << endl;
-	/*
+
 	if(m_mygpuID != 0)
 	{
-		cout << "wait it!" << endl;
-		cout << "myrank: " << m_myrank << endl;
 		MPI_Wait(&m_request_X,&m_status);
 		MPI_Wait(&m_request_y,&m_status);
 	}
-	*/
 
+
+	MPI_Barrier(MPI_COMM_WORLD);
 	//cout << "post wait it" << endl;
 	if(m_next_matrices_X[0]->rows != CURRENT_BATCH->rows)
 	{
@@ -408,13 +407,13 @@ void BatchAllocator::replace_current_batch_with_next()
 
 void BatchAllocator::replace_current_cv_batch_with_next()
 {
-	/*
 	if(m_mygpuID != 0)
 	{
 		MPI_Wait(&m_request_cv_X,&m_status);
 		MPI_Wait(&m_request_cv_y,&m_status);
 	}
-	*/
+
+	MPI_Barrier(MPI_COMM_WORLD);
 
 	if(m_next_matrices_cv_X[0]->rows != CURRENT_BATCH_CV->rows)
 	{

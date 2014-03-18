@@ -33,7 +33,7 @@ DeepNeuralNetwork::DeepNeuralNetwork(std::string path_X, std::string path_y, flo
 	m_gpus = gpus;
 
 	m_BA = BatchAllocator();
-	m_BA.init(path_X,path_y,cv_size,128,512,m_gpus,batchmethod);
+	m_BA.init(path_X,path_y,cv_size,128,128,m_gpus,batchmethod);
 
 	LEARNING_RATE = 0.003;
 	MOMENTUM = 0.5;
@@ -138,24 +138,17 @@ void DeepNeuralNetwork::train()
 		  if(m_BA.BATCH_METHOD != Single_GPU)
 			  m_BA.broadcast_batch_to_PCI();
 
-
 		  weight_updates();
 		  free_variables();
-		  //cout << "post free_variables " << m_gpus.MYRANK << endl;
+
 		  m_BA.replace_current_batch_with_next();
-		 // cout << "post replace_current_batch_with_next "<< m_gpus.MYRANK << endl;
 		}
 
 		train_error();
 		cross_validation_error();
 	}
 
-
-	 //if(m_BA.BATCH_METHOD != Single_GPU)
-	//	 m_gpus.shutdown_MPI();
-
 	m_BA.finish_batch_allocator();
-
 }
 
 void DeepNeuralNetwork::backprop()
@@ -166,9 +159,6 @@ void DeepNeuralNetwork::backprop()
 	  for(int i = W.size()-1; i > 0; i--)
 	  {
 		  m_gpus.Tdot(Z[i],E.back(),GRAD[i]);
-		  //if(m_BA.BATCH_METHOD == Batch_split)
-		  //	  m_BA.average_weight(GRAD[i]);
-
 		  derivative_function(i, Z[i]);
 		  E.push_back(m_gpus.dotT(E.back(), W[i]));
 		  mul(E.back(),Z[i],E.back());
@@ -194,10 +184,7 @@ void DeepNeuralNetwork::free_variables()
 void DeepNeuralNetwork::weight_updates()
 {
 	  for(int i = 0;i < GRAD.size(); i++)
-	  {
-		  //cout << "MS: " << sum(MS[i]) << " GRAD: " << sum(GRAD[i]) << " W: "  << sum(W[i]) << " M: " << sum(M[i]) << endl;
 		  RMSprop_with_nesterov_weight_update(MS[i],GRAD[i],W[i],M[i],0.9f,LEARNING_RATE,m_BA.CURRENT_BATCH->rows);
-	  }
 }
 
 
@@ -290,7 +277,7 @@ void DeepNeuralNetwork::nesterov_updates()
 void DeepNeuralNetwork::train_error()
 {
 	  int errors = 0;
-	  for(int i = 0; i < m_BA.TOTAL_BATCHES-1; i++)
+	  for(int i = 0; i < m_BA.TOTAL_BATCHES; i++)
 	  {
 		  m_BA.allocate_next_batch_async();
 
