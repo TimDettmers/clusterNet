@@ -67,6 +67,7 @@ private:
 	 std::map<std::string,float> m_dictTickTockCumulative;
 	 MPI_Request* m_requests;
 	 MPI_Request m_sendrequest;
+	 std::vector<MPI_Request> m_sendrequests;
 	 std::map<std::string,Matrix**> m_matrixCache;
 	 std::map<std::string,float**> m_matrixHStackCache;
 	 std::map<std::string,int> m_matrixCacheUsage;

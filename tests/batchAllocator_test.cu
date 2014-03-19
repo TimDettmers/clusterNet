@@ -151,7 +151,7 @@ int run_batchAllocator_test(ClusterNet gpus)
 				  value++;
 			  }
 
-			  b_dist.broadcast_batch_to_PCI();
+			  b_dist.broadcast_cv_batch_to_PCI();
 
 			  for(int i = 0; i < b.CURRENT_BATCH->rows*10; i++)
 			  {

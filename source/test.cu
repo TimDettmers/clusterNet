@@ -799,12 +799,16 @@ int main(int argc, char *argv[])
 	layers.push_back(1000);
 	//Matrix *X = read_hdf5("/home/tim/mnist_full_X.hdf5");
 	//Matrix *y = read_hdf5("/home/tim/mnist_full_y.hdf5");
-	//DeepNeuralNetwork net = DeepNeuralNetwork(X,y,0.20,layers,Classification);
+	//ClusterNet gpu = ClusterNet(12345);
+	//DeepNeuralNetwork net = DeepNeuralNetwork(X,y,0.20,layers,Classification,gpu);
 
 
 	ClusterNet gpus = ClusterNet(argc,argv,12345);
+
 	DeepNeuralNetwork net = DeepNeuralNetwork("/home/tim/mnist_full_X.hdf5","/home/tim/mnist_full_y.hdf5",0.20,layers,Classification,gpus, Distributed_weights);
+	gpus.tick();
 	net.train();
+	gpus.tock();
 
 
 	gpus.shutdown_MPI();

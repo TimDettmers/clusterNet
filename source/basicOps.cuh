@@ -35,6 +35,7 @@ Matrix *fill_matrix(int rows, int cols, float fill_value);
 Matrix *ones(int rows, int cols);
 Matrix *zeros(int rows, int cols);
 Matrix *empty(int rows, int cols);
+Matrix *empty_pinned(int rows, int cols);
 Matrix *arange(int rows, int cols);
 Matrix *arange(int start, int rows, int cols);
 

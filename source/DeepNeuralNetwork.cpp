@@ -117,7 +117,7 @@ void DeepNeuralNetwork::train()
 	init_weights();
 
 	float error = 0;
-	int epochs = 10;
+	int epochs = 100;
 	//size_t free, total;
 	int device;
 	for(int EPOCH = 0; EPOCH < epochs; EPOCH++)
@@ -130,25 +130,28 @@ void DeepNeuralNetwork::train()
 		if(MOMENTUM > 0.95) MOMENTUM = 0.95;
 		for(int i = 0; i < m_BA.TOTAL_BATCHES; i++)
 		{
-		  m_BA.allocate_next_batch_async();
+
+		  m_BA.broadcast_batch_to_PCI2();
+
 
 		  nesterov_updates();
 		  feedforward(Dropout);
 		  backprop();
-		  if(m_BA.BATCH_METHOD != Single_GPU)
-			  m_BA.broadcast_batch_to_PCI();
+		  m_BA.allocate_next_batch_async2();
 
 		  weight_updates();
 		  free_variables();
 
-		  m_BA.replace_current_batch_with_next();
+		  m_BA.replace_current_batch_with_next2();
 		}
 
 		train_error();
 		cross_validation_error();
 	}
 
+	cout << "pre finish" << endl;
 	m_BA.finish_batch_allocator();
+	cout << "post finish" << endl;
 }
 
 void DeepNeuralNetwork::backprop()
@@ -279,17 +282,16 @@ void DeepNeuralNetwork::train_error()
 	  int errors = 0;
 	  for(int i = 0; i < m_BA.TOTAL_BATCHES; i++)
 	  {
-		  m_BA.allocate_next_batch_async();
+			  m_BA.broadcast_batch_to_PCI2();
 
 		  feedforward(Train_error);
+		  m_BA.allocate_next_batch_async2();
 
-		  if(m_BA.BATCH_METHOD != Single_GPU)
-			  m_BA.broadcast_batch_to_PCI();
 		  errors += get_classification_errors(Train);
 
 		  free_variables();
 
-		  m_BA.replace_current_batch_with_next();
+		  m_BA.replace_current_batch_with_next2();
 	  }
 
 	  if(m_BA.BATCH_METHOD == Single_GPU || (m_BA.BATCH_METHOD != Single_GPU && m_gpus.MYRANK == 0))
@@ -302,15 +304,14 @@ void DeepNeuralNetwork::cross_validation_error()
 	  int errors = 0;
 	  for(int i = 0; i < m_BA.TOTAL_ITERATIONS_CV; i++)
 	  {
-		  m_BA.allocate_next_cv_batch_async();
+			  m_BA.broadcast_cv_batch_to_PCI2();
 		  feedforward(CV_error);
-		  if(m_BA.BATCH_METHOD != Single_GPU)
-			  m_BA.broadcast_cv_batch_to_PCI();
+		  m_BA.allocate_next_cv_batch_async2();
 		  errors += get_classification_errors(CV);
 
 		  free_variables();
 
-		  m_BA.replace_current_cv_batch_with_next();
+		  m_BA.replace_current_cv_batch_with_next2();
 	  }
 
 	  if(m_BA.BATCH_METHOD == Single_GPU || (m_BA.BATCH_METHOD != Single_GPU && m_gpus.MYRANK == 0))

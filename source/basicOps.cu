@@ -176,6 +176,25 @@ Matrix *empty(int rows, int cols)
   return out;
 }
 
+Matrix *empty_pinned(int rows, int cols)
+{
+  float *pinned_data;
+  int size = rows*cols;
+  size_t bytes = rows*cols*sizeof(float);
+  cudaHostAlloc(&pinned_data, bytes, cudaHostAllocPortable);
+
+  Matrix *out = (Matrix*)malloc(sizeof(Matrix));
+  out->rows = rows;
+  out->cols = cols;
+  out->bytes = bytes;
+  out->size = size;
+  out->data = pinned_data;
+  out->isDistributed = 0;
+  out->cols_distributed = 0;
+
+  return out;
+}
+
 
 Matrix *fill_matrix(int rows, int cols, float fill_value)
 {

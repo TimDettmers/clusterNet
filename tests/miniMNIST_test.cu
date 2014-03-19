@@ -57,6 +57,7 @@ void run_miniMNIST_test(ClusterNet gpus)
 		  add(w1,m1,w1);
 		  add(w2,m2,w2);
 
+		  //feedforward
 		  Matrix *d0 = gpus.dropout(b.CURRENT_BATCH,0.2);
 		  //print_gpus_matrix(w1);
 		  Matrix *z1 = gpus.dot(d0, w1);
@@ -74,6 +75,7 @@ void run_miniMNIST_test(ClusterNet gpus)
 		  mul(e2,z1,e2);
 		  gpus.Tdot(b.CURRENT_BATCH,e2,grad_w1);
 
+		  //weight updates
 		  RMSprop_with_nesterov_weight_update(ms1,grad_w1,w1,m1,0.9f,learning_rate,b.CURRENT_BATCH->rows);
 		  RMSprop_with_nesterov_weight_update(ms2,grad_w2,w2,m2,0.9f,learning_rate,b.CURRENT_BATCH->rows);
 
