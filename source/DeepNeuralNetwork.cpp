@@ -149,9 +149,7 @@ void DeepNeuralNetwork::train()
 		cross_validation_error();
 	}
 
-	cout << "pre finish" << endl;
 	m_BA.finish_batch_allocator();
-	cout << "post finish" << endl;
 }
 
 void DeepNeuralNetwork::backprop()

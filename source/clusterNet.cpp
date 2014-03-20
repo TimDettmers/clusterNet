@@ -140,15 +140,7 @@ void ClusterNet::shutdown_MPI()
 {
 	cudaDeviceSynchronize();
 	MPI_Barrier(MPI_COMM_WORLD);
-	sleep(1);
-	cout << "pre finalize" << endl;
-
-
 	MPI_Finalize();
-	cout << "myrank: " << MYRANK << " post finalize" << endl;
-
-
-
 }
 
 Matrix *ClusterNet::dot(Matrix *A, Matrix *B)
@@ -417,7 +409,6 @@ void ClusterNet::dotMPI(Matrix *A, Matrix *B, Matrix *out, bool applyTranspose_A
 
 	if(out->isDistributed == 0 && !applyTranspose_B)
 	{
-		//cout << "pre send, myrank: " << MYRANK << endl;
 		int matrix_idx = MYRANK;
 		for (int i = 0; i < MPI_SIZE - 1; i++)
 		{
@@ -425,7 +416,7 @@ void ClusterNet::dotMPI(Matrix *A, Matrix *B, Matrix *out, bool applyTranspose_A
 			matrix_idx = (matrix_idx - 1) < 0 ? MPI_SIZE - 1 : (matrix_idx - 1);
 			MPI_Recv(m_matrixCache[strMatrixName][matrix_idx]->data, m_matrixCache[strMatrixName][matrix_idx]->size, MPI_FLOAT, m_source, 100, MPI_COMM_WORLD, &m_status);
 		}
-		//cout << "post send, myrank: " << MYRANK << endl;
+
 		for(int i = 0; i < MPI_SIZE -1;i++ )
 			MPI_Wait(&m_sendrequests[i],&m_status);
 

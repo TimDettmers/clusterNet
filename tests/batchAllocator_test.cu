@@ -107,8 +107,6 @@ int run_batchAllocator_test(ClusterNet gpus)
 		  b_dist.replace_current_cv_batch_with_next();
 	  }
 	}
-
-
 	   assert(test_eq(value,7840000,"Batch test"));
 	   assert(test_eq(value_y,10000,"Batch test"));
 
@@ -151,7 +149,7 @@ int run_batchAllocator_test(ClusterNet gpus)
 				  value++;
 			  }
 
-			  b_dist.broadcast_cv_batch_to_PCI();
+			  b_dist.broadcast_batch_to_PCI();
 
 			  for(int i = 0; i < b.CURRENT_BATCH->rows*10; i++)
 			  {
