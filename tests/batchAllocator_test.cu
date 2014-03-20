@@ -41,7 +41,7 @@ int run_batchAllocator_test(ClusterNet gpus)
 	{
 	  value = 0;
 	  value_y = 0;
-	  for(int batchno = 0; batchno < b.TOTAL_ITERATIONS; batchno++)
+	  for(int batchno = 0; batchno < b.TOTAL_BATCHES; batchno++)
 	  {
 		  assert(b.CURRENT_BATCH->rows == 128 || b.CURRENT_BATCH->rows == 8000%128);
 		  assert(b_dist.CURRENT_BATCH->rows == 128 || b_dist.CURRENT_BATCH->rows == 8000%128);
@@ -76,7 +76,7 @@ int run_batchAllocator_test(ClusterNet gpus)
 	  assert(test_eq(value,6272000,"Batch test train 128"));
 	  assert(test_eq(value_y,8000,"Batch test train 128"));
 
-	  for(int batchno = 0; batchno < b.TOTAL_ITERATIONS_CV; batchno++)
+	  for(int batchno = 0; batchno < b.TOTAL_BATCHES_CV; batchno++)
 	  {
 		  assert(b.CURRENT_BATCH_CV->rows == 256 || b.CURRENT_BATCH_CV->rows == 2000%256);
 		  assert(b_dist.CURRENT_BATCH_CV->rows == 256 || b_dist.CURRENT_BATCH_CV->rows == 2000%256);

@@ -27,14 +27,14 @@ public:
 	 Matrix *CURRENT_BATCH_Y;
 	 Matrix *CURRENT_BATCH_CV;
 	 Matrix *CURRENT_BATCH_CV_Y;
-	 int TOTAL_ITERATIONS;
-	 int TOTAL_ITERATIONS_CV;
 	 int TOTAL_BATCHES;
 	 int TOTAL_BATCHES_CV;
 	 int BATCH_SIZE;
 	 int BATCH_SIZE_CV;
 	 int TRAIN_SET_SIZE;
 	 int CV_SET_SIZE;
+
+	 bool SKIP_LAST_BATCH;
 
 	 void finish_batch_allocator();
 	 void broadcast_batch_to_PCI();
@@ -49,11 +49,9 @@ public:
 	 void replace_current_batch_with_next2();
 	 void replace_current_cv_batch_with_next();
 	 void replace_current_cv_batch_with_next2();
-	 void average_weight(Matrix *W);
 
 	 void init(Matrix *X, Matrix *y, float cross_validation_size, int batch_size, int cv_batch_size, ClusterNet cluster, BatchAllocationMethod_t batchmethod);
 	 void init(std::string path_X, std::string path_y, float cross_validation_size, int batch_size, int cv_batch_size, ClusterNet cluster, BatchAllocationMethod_t batchmethod);
-	 void init(Matrix *X, Matrix *y, float cross_validation_size, int batch_size, int cv_batch_size, BatchAllocationMethod_t batchmethod);
 	 void init(Matrix *X, Matrix *y, float cross_validation_size, int batch_size, int cv_batch_size);
 
 	 int m_next_batch_number_cv;
@@ -108,7 +106,8 @@ private:
 	 MPI_Request m_request_cv_X;
 	 MPI_Request m_request_cv_y;
 
-	 void MPI_get_dataset_dimensions(Matrix *X, Matrix *y);
+	 void MPI_get_dataset_dimensions();
+	 void init(float cross_validation_size, int batch_size, int cv_batch_size);
 
 
 };

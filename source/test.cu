@@ -797,15 +797,13 @@ int main(int argc, char *argv[])
 
 	std::vector<int> layers;
 	layers.push_back(1000);
-	//Matrix *X = read_hdf5("/home/tim/mnist_full_X.hdf5");
-	//Matrix *y = read_hdf5("/home/tim/mnist_full_y.hdf5");
-	//ClusterNet gpu = ClusterNet(12345);
-	//DeepNeuralNetwork net = DeepNeuralNetwork(X,y,0.20,layers,Classification,gpu);
-
 
 	ClusterNet gpus = ClusterNet(argc,argv,12345);
+	BatchAllocator allocator = BatchAllocator();
+	allocator.init("/home/tim/mnist_full_X.hdf5","/home/tim/mnist_full_y.hdf5",0.20,128,512,gpus,Distributed_weights);
+	allocator.SKIP_LAST_BATCH = true;
 
-	DeepNeuralNetwork net = DeepNeuralNetwork("/home/tim/mnist_full_X.hdf5","/home/tim/mnist_full_y.hdf5",0.20,layers,Classification,gpus, Distributed_weights);
+	DeepNeuralNetwork net = DeepNeuralNetwork(layers,Classification,gpus, allocator);
 	gpus.tick();
 	net.train();
 	gpus.tock();

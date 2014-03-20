@@ -286,7 +286,10 @@ void run_miniMNIST_test(ClusterNet gpus)
 	std::vector<int> layers;
 	layers.push_back(500);
 
-	DeepNeuralNetwork net = DeepNeuralNetwork(X,y,0.20,layers,Classification,gpus, Distributed_weights);
+	BatchAllocator allocator = BatchAllocator();
+	allocator.init(X,y,0.2,64,64,gpus, Distributed_weights);
+	DeepNeuralNetwork net = DeepNeuralNetwork(layers,Classification, gpus, allocator);
+	net.EPOCHS = 10;
 	net.train();
 
 	if(gpus.MYRANK == 0)
