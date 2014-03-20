@@ -92,17 +92,18 @@ void DeepNeuralNetwork::train()
 		if(MOMENTUM > 0.95) MOMENTUM = 0.95;
 		for(int i = 0; i < m_BA.TOTAL_BATCHES; i++)
 		{
-		  m_BA.broadcast_batch_to_PCI2();
 
+		  //m_BA.slice_batch();
 		  nesterov_updates();
+		  m_BA.broadcast_batch_to_processes();
 		  feedforward(Dropout);
-		  m_BA.allocate_next_batch_async2();
+		  m_BA.allocate_next_batch_async();
 		  backprop();
 
 		  weight_updates();
 		  free_variables();
 
-		  m_BA.replace_current_batch_with_next2();
+		  m_BA.replace_current_batch_with_next();
 		}
 
 		train_error();
@@ -241,15 +242,16 @@ void DeepNeuralNetwork::train_error()
 	  for(int i = 0; i < m_BA.TOTAL_BATCHES; i++)
 	  {
 
-		  m_BA.broadcast_batch_to_PCI2();
+		  //m_BA.slice_batch();
+		  m_BA.broadcast_batch_to_processes();
 		  feedforward(Train_error);
-		  m_BA.allocate_next_batch_async2();
+		  m_BA.allocate_next_batch_async();
 
 		  errors += get_classification_errors(Train);
 
 		  free_variables();
 
-		  m_BA.replace_current_batch_with_next2();
+		  m_BA.replace_current_batch_with_next();
 	  }
 
 	  if(m_BA.BATCH_METHOD == Single_GPU || (m_BA.BATCH_METHOD != Single_GPU && m_gpus.MYRANK == 0))
@@ -262,14 +264,16 @@ void DeepNeuralNetwork::cross_validation_error()
 	  int errors = 0;
 	  for(int i = 0; i < m_BA.TOTAL_BATCHES_CV; i++)
 	  {
-		  m_BA.broadcast_cv_batch_to_PCI2();
+
+		  //m_BA.slice_batch_cv();
+		  m_BA.broadcast_batch_cv_to_processes();
 		  feedforward(CV_error);
-		  m_BA.allocate_next_cv_batch_async2();
+		  m_BA.allocate_next_cv_batch_async();
 		  errors += get_classification_errors(CV);
 
 		  free_variables();
 
-		  m_BA.replace_current_cv_batch_with_next2();
+		  m_BA.replace_current_cv_batch_with_next();
 	  }
 
 	  if(m_BA.BATCH_METHOD == Single_GPU || (m_BA.BATCH_METHOD != Single_GPU && m_gpus.MYRANK == 0))

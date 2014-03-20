@@ -796,7 +796,7 @@ int main(int argc, char *argv[])
 
 
 	std::vector<int> layers;
-	layers.push_back(1000);
+	layers.push_back(10000);
 
 	ClusterNet gpus = ClusterNet(argc,argv,12345);
 	BatchAllocator allocator = BatchAllocator();
@@ -804,6 +804,7 @@ int main(int argc, char *argv[])
 	allocator.SKIP_LAST_BATCH = true;
 
 	DeepNeuralNetwork net = DeepNeuralNetwork(layers,Classification,gpus, allocator);
+	net.EPOCHS = 5;
 	gpus.tick();
 	net.train();
 	gpus.tock();

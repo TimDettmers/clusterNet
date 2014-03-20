@@ -37,18 +37,12 @@ public:
 	 bool SKIP_LAST_BATCH;
 
 	 void finish_batch_allocator();
-	 void broadcast_batch_to_PCI();
-	 void broadcast_cv_batch_to_PCI();
-	 void broadcast_batch_to_PCI2();
-	 void broadcast_cv_batch_to_PCI2();
+	 void broadcast_batch_to_processes();
+	 void broadcast_batch_cv_to_processes();
 	 void allocate_next_batch_async();
-	 void allocate_next_batch_async2();
 	 void allocate_next_cv_batch_async();
-	 void allocate_next_cv_batch_async2();
 	 void replace_current_batch_with_next();
-	 void replace_current_batch_with_next2();
 	 void replace_current_cv_batch_with_next();
-	 void replace_current_cv_batch_with_next2();
 
 	 void init(Matrix *X, Matrix *y, float cross_validation_size, int batch_size, int cv_batch_size, ClusterNet cluster, BatchAllocationMethod_t batchmethod);
 	 void init(std::string path_X, std::string path_y, float cross_validation_size, int batch_size, int cv_batch_size, ClusterNet cluster, BatchAllocationMethod_t batchmethod);

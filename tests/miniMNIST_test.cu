@@ -48,8 +48,7 @@ void run_miniMNIST_test(ClusterNet gpus)
 	  if(momentum > 0.95) momentum = 0.95;
 	  for(int i = 0; i < b.TOTAL_BATCHES; i++)
 	  {
-
-		  b.allocate_next_batch_async();
+		  b.broadcast_batch_to_processes();
 
 		  //nesterov updates
 		  scalarMul(m1,momentum,m1);
@@ -66,6 +65,8 @@ void run_miniMNIST_test(ClusterNet gpus)
 		  Matrix *a2 = gpus.dot(d1,w2);
 		  Matrix *out = softmax(a2);
 		  Matrix *t = create_t_matrix(b.CURRENT_BATCH_Y,10);
+
+		  b.allocate_next_batch_async();
 
 		  //backprop
 		  Matrix *e1 = sub(out, t);
@@ -92,18 +93,20 @@ void run_miniMNIST_test(ClusterNet gpus)
 
 	  }
 
+
 	  train_error = 0;
 	  for(int i = 0; i < b.TOTAL_BATCHES; i++)
 	  {
-		  b.allocate_next_batch_async();
+
+		  b.broadcast_batch_to_processes();
 
 		  Matrix *a1 = gpus.dot(b.CURRENT_BATCH,w1);
-
 		  logistic(a1, a1);
 		  Matrix *a2 = gpus.dot(a1,w2);
 		  Matrix *out = softmax(a2);
 		  Matrix *result = argmax(out);
 		  Matrix *eq = equal(result,b.CURRENT_BATCH_Y);
+		  b.allocate_next_batch_async();
 		  float sum_value = sum(eq);
 
 		  train_error += (b.CURRENT_BATCH->rows - sum_value)/ (1.0f * b.CURRENT_BATCH->rows *b.TOTAL_BATCHES) ;
@@ -122,14 +125,14 @@ void run_miniMNIST_test(ClusterNet gpus)
 	  cv_error = 0;
 	  for(int i = 0; i < b.TOTAL_BATCHES_CV; i++)
 	  {
-		  b.allocate_next_cv_batch_async();
-
+		  b.broadcast_batch_cv_to_processes();
 		  Matrix *a1 = gpus.dot(b.CURRENT_BATCH_CV,w1);
 		  logistic(a1, a1);
 		  Matrix *a2 = gpus.dot(a1,w2);
 		  Matrix *out = softmax(a2);
 		  Matrix *result = argmax(out);
 		  Matrix *eq = equal(result,b.CURRENT_BATCH_CV_Y);
+		  b.allocate_next_cv_batch_async();
 		  float sum_value = sum(eq);
 
 		  cv_error += (b.CURRENT_BATCH_CV->rows  - sum_value)/ (1.0f * b.CURRENT_BATCH_CV->rows *b.TOTAL_BATCHES_CV) ;
@@ -146,7 +149,6 @@ void run_miniMNIST_test(ClusterNet gpus)
 	  //std::cout << "Cross validation error: " << cv_error << std::endl;
 
 	}
-
 
 	ASSERT(train_error < 0.01f,"mini-MNIST train error 11 epochs < 0.01.");
 	ASSERT(cv_error < 0.19f, "mini-MNIST train error 11 epochs < 0.19.");
@@ -174,7 +176,7 @@ void run_miniMNIST_test(ClusterNet gpus)
 	  for(int i = 0; i < b_dist.TOTAL_BATCHES; i++)
 	  {
 
-		  b_dist.allocate_next_batch_async();
+		  b_dist.broadcast_batch_to_processes();
 
 		  //nesterov updates
 		  scalarMul(m1_dist,momentum,m1_dist);
@@ -191,7 +193,7 @@ void run_miniMNIST_test(ClusterNet gpus)
 		  Matrix *out = softmax(a2);
 		  Matrix *t = create_t_matrix(b_dist.CURRENT_BATCH_Y,10);
 
-		  b_dist.broadcast_batch_to_PCI();
+		  b_dist.allocate_next_batch_async();
 
 		  //backprop
 		  Matrix *e1 = sub(out, t);
@@ -220,7 +222,7 @@ void run_miniMNIST_test(ClusterNet gpus)
 	  train_error = 0;
 	  for(int i = 0; i < b_dist.TOTAL_BATCHES; i++)
 	  {
-		  b_dist.allocate_next_batch_async();
+		  b_dist.broadcast_batch_to_processes ();
 
 		  Matrix *a1 = gpus.dot(b_dist.CURRENT_BATCH,w1);
 
@@ -231,7 +233,7 @@ void run_miniMNIST_test(ClusterNet gpus)
 		  Matrix *eq = equal(result,b_dist.CURRENT_BATCH_Y);
 		  float sum_value = sum(eq);
 
-		  b_dist.broadcast_batch_to_PCI();
+		  b_dist.allocate_next_batch_async();
 
 		  train_error += (b_dist.CURRENT_BATCH->rows - sum_value)/ (1.0f * b_dist.CURRENT_BATCH->rows *b_dist.TOTAL_BATCHES) ;
 
@@ -249,7 +251,7 @@ void run_miniMNIST_test(ClusterNet gpus)
 	  cv_error = 0;
 	  for(int i = 0; i < b_dist.TOTAL_BATCHES_CV; i++)
 	  {
-		  b_dist.allocate_next_cv_batch_async();
+		  b_dist.broadcast_batch_cv_to_processes();
 
 		  Matrix *a1 = gpus.dot(b_dist.CURRENT_BATCH_CV,w1);
 		  logistic(a1, a1);
@@ -259,7 +261,7 @@ void run_miniMNIST_test(ClusterNet gpus)
 		  Matrix *eq = equal(result,b_dist.CURRENT_BATCH_CV_Y);
 		  float sum_value = sum(eq);
 
-		  b_dist.broadcast_cv_batch_to_PCI();
+		  b_dist.allocate_next_cv_batch_async();
 
 		  cv_error += (b_dist.CURRENT_BATCH_CV->rows  - sum_value)/ (1.0f * b_dist.CURRENT_BATCH_CV->rows *b_dist.TOTAL_BATCHES_CV) ;
 
