@@ -4,6 +4,7 @@
 #include <batchAllocator_test.cuh>
 #include <miniMNIST_test.cuh>
 #include <clusterNet.h>
+#include <util_test.cuh>
 
 
 int main(int argc, char *argv[])
@@ -13,6 +14,8 @@ int main(int argc, char *argv[])
   run_clusterNet_test(gpus);
   run_batchAllocator_test(gpus);
   run_miniMNIST_test(gpus);
+  run_util_test();
+
 
   printf("----------------------\n");
   printf("All tests passed successfully!\n");
