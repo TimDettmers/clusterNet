@@ -29,6 +29,12 @@ typedef struct Matrix
   float *data;
   int isDistributed;
   int cols_distributed;
+
+  int isSparse;
+  size_t ptr_bytes;
+  size_t idx_bytes;
+  int *ptr_rows;
+  int *idx_cols;
 } Matrix;
 
 Matrix *fill_matrix(int rows, int cols, float fill_value);

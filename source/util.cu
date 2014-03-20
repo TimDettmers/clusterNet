@@ -12,6 +12,8 @@
 
 using std::string;
 using std::vector;
+using std::cout;
+using std::endl;
 
 Matrix *read_csv (const char* filename)
 {
@@ -52,12 +54,13 @@ Matrix *read_csv (const char* filename)
   return out;
 }
 
-Matrix *read_hdf5(const char * filepath)
+Matrix *read_hdf5(const char *filepath){ return read_hdf5(filepath,"/Default"); }
+Matrix *read_hdf5(const char *filepath, const char *tag)
 {
 	   hid_t       file_id, dataset_id;
 
 	   file_id = H5Fopen(filepath, H5F_ACC_RDWR, H5P_DEFAULT);
-	   dataset_id = H5Dopen2(file_id, "/Default", H5P_DEFAULT);
+	   dataset_id = H5Dopen2(file_id, tag, H5P_DEFAULT);
 
 	   hid_t dspace = H5Dget_space(dataset_id);
 	   hsize_t dims[2];
@@ -81,6 +84,73 @@ Matrix *read_hdf5(const char * filepath)
 	   out->cols_distributed = 0;
 
 	   return out;
+}
+
+Matrix *read_sparse_hdf5(const char *filepath)
+{
+	hid_t       file_id, dataset_id_idx, dataset_id_ptr, dataset_id_data, dataset_id_shape, dspace;
+	hsize_t dims[2];
+	size_t bytes;
+	file_id = H5Fopen(filepath, H5F_ACC_RDWR, H5P_DEFAULT);
+	Matrix *out = (Matrix*)malloc(sizeof(Matrix));
+
+	dataset_id_idx = H5Dopen2(file_id, "/indices", H5P_DEFAULT);
+	dspace = H5Dget_space(dataset_id_idx);
+	H5Sget_simple_extent_dims(dspace, dims, NULL);
+	bytes = sizeof(int)*dims[0];
+	int *idx;
+	cudaHostAlloc(&idx, bytes, cudaHostAllocPortable);
+	H5Dread(dataset_id_idx, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, idx);
+	H5Dclose(dataset_id_idx);
+
+	out->idx_bytes = sizeof(int)*dims[0];
+	out->idx_cols = idx;
+
+
+	dataset_id_ptr = H5Dopen2(file_id, "/indptr", H5P_DEFAULT);
+	dspace = H5Dget_space(dataset_id_ptr);
+	H5Sget_simple_extent_dims(dspace, dims, NULL);
+	bytes = sizeof(int)*dims[0];
+	int *ptr;
+	cudaHostAlloc(&ptr, bytes, cudaHostAllocPortable);
+	H5Dread(dataset_id_ptr, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, ptr);
+	H5Dclose(dataset_id_ptr);
+
+	out->ptr_bytes = sizeof(int)*dims[0];
+	out->ptr_rows = ptr;
+
+
+	dataset_id_data = H5Dopen2(file_id, "/data", H5P_DEFAULT);
+	dspace = H5Dget_space(dataset_id_data);
+	H5Sget_simple_extent_dims(dspace, dims, NULL);
+	bytes = sizeof(float)*dims[0];
+	float *data;
+	cudaHostAlloc(&data, bytes, cudaHostAllocPortable);
+	H5Dread(dataset_id_data, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, data);
+	H5Dclose(dataset_id_data);
+
+	out->bytes = sizeof(float)*dims[0];
+	out->size = (int)dims[0];
+
+	dataset_id_shape = H5Dopen2(file_id, "/shape", H5P_DEFAULT);
+	dspace = H5Dget_space(dataset_id_shape);
+	H5Sget_simple_extent_dims(dspace, dims, NULL);
+	bytes = sizeof(long)*dims[0];
+	long shape[2];
+	H5Dread(dataset_id_shape, H5T_NATIVE_LONG, H5S_ALL, H5S_ALL, H5P_DEFAULT, shape);
+	H5Dclose(dataset_id_shape);
+
+	H5Fclose(file_id);
+
+
+	out->rows = (int)shape[0];
+	out->cols= (int)shape[1];
+	out->data = data;
+	out->isDistributed = 0;
+	out->isSparse = 1;
+
+
+	return out;
 }
 
 void write_hdf5(const char * filepath, Matrix *A)

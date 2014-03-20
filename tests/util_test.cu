@@ -3,7 +3,6 @@
 #include <assert.h>
 #include <string>
 
-
 void run_util_test()
 {
 	char buff[1024];
@@ -14,4 +13,32 @@ void run_util_test()
 	Matrix *X = read_hdf5((path + "/numpy_arange_as_h5py.hdf5").c_str());
 	for(int i = 0;i < X->size; i++)
 		assert(test_eq(X->data[i],(float)i,"HDF5 read for h5py data."));
+
+	X = read_sparse_hdf5((path + "/scipy_sparse_arange_as_h5py.hdf5").c_str());
+	for(int i = 0;i < X->size; i++)
+		assert(test_eq(X->data[i],(float)(i+1),"HDF5 read sparse for h5py data."));
+
+	int col_count = 1;
+	for(int i = 0;i < 105; i++)
+	{
+		assert(test_eq(X->idx_cols[i],col_count,"HDF5 read sparse for h5py data."));
+		col_count++;
+		if(col_count == 50)
+			col_count = 0;
+
+	}
+
+	int row_ptr = 0;
+	for(int i = 0;i < X->rows-1; i++)
+	{
+		assert(test_eq(X->ptr_rows[i],row_ptr,"HDF5 read sparse for h5py data."));
+		row_ptr += i == 0 ? 49 : 50;
+	}
+
+
+
+
+
+
+
 }

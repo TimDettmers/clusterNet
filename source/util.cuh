@@ -14,6 +14,8 @@
 
 Matrix *read_csv(const char* filename);
 Matrix *read_hdf5(const char * filepath);
+Matrix *read_sparse_hdf5(const char * filepath);
+Matrix *read_hdf5(const char *filepath, const char *tag);
 void write_hdf5(const char * filepath, Matrix *A);
 
 cudaEvent_t* tick();
