@@ -130,20 +130,14 @@ void BatchAllocator::init(float cross_validation_size, int batch_size, int batch
 	}
 
 	CURRENT_BATCH = empty(BATCH_SIZE,m_Cols_X);
-	m_next_matrices_X.push_back(empty(BATCH_SIZE,m_Cols_X));
 	CURRENT_BATCH_Y = empty(BATCH_SIZE,m_Cols_y);
-	m_next_matrices_y.push_back(empty(BATCH_SIZE,m_Cols_y));
-
 	CURRENT_BATCH_CV = empty(BATCH_SIZE_CV,m_Cols_X);
-	m_next_matrices_cv_X.push_back(empty(BATCH_SIZE_CV,m_Cols_X));
 	CURRENT_BATCH_CV_Y = empty(BATCH_SIZE_CV,m_Cols_y);
-	m_next_matrices_cv_y.push_back(empty(BATCH_SIZE_CV,m_Cols_y));
 
 	m_next_buffer_X = empty_pinned(BATCH_SIZE,m_Cols_X);
 	m_next_buffer_y = empty_pinned(BATCH_SIZE,m_Cols_y);
 	m_next_buffer_cv_X = empty_pinned(BATCH_SIZE_CV,m_Cols_X);
 	m_next_buffer_cv_y = empty_pinned(BATCH_SIZE_CV,m_Cols_y);
-
 
 	m_next_batch_X = empty(BATCH_SIZE,m_Cols_X);
 	m_next_batch_y = empty(BATCH_SIZE,m_Cols_y);
@@ -154,12 +148,6 @@ void BatchAllocator::init(float cross_validation_size, int batch_size, int batch
 	if(m_mygpuID == 0)
 	{
 		if(BATCH_METHOD == Distributed_weights){ m_myrank = m_cluster.MYRANK; }
-
-		m_next_matrices_X.push_back(empty(BATCH_SIZE,m_Cols_X));
-		m_next_matrices_y.push_back(empty(BATCH_SIZE,m_Cols_y));
-		m_next_matrices_cv_X.push_back(empty(BATCH_SIZE_CV,m_Cols_X));
-		m_next_matrices_cv_y.push_back(empty(BATCH_SIZE_CV,m_Cols_y));
-
 
 		for(int i = 0; i < m_cluster.PCIe_RANKS.size()-1;i++)
 		{

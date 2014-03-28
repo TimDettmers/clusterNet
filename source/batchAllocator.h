@@ -57,12 +57,6 @@ private:
 	 Matrix *m_full_X;
 	 Matrix *m_full_y;
 
-
-	 std::vector<Matrix*> m_next_matrices_X;
-	 std::vector<Matrix*> m_next_matrices_y;
-	 std::vector<Matrix*> m_next_matrices_cv_X;
-	 std::vector<Matrix*> m_next_matrices_cv_y;
-
 	 Matrix* m_next_buffer_X;
 	 Matrix* m_next_buffer_y;
 	 Matrix* m_next_buffer_cv_X;
@@ -82,18 +76,11 @@ private:
 	 cudaStream_t m_streamNext_batch_y;
 	 cudaStream_t m_streamNext_batch_cv_X;
 	 cudaStream_t m_streamNext_batch_cv_y;
-	 MPI_Request m_request_send_X;
-	 MPI_Request m_request_send_y;
-	 MPI_Request m_request_send_cv_X;
-	 MPI_Request m_request_send_cv_y;
 
 	 std::vector<MPI_Request> m_requests_send_X;
 	 std::vector<MPI_Request> m_requests_send_y;
 	 std::vector<MPI_Request> m_requests_send_cv_X;
 	 std::vector<MPI_Request> m_requests_send_cv_y;
-
-	 MPI_Request m_request_send_W;
-	 MPI_Request m_request_W;
 
 	 MPI_Request m_request_X;
 	 MPI_Request m_request_y;
