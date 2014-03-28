@@ -50,6 +50,7 @@ Matrix *read_csv (const char* filename)
   out->data = data;
   out->isDistributed = 0;
   out->cols_distributed = 0;
+  out->isSparse = 0;
 
   return out;
 }
@@ -82,6 +83,7 @@ Matrix *read_hdf5(const char *filepath, const char *tag)
 	   out->size = (int)(dims[0]*dims[1]);
 	   out->isDistributed = 0;
 	   out->cols_distributed = 0;
+	   out->isSparse = 0;
 
 	   return out;
 }
@@ -287,4 +289,29 @@ bool replace(std::string& str, const std::string& from, const std::string& to)
     str.replace(start_pos, from.length(), to);
     return true;
 }
+
+void slice_sparse_to_dense(Matrix *X, Matrix *out, int start, int length)
+{
+	int idx_from = 0;
+	int idx_to = 0;
+	int idx = 0;
+
+	for(int i = 0; i < out->size; i++)
+		out->data[i] = 0.0f;
+
+	for(int row = 0; row < length; row++)
+	{
+		idx_from = X->ptr_rows[start + row];
+		idx_to = X->ptr_rows[start + row + 1];
+
+		for(int i = idx_from; i < idx_to; i++)
+		{
+			idx = X->idx_cols[i];
+			out->data[(row*out->cols) + idx] = X->data[i];
+		}
+	}
+
+
+}
+
 

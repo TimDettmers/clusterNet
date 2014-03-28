@@ -175,10 +175,34 @@ void BatchAllocator::init(float cross_validation_size, int batch_size, int batch
 		m_next_batch_number = 0;
 		m_next_batch_number_cv = 0;
 
-		memcpy(&m_next_buffer_X->data[0],&m_full_X->data[0], m_next_buffer_X->bytes);
-		memcpy(&m_next_buffer_y->data[0],&m_full_y->data[0], m_next_buffer_y->bytes);
-		memcpy(&m_next_buffer_cv_X->data[0],&m_full_X->data[(TRAIN_SET_SIZE * m_full_X->cols)],	m_next_buffer_cv_X->bytes);
-		memcpy(&m_next_buffer_cv_y->data[0],&m_full_y->data[(TRAIN_SET_SIZE * m_full_y->cols)],	m_next_buffer_cv_y->bytes);
+		if(!m_full_X->isSparse)
+			{
+			memcpy(&m_next_buffer_X->data[0],&m_full_X->data[0], m_next_buffer_X->bytes);
+			memcpy(&m_next_buffer_y->data[0],&m_full_y->data[0], m_next_buffer_y->bytes);
+			memcpy(&m_next_buffer_cv_X->data[0],&m_full_X->data[(TRAIN_SET_SIZE * m_full_X->cols)],	m_next_buffer_cv_X->bytes);
+			memcpy(&m_next_buffer_cv_y->data[0],&m_full_y->data[(TRAIN_SET_SIZE * m_full_y->cols)],	m_next_buffer_cv_y->bytes);
+		}
+		else
+		{
+
+			int to = m_full_X->data[BATCH_SIZE];
+			int from_cv = m_full_X->data[TRAIN_SET_SIZE];
+			int to_cv = m_full_X->data[TRAIN_SET_SIZE + BATCH_SIZE_CV];
+
+			int size_cv = from_cv-to_cv;
+			int size = to;
+
+			int *buffer_idx = (int*)malloc(sizeof(int)*size);
+			int *buffer_idx_cv = (int*)malloc(sizeof(int)*size_cv);
+
+			float *data = (float*)malloc(sizeof(float)*size);
+			float *data_cv = (float*)malloc(sizeof(float)*size_cv);
+
+			memcpy(&data[0],&m_full_X->data[0], sizeof(float)*size);
+			memcpy(&data_cv[0],&m_full_X->data[from_cv], sizeof(float)*size_cv);
+
+
+		}
 
 		/*
 

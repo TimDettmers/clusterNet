@@ -738,8 +738,20 @@ int main(int argc, char *argv[])
 
 
 	ClusterNet gpus = ClusterNet(argc,argv,1245);
+	Matrix *X;
 	if(gpus.MYGPUID == 0)
-		read_sparse_hdf5("/home/tim/crowdflower_X.hdf5");
+	{
+		X = read_sparse_hdf5("/home/tim/crowdflower_X.hdf5");
+		cout << X->rows << endl;
+		cout << X->cols << endl;
+
+		Matrix *out = empty_pinned(128,X->cols);
+
+		slice_sparse_to_dense(X,out,0,128);
+
+		printmat(out);
+	}
+
 
 	gpus.shutdown_MPI();
 

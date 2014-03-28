@@ -35,7 +35,10 @@ void run_util_test()
 		row_ptr += i == 0 ? 49 : 50;
 	}
 
-
+	Matrix *out = empty_pinned(X->rows,X->cols);
+	slice_sparse_to_dense(X,out,0,X->rows);
+	for(int i = 0;i < out->size; i++)
+		assert(test_eq(out->data[i],(float)i,"slice sparse to dense test."));
 
 
 
