@@ -172,6 +172,12 @@ Matrix *empty(int rows, int cols)
   out->data = gpu_data;
   out->isDistributed = 0;
   out->cols_distributed = 0;
+  out->isSparse = 0;
+  out->idx_bytes = 0;
+  out->idx_cols = 0;
+  out->ptr_bytes = 0;
+  out->ptr_rows = 0;
+
 
   return out;
 }
@@ -191,6 +197,11 @@ Matrix *empty_pinned(int rows, int cols)
   out->data = pinned_data;
   out->isDistributed = 0;
   out->cols_distributed = 0;
+  out->isSparse = 0;
+  out->idx_bytes = 0;
+  out->idx_cols = 0;
+  out->ptr_bytes = 0;
+  out->ptr_rows = 0;
 
   return out;
 }

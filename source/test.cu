@@ -737,20 +737,43 @@ int main(int argc, char *argv[])
 {
 
 
+
+
+
 	ClusterNet gpus = ClusterNet(argc,argv,1245);
+	BatchAllocator b = BatchAllocator();
 	Matrix *X;
+	Matrix *y ;
 	if(gpus.MYGPUID == 0)
 	{
 		X = read_sparse_hdf5("/home/tim/crowdflower_X.hdf5");
-		cout << X->rows << endl;
-		cout << X->cols << endl;
-
-		Matrix *out = empty_pinned(128,X->cols);
-
-		slice_sparse_to_dense(X,out,0,128);
-
-		printmat(out);
+		y = to_host(gpus.rand(X->rows,20));
 	}
+	else
+	{
+		X = empty(1,1);
+		y = empty(1,1);
+	}
+
+
+	b.init(X,y,0.2,128,512,gpus, Distributed_weights);
+	std::vector<int> layers;
+	layers.push_back(1000);
+	//DeepNeuralNetwork net = DeepNeuralNetwork(layers,Classification,gpus,b);
+
+	Matrix *A = gpus.rand(b.CURRENT_BATCH->cols,1000);
+
+	gpus.dot(b.CURRENT_BATCH,A);
+	gpus.dot(b.CURRENT_BATCH_CV,A);
+
+	b.broadcast_batch_to_processes();
+	b.allocate_next_batch_async();
+	b.replace_current_batch_with_next();
+	b.broadcast_batch_cv_to_processes();
+	b.allocate_next_cv_batch_async();
+	b.replace_current_cv_batch_with_next();
+	gpus.dot(b.CURRENT_BATCH,A);
+	gpus.dot(b.CURRENT_BATCH_CV,A);
 
 
 	gpus.shutdown_MPI();

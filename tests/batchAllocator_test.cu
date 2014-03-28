@@ -53,6 +53,7 @@ int run_batchAllocator_test(ClusterNet gpus)
 		  m_host2_dist = to_host(b_dist.CURRENT_BATCH_Y);
 		  b_dist.broadcast_batch_to_processes();
 
+
 		  for(int i = 0; i <  b.CURRENT_BATCH->rows*784; i++)
 		  {
 			  assert(test_eq(m_host->data[i],(float)value,i,i,"Batch test"));
@@ -127,7 +128,6 @@ int run_batchAllocator_test(ClusterNet gpus)
 		assert(test_matrix(b_dist.CURRENT_BATCH_Y,128,10));
 		assert(test_matrix(b_dist.CURRENT_BATCH_CV,512,784));
 		assert(test_matrix(b_dist.CURRENT_BATCH_CV_Y,512,10));
-
 
 	   for(int epoch = 0; epoch < 2; epoch++)
 	   {

@@ -152,6 +152,8 @@ Matrix *read_sparse_hdf5(const char *filepath)
 	out->isSparse = 1;
 
 
+
+
 	return out;
 }
 
@@ -310,6 +312,7 @@ void slice_sparse_to_dense(Matrix *X, Matrix *out, int start, int length)
 			out->data[(row*out->cols) + idx] = X->data[i];
 		}
 	}
+
 
 
 }
