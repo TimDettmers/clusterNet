@@ -752,17 +752,14 @@ int main(int argc, char *argv[])
 
 	b.init(X,y,0.2,128,512,gpus, Distributed_weights);
 	std::vector<int> layers;
-	layers.push_back(10000);
 	layers.push_back(4000);
+	layers.push_back(2000);
 	b.SKIP_LAST_BATCH = true;
 	DeepNeuralNetwork net = DeepNeuralNetwork(layers,Regression,gpus,b,24);
 	net.EPOCHS = 10;
 	net.LEARNING_RATE = 0.00001;
+	net.OUTPUT_IS_PROBABILITY = true;
 	net.train();
-
-	Matrix *A = gpus.rand(b.CURRENT_BATCH->cols,100);
-
-	gpus.dot(b.CURRENT_BATCH,A);
 
 	gpus.shutdown_MPI();
 

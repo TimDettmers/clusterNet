@@ -17,8 +17,10 @@ DeepNeuralNetwork::DeepNeuralNetwork(std::vector<int> lLayerSizes, Networktype_t
 	m_BA = allocator;
 
 	EPOCHS = 100;
+	TRANSITION_EPOCH = 75;
 	LEARNING_RATE = 0.003;
 	MOMENTUM = 0.5;
+	OUTPUT_IS_PROBABILITY = false;
 	m_output_dim = categories;
 	m_net_type = net_type;
 
@@ -91,6 +93,9 @@ void DeepNeuralNetwork::init_weights()
 
 void DeepNeuralNetwork::train()
 {
+	if(OUTPUT_IS_PROBABILITY)
+		lUnits.back() = Double_Rectified_Linear;
+
 	for(int EPOCH = 0; EPOCH < EPOCHS; EPOCH++)
 	{
 		if(m_BA.BATCH_METHOD == Single_GPU || (m_BA.BATCH_METHOD != Single_GPU && m_gpus.MYRANK == 0))
@@ -208,6 +213,8 @@ float DeepNeuralNetwork::get_errors(Batchtype_t batch_t)
 	{
 		Matrix *sqrErr = squared_error(Z.back(),batch_t == Train ? m_BA.CURRENT_BATCH_Y : m_BA.CURRENT_BATCH_CV_Y);
 		errors = sum(sqrErr);
+		errors /=  m_BA.CURRENT_BATCH_Y->cols;
+		errors = sqrt(errors);
 		cudaFree(sqrErr->data);
 	}
 
@@ -228,6 +235,9 @@ void DeepNeuralNetwork::activation_function(int layer, Matrix * A)
 		case Softmax:
 			softmax(A,A);
 			break;
+		case Double_Rectified_Linear:
+			doubleRectifiedLinear(A,A);
+			break;
 		case Linear:
 			break;
 	}
@@ -242,6 +252,9 @@ void DeepNeuralNetwork::derivative_function(int layer, Matrix * A)
 			break;
 		case Rectified_Linear:
 			rectified_linear_derivative(A,A);
+			break;
+		case Double_Rectified_Linear:
+			double_rectified_linear_derivative(A,A);
 			break;
 		default:
 			throw "Unknown unit";

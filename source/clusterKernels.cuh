@@ -43,4 +43,6 @@ __global__ void kCreateSparseRdmWeight(float *rdm, float* indicies, float *out, 
 __global__ void kRectifiedLinear(float *A, float *out, int size);
 __global__ void kRectifiedLinear_Derivative(float *A, float *out, int size);
 __global__ void kSquaredError(float *A, float *t, float *out, int size);
+__global__ void kDoubleRectifiedLinear(float* A, float* out, int size);
+__global__ void kDoubleRectifiedLinear_Derivative(float *A, float *out, int size);
 #endif

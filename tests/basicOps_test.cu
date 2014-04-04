@@ -429,6 +429,15 @@ int run_basicOps_test()
 	  assert(test_eq(m_host->data[i],(float)(i + 101), "Arange data test."));
   }
 
+  //cutoff to probability test
+  m_host = to_host(doubleRectifiedLinear(gpu.randn(123,357,0,10)));
+  assert(test_matrix(m_host,123,357));
+  for(int i = 0; i < m_host->size; i++)
+  {
+	  if(!((m_host->data[i] <=1.0f) && (m_host->data[i] >=0.0f)))
+		  printf("%i: %f\n",i, m_host->data[i]);
+	  ASSERT((m_host->data[i] <=1.0f) && (m_host->data[i] >=0.0f),"cutoff to probability test.");
+  }
   return 0;
 }
 

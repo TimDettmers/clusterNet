@@ -137,6 +137,7 @@ __global__ void kAdd(float *A, float *B, float *out, int size)
        out[i] = A[i] + B[i];
 }
 
+
 __global__ void kMul(float *A, float *B, float *out, int size)
 {
   const unsigned int numThreads = blockDim.x * gridDim.x;
@@ -514,6 +515,29 @@ __global__ void kRectifiedLinear_Derivative(float *A, float *out, int size)
 
 	  for (unsigned int i = idx;i < size; i += numThreads)
 		  out[i] = A[i] > 0.0f ? 1.0f : 0.0f;
+
+}
+
+__global__ void kDoubleRectifiedLinear(float *A, float *out, int size)
+{
+  const unsigned int numThreads = blockDim.x * gridDim.x;
+  const int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
+
+  for (unsigned int i = idx;i < size; i += numThreads)
+  {
+      out[i] = (A[i] >= 0.0f) && (A[i] <= 1.0f) ? A[i] : 0.0f;
+  }
+}
+
+__global__ void kDoubleRectifiedLinear_Derivative(float *A, float *out, int size)
+{
+	  const unsigned int numThreads = blockDim.x * gridDim.x;
+	  const int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
+
+	  for (unsigned int i = idx;i < size; i += numThreads)
+	  {
+		  out[i] = (A[i] <= 0.0f) || (A[i] >1.0f) ? 0.0f : 1.0f;
+	  }
 
 }
 

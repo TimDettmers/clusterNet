@@ -455,6 +455,20 @@ void gpuSqrt(Matrix *A, Matrix *out)
   kSqrt<<<block_size,THREADS_PER_BLOCKS>>>(A->data, out->data, A->size);
 }
 
+Matrix *doubleRectifiedLinear(Matrix *A)
+{
+  Matrix *out = empty(A->rows,A->cols);
+  doubleRectifiedLinear(A, out);
+
+  return out;
+}
+
+void doubleRectifiedLinear(Matrix *A, Matrix *out)
+{
+  int block_size = (A->size/THREADS_PER_BLOCKS) + 1;
+  kDoubleRectifiedLinear<<<block_size,THREADS_PER_BLOCKS>>>(A->data, out->data, A->size);
+}
+
 Matrix *square(Matrix *A)
 {
   Matrix *out = empty(A->rows,A->cols);
@@ -688,6 +702,18 @@ void rectified_linear_derivative(Matrix *A, Matrix *out)
 {
 	int blocks = (out->size/THREADS_PER_BLOCKS) + 1;
 	kRectifiedLinear_Derivative<<<blocks,THREADS_PER_BLOCKS>>>(A->data, out->data, out->size);
+}
+
+Matrix *double_rectified_linear_derivative(Matrix *A)
+{
+	Matrix *out = empty(A->rows,A->cols);
+	double_rectified_linear_derivative(A,out);
+	return out;
+}
+void double_rectified_linear_derivative(Matrix *A, Matrix *out)
+{
+	int blocks = (out->size/THREADS_PER_BLOCKS) + 1;
+	kDoubleRectifiedLinear_Derivative<<<blocks,THREADS_PER_BLOCKS>>>(A->data, out->data, out->size);
 }
 
 Matrix *squared_error(Matrix *A, Matrix *targets)

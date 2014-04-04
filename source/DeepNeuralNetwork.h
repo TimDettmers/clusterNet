@@ -25,7 +25,8 @@ typedef enum Unittype_t
 	Logistic = 0,
 	Rectified_Linear = 1,
 	Softmax = 2,
-	Linear = 4
+	Linear = 4,
+	Double_Rectified_Linear = 8
 } Unittype_t;
 
 typedef enum Networktype_t
@@ -50,6 +51,8 @@ public:
 	float LEARNING_RATE;
 	float MOMENTUM;
 	int EPOCHS;
+	bool OUTPUT_IS_PROBABILITY;
+	int TRANSITION_EPOCH;
 
 private:
 	Costfunction_t m_costFunction;

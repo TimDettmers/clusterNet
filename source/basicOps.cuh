@@ -89,6 +89,8 @@ Matrix *gpuLog(Matrix *A);
 void gpuLog(Matrix *A, Matrix *out);
 Matrix *gpuSqrt(Matrix *A);
 void gpuSqrt(Matrix *A, Matrix *out);
+Matrix *doubleRectifiedLinear(Matrix *A);
+void doubleRectifiedLinear(Matrix *A, Matrix *out);
 
 Matrix *softmax(Matrix *A);
 void softmax(Matrix *A, Matrix *out);
@@ -105,6 +107,8 @@ Matrix *rectified_linear(Matrix *A);
 void rectified_linear(Matrix *A, Matrix *out);
 Matrix *rectified_linear_derivative(Matrix *A);
 void rectified_linear_derivative(Matrix *A, Matrix *out);
+Matrix *double_rectified_linear_derivative(Matrix *A);
+void double_rectified_linear_derivative(Matrix *A, Matrix *out);
 Matrix *squared_error(Matrix *A, Matrix *targets);
 void squared_error(Matrix *A, Matrix *targets, Matrix *out);
 
