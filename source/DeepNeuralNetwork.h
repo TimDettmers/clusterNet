@@ -65,15 +65,17 @@ private:
 	std::vector<Matrix*> MS;
 	std::vector<int> m_lLayers;
 	ClusterNet m_gpus;
+	int m_output_dim;
+	Networktype_t m_net_type;
 
-	void init_network_layout(std::vector<int> lLayerSizes, Networktype_t net_type);
-	void init_weights(Networktype_t nettype, int categories);
+	void init_network_layout(std::vector<int> lLayerSizes);
+	void init_weights();
 	void nesterov_updates();
 	void feedforward(FeedForward_t ff);
 	void backprop();
 	void weight_updates();
 	void free_variables();
-	int get_classification_errors(Batchtype_t batch_t);
+	float get_errors(Batchtype_t batch_t);
 	void cross_validation_error();
 	void train_error();
 

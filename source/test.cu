@@ -741,8 +741,8 @@ int main(int argc, char *argv[])
 	Matrix *y ;
 	if(gpus.MYGPUID == 0)
 	{
-		X = read_sparse_hdf5("/home/tim/data/X_tfidf.hdf5");
-		y = read_sparse_hdf5("/home/tim/data/y.hdf5");
+		X = read_sparse_hdf5("/home/tim/crowdflower_X.hdf5");
+		y = read_sparse_hdf5("/home/tim/crowdflower_y.hdf5");
 	}
 	else
 	{
@@ -752,13 +752,13 @@ int main(int argc, char *argv[])
 
 	b.init(X,y,0.2,128,512,gpus, Distributed_weights);
 	std::vector<int> layers;
-	layers.push_back(100);
+	layers.push_back(10000);
+	layers.push_back(4000);
 	b.SKIP_LAST_BATCH = true;
-	//DeepNeuralNetwork net = DeepNeuralNetwork(layers,Regression,gpus,b);
-	//net.EPOCHS = 2;
-	//MPI_Barrier(MPI_COMM_WORLD);
-	//cout << "myrank: " << gpus.MYRANK << endl;
-	//net.train();
+	DeepNeuralNetwork net = DeepNeuralNetwork(layers,Regression,gpus,b,24);
+	net.EPOCHS = 10;
+	net.LEARNING_RATE = 0.00001;
+	net.train();
 
 	Matrix *A = gpus.rand(b.CURRENT_BATCH->cols,100);
 

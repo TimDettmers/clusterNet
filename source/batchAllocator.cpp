@@ -483,6 +483,7 @@ void BatchAllocator::finish_batch_allocator()
 {
 	cudaDeviceSynchronize();
 
+	/*
 	cudaFree(m_next_buffer_X->data);
 	cudaFree(m_next_buffer_y->data);
 	cudaFree(m_next_buffer_cv_X->data);
@@ -498,6 +499,7 @@ void BatchAllocator::finish_batch_allocator()
 	cudaFree(CURRENT_BATCH_CV->data);
 	cudaFree(CURRENT_BATCH_Y->data);
 	cudaFree(CURRENT_BATCH_CV_Y->data);
+	*/
 
 	cudaStreamDestroy(m_streamNext_batch_X);
 	cudaStreamDestroy(m_streamNext_batch_y);
