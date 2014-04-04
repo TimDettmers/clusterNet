@@ -735,19 +735,14 @@ void dotMPI_test(int argc, char *argv[])
 
 int main(int argc, char *argv[])
 {
-
-
-
-
-
 	ClusterNet gpus = ClusterNet(argc,argv,1245);
 	BatchAllocator b = BatchAllocator();
 	Matrix *X;
 	Matrix *y ;
 	if(gpus.MYGPUID == 0)
 	{
-		X = read_sparse_hdf5("/home/tim/crowdflower_X.hdf5");
-		y = to_host(gpus.rand(X->rows,20));
+		X = read_sparse_hdf5("/home/tim/data/X_tfidf.hdf5");
+		y = read_sparse_hdf5("/home/tim/data/y.hdf5");
 	}
 	else
 	{
@@ -755,26 +750,19 @@ int main(int argc, char *argv[])
 		y = empty(1,1);
 	}
 
-
 	b.init(X,y,0.2,128,512,gpus, Distributed_weights);
 	std::vector<int> layers;
-	layers.push_back(1000);
-	//DeepNeuralNetwork net = DeepNeuralNetwork(layers,Classification,gpus,b);
+	layers.push_back(100);
+	b.SKIP_LAST_BATCH = true;
+	//DeepNeuralNetwork net = DeepNeuralNetwork(layers,Regression,gpus,b);
+	//net.EPOCHS = 2;
+	//MPI_Barrier(MPI_COMM_WORLD);
+	//cout << "myrank: " << gpus.MYRANK << endl;
+	//net.train();
 
-	Matrix *A = gpus.rand(b.CURRENT_BATCH->cols,1000);
+	Matrix *A = gpus.rand(b.CURRENT_BATCH->cols,100);
 
 	gpus.dot(b.CURRENT_BATCH,A);
-	gpus.dot(b.CURRENT_BATCH_CV,A);
-
-	b.broadcast_batch_to_processes();
-	b.allocate_next_batch_async();
-	b.replace_current_batch_with_next();
-	b.broadcast_batch_cv_to_processes();
-	b.allocate_next_cv_batch_async();
-	b.replace_current_cv_batch_with_next();
-	gpus.dot(b.CURRENT_BATCH,A);
-	gpus.dot(b.CURRENT_BATCH_CV,A);
-
 
 	gpus.shutdown_MPI();
 

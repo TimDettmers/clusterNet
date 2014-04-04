@@ -11,7 +11,7 @@
 using std::cout;
 using std::endl;
 
-DeepNeuralNetwork::DeepNeuralNetwork(std::vector<int> lLayerSizes, Networktype_t net_type, ClusterNet gpus, BatchAllocator allocator)
+DeepNeuralNetwork::DeepNeuralNetwork(std::vector<int> lLayerSizes, Networktype_t net_type, ClusterNet gpus, BatchAllocator allocator, int categories)
 {
 	m_gpus = gpus;
 	m_BA = allocator;
@@ -21,64 +21,69 @@ DeepNeuralNetwork::DeepNeuralNetwork(std::vector<int> lLayerSizes, Networktype_t
 	MOMENTUM = 0.5;
 
 	init_network_layout(lLayerSizes,net_type);
-	init_weights();
+	init_weights(net_type, categories);
 
 }
 
 void DeepNeuralNetwork::init_network_layout(std::vector<int> lLayerSizes, Networktype_t net_type)
 {
-	lLayers = lLayerSizes;
+	m_lLayers = lLayerSizes;
 	if(net_type == Classification){ m_costFunction = Root_Squared_Error;}
-		if(net_type == Regression){ m_costFunction = Cross_Entropy; }
+	if(net_type == Regression){ m_costFunction = Cross_Entropy; }
 
-		lDropout.push_back(0.2f);
-		for(int i = 0;i < lLayers.size(); i++)
-		{
-			if(net_type == Classification){ lUnits.push_back(Logistic); }
-			if(net_type == Regression){ lUnits.push_back(Rectified_Linear); }
-			lDropout.push_back(0.5f);
-		}
-		if(net_type == Classification){ lUnits.push_back(Softmax); }
-		if(net_type == Regression){ lUnits.push_back(Linear); }
+	lDropout.push_back(0.2f);
+	for(int i = 0;i < m_lLayers.size(); i++)
+	{
+		if(net_type == Classification){ lUnits.push_back(Logistic); }
+		if(net_type == Regression){ lUnits.push_back(Rectified_Linear); }
+		lDropout.push_back(0.5f);
+	}
+	if(net_type == Classification){ lUnits.push_back(Softmax); }
+	if(net_type == Regression){ lUnits.push_back(Linear); }
 }
 
-void DeepNeuralNetwork::init_weights()
+void DeepNeuralNetwork::init_weights(Networktype_t nettype, int categories)
 {
+
+	int output_size = categories;
+	if(nettype == Regression)
+		output_size = m_BA.CURRENT_BATCH_Y->cols;
+
 	if(m_BA.BATCH_METHOD == Distributed_weights)
 	{
-		W.push_back(m_gpus.distributed_uniformSqrtWeight(m_BA.CURRENT_BATCH->cols,lLayers[0]));
-		M.push_back(m_gpus.distributed_zeros(m_BA.CURRENT_BATCH->cols,lLayers[0]));
-		MS.push_back(m_gpus.distributed_zeros(m_BA.CURRENT_BATCH->cols,lLayers[0]));
-		GRAD.push_back(m_gpus.distributed_zeros(m_BA.CURRENT_BATCH->cols,lLayers[0]));
-		for(int i = 0;i < (lLayers.size()-1); i++)
+		W.push_back(m_gpus.distributed_uniformSqrtWeight(m_BA.CURRENT_BATCH->cols,m_lLayers[0]));
+		M.push_back(m_gpus.distributed_zeros(m_BA.CURRENT_BATCH->cols,m_lLayers[0]));
+		MS.push_back(m_gpus.distributed_zeros(m_BA.CURRENT_BATCH->cols,m_lLayers[0]));
+		GRAD.push_back(m_gpus.distributed_zeros(m_BA.CURRENT_BATCH->cols,m_lLayers[0]));
+		for(int i = 0;i < (m_lLayers.size()-1); i++)
 		{
-			W.push_back(m_gpus.distributed_uniformSqrtWeight(lLayers[i],lLayers[i+1]));
-			M.push_back(m_gpus.distributed_zeros(lLayers[i],lLayers[i+1]));
-			MS.push_back(m_gpus.distributed_zeros(lLayers[i],lLayers[i+1]));
-			GRAD.push_back(m_gpus.distributed_zeros(lLayers[i],lLayers[i+1]));
+			W.push_back(m_gpus.distributed_uniformSqrtWeight(m_lLayers[i],m_lLayers[i+1]));
+			M.push_back(m_gpus.distributed_zeros(m_lLayers[i],m_lLayers[i+1]));
+			MS.push_back(m_gpus.distributed_zeros(m_lLayers[i],m_lLayers[i+1]));
+			GRAD.push_back(m_gpus.distributed_zeros(m_lLayers[i],m_lLayers[i+1]));
 		}
-		W.push_back(m_gpus.distributed_uniformSqrtWeight(lLayers.back(),10));
-		M.push_back(m_gpus.distributed_zeros(lLayers.back(),10));
-		MS.push_back(m_gpus.distributed_zeros(lLayers.back(),10));
-		GRAD.push_back(m_gpus.distributed_zeros(lLayers.back(),10));
+		W.push_back(m_gpus.distributed_uniformSqrtWeight(m_lLayers.back(), output_size));
+		M.push_back(m_gpus.distributed_zeros(m_lLayers.back(),output_size));
+		MS.push_back(m_gpus.distributed_zeros(m_lLayers.back(),output_size));
+		GRAD.push_back(m_gpus.distributed_zeros(m_lLayers.back(),output_size));
 	}
 	else
 	{
-		W.push_back(m_gpus.uniformSqrtWeight(m_BA.CURRENT_BATCH->cols,lLayers[0]));
-		M.push_back(zeros(m_BA.CURRENT_BATCH->cols,lLayers[0]));
-		MS.push_back(zeros(m_BA.CURRENT_BATCH->cols,lLayers[0]));
-		GRAD.push_back(zeros(m_BA.CURRENT_BATCH->cols,lLayers[0]));
-		for(int i = 0;i < (lLayers.size()-1); i++)
+		W.push_back(m_gpus.uniformSqrtWeight(m_BA.CURRENT_BATCH->cols,m_lLayers[0]));
+		M.push_back(zeros(m_BA.CURRENT_BATCH->cols,m_lLayers[0]));
+		MS.push_back(zeros(m_BA.CURRENT_BATCH->cols,m_lLayers[0]));
+		GRAD.push_back(zeros(m_BA.CURRENT_BATCH->cols,m_lLayers[0]));
+		for(int i = 0;i < (m_lLayers.size()-1); i++)
 		{
-			W.push_back(m_gpus.uniformSqrtWeight(lLayers[i],lLayers[i+1]));
-			M.push_back(zeros(lLayers[i],lLayers[i+1]));
-			MS.push_back(zeros(lLayers[i],lLayers[i+1]));
-			GRAD.push_back(zeros(lLayers[i],lLayers[i+1]));
+			W.push_back(m_gpus.uniformSqrtWeight(m_lLayers[i],m_lLayers[i+1]));
+			M.push_back(zeros(m_lLayers[i],m_lLayers[i+1]));
+			MS.push_back(zeros(m_lLayers[i],m_lLayers[i+1]));
+			GRAD.push_back(zeros(m_lLayers[i],m_lLayers[i+1]));
 		}
-		W.push_back(m_gpus.uniformSqrtWeight(lLayers.back(),10));
-		M.push_back(zeros(lLayers.back(),10));
-		MS.push_back(zeros(lLayers.back(),10));
-		GRAD.push_back(zeros(lLayers.back(),10));
+		W.push_back(m_gpus.uniformSqrtWeight(m_lLayers.back(),output_size));
+		M.push_back(zeros(m_lLayers.back(),output_size));
+		MS.push_back(zeros(m_lLayers.back(),output_size));
+		GRAD.push_back(zeros(m_lLayers.back(),output_size));
 	}
 }
 
@@ -92,8 +97,6 @@ void DeepNeuralNetwork::train()
 		if(MOMENTUM > 0.95) MOMENTUM = 0.95;
 		for(int i = 0; i < m_BA.TOTAL_BATCHES; i++)
 		{
-
-		  //m_BA.slice_batch();
 		  nesterov_updates();
 		  m_BA.broadcast_batch_to_processes();
 		  feedforward(Dropout);

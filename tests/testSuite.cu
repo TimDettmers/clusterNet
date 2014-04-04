@@ -14,7 +14,7 @@ int main(int argc, char *argv[])
   run_clusterNet_test(gpus);
   run_batchAllocator_test(gpus);
   run_miniMNIST_test(gpus);
-  run_util_test();
+  //run_util_test();
 
 
   printf("----------------------\n");

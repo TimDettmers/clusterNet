@@ -174,7 +174,6 @@ void BatchAllocator::init(float cross_validation_size, int batch_size, int batch
 			slice_sparse_to_dense(m_full_X,m_next_buffer_cv_X,TRAIN_SET_SIZE,BATCH_SIZE_CV);
 		}
 
-
 		if(m_full_y->isSparse != 1)
 		{
 			memcpy(&m_next_buffer_y->data[0],&m_full_y->data[0], m_next_buffer_y->bytes);

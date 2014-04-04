@@ -50,6 +50,7 @@ void run_miniMNIST_test(ClusterNet gpus)
 	  {
 		  b.broadcast_batch_to_processes();
 
+
 		  //nesterov updates
 		  scalarMul(m1,momentum,m1);
 		  scalarMul(m2,momentum,m2);
@@ -288,9 +289,10 @@ void run_miniMNIST_test(ClusterNet gpus)
 	std::vector<int> layers;
 	layers.push_back(500);
 
+
 	BatchAllocator allocator = BatchAllocator();
 	allocator.init(X,y,0.2,64,64,gpus, Distributed_weights);
-	DeepNeuralNetwork net = DeepNeuralNetwork(layers,Classification, gpus, allocator);
+	DeepNeuralNetwork net = DeepNeuralNetwork(layers,Classification, gpus, allocator, 10);
 	net.EPOCHS = 10;
 	net.train();
 

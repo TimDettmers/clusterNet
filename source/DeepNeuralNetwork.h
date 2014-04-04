@@ -44,7 +44,7 @@ typedef enum Costfunction_t
 class DeepNeuralNetwork
 {
 public:
-	DeepNeuralNetwork(std::vector<int> lLayerSizes, Networktype_t net_type, ClusterNet gpus, BatchAllocator allocator);
+	DeepNeuralNetwork(std::vector<int> lLayerSizes, Networktype_t net_type, ClusterNet gpus, BatchAllocator allocator, int categories);
 	void train();
 
 	float LEARNING_RATE;
@@ -63,11 +63,11 @@ private:
 	std::vector<Matrix*> M;
 	std::vector<Matrix*> GRAD;
 	std::vector<Matrix*> MS;
-	std::vector<int> lLayers;
+	std::vector<int> m_lLayers;
 	ClusterNet m_gpus;
 
 	void init_network_layout(std::vector<int> lLayerSizes, Networktype_t net_type);
-	void init_weights();
+	void init_weights(Networktype_t nettype, int categories);
 	void nesterov_updates();
 	void feedforward(FeedForward_t ff);
 	void backprop();
