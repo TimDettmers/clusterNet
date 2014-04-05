@@ -206,6 +206,30 @@ Matrix *empty_pinned(int rows, int cols)
   return out;
 }
 
+Matrix *empty_cpu(int rows, int cols)
+{
+
+  int size = rows*cols;
+  size_t bytes = rows*cols*sizeof(float);
+  float *data = (float*)malloc(bytes);
+
+  Matrix *out = (Matrix*)malloc(sizeof(Matrix));
+  out->rows = rows;
+  out->cols = cols;
+  out->bytes = bytes;
+  out->size = size;
+  out->data = data;
+  out->isDistributed = 0;
+  out->cols_distributed = 0;
+  out->isSparse = 0;
+  out->idx_bytes = 0;
+  out->idx_cols = 0;
+  out->ptr_bytes = 0;
+  out->ptr_rows = 0;
+
+  return out;
+}
+
 
 Matrix *fill_matrix(int rows, int cols, float fill_value)
 {

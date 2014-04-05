@@ -738,16 +738,20 @@ int main(int argc, char *argv[])
 	ClusterNet gpus = ClusterNet(argc,argv,1245);
 	BatchAllocator b = BatchAllocator();
 	Matrix *X;
-	Matrix *y ;
+	Matrix *y;
+	Matrix *test;
+	Matrix *out;
 	if(gpus.MYGPUID == 0)
 	{
 		X = read_sparse_hdf5("/home/tim/crowdflower_X.hdf5");
 		y = read_sparse_hdf5("/home/tim/crowdflower_y.hdf5");
+		test = read_sparse_hdf5("/home/tim/crowdflower_test.hdf5");
 	}
 	else
 	{
 		X = empty(1,1);
 		y = empty(1,1);
+		test = empty(1,1);
 	}
 
 	b.init(X,y,0.2,128,512,gpus, Distributed_weights);
@@ -756,10 +760,16 @@ int main(int argc, char *argv[])
 	layers.push_back(2000);
 	b.SKIP_LAST_BATCH = true;
 	DeepNeuralNetwork net = DeepNeuralNetwork(layers,Regression,gpus,b,24);
-	net.EPOCHS = 10;
+	net.EPOCHS = 1;
+	net.TRANSITION_EPOCH = 10;
 	net.LEARNING_RATE = 0.00001;
 	net.OUTPUT_IS_PROBABILITY = true;
 	net.train();
+	out = net.predict(test);
+
+	if(gpus.MYGPUID == 0)
+		for(int i = 0; i < 100; i++)
+			cout << out->data[i] << endl;
 
 	gpus.shutdown_MPI();
 

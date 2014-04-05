@@ -260,12 +260,12 @@ int test_matrix(Matrix *A, int rows, int cols)
   return 0;
 }
 
-void print_matrix(Matrix *A)
+void print_matrix(Matrix *A, int end_rows, int end_cols)
 {
-	for(int row = 0; row< A->rows; row++)
+	for(int row = 0; row< end_rows; row++)
 	  {
 		  printf("[");
-		  for(int col =0; col < A->cols; col++)
+		  for(int col =0; col < end_cols; col++)
 		  {
 			  printf("%f ",A->data[(row*A->cols)+col]);
 		  }
@@ -277,7 +277,16 @@ void print_matrix(Matrix *A)
 void printmat(Matrix *A)
 {
   Matrix * m = to_host(A);
-  print_matrix(m);
+  print_matrix(m,A->rows,A->cols);
+  free(m->data);
+  free(m);
+
+}
+
+void printmat(Matrix *A, int end_rows, int end_cols)
+{
+  Matrix * m = to_host(A);
+  print_matrix(m, end_rows, end_cols);
   free(m->data);
   free(m);
 

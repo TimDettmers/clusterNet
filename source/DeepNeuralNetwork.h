@@ -42,11 +42,18 @@ typedef enum Costfunction_t
 	Root_Squared_Error = 2
 } Costfunction_t;
 
+typedef enum WeightUpdateType_t
+{
+	RMSProp = 0,
+	NoMomentum = 1
+} WeightUpdateType_t;
+
 class DeepNeuralNetwork
 {
 public:
 	DeepNeuralNetwork(std::vector<int> lLayerSizes, Networktype_t net_type, ClusterNet gpus, BatchAllocator allocator, int categories);
 	void train();
+	Matrix* predict(Matrix *X);
 
 	float LEARNING_RATE;
 	float MOMENTUM;
@@ -70,6 +77,7 @@ private:
 	ClusterNet m_gpus;
 	int m_output_dim;
 	Networktype_t m_net_type;
+	WeightUpdateType_t m_update_type;
 
 	void init_network_layout(std::vector<int> lLayerSizes);
 	void init_weights();

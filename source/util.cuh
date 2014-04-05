@@ -28,8 +28,9 @@ int test_eq(float f1, float f2, int idx1, int idx2, char* message);
 int test_eq(int i1, int i2, char* message);
 int test_eq(int i1, int i2, int idx1, int idx2, char* message);
 int test_matrix(Matrix *A, int rows, int cols);
-void print_matrix(Matrix *A);
 void printmat(Matrix *A);
+void printmat(Matrix *A, int end_rows, int end_cols);
+void print_matrix(Matrix *A, int end_rows, int end_cols);
 bool replace(std::string& str, const std::string& from, const std::string& to);
 void slice_sparse_to_dense(Matrix *X, Matrix *out, int start, int length);
 #endif
