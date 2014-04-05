@@ -106,17 +106,17 @@ void DeepNeuralNetwork::train()
 		if(MOMENTUM > 0.95) MOMENTUM = 0.95;
 
 		if(EPOCH >= TRANSITION_EPOCH)
-		{
-			if(EPOCH == TRANSITION_EPOCH)
-			{
-				m_update_type = NoMomentum;
-				for(int i = 0; i < lDropout.size(); i++)
-					lDropout[i] = lDropout[i] / 2.0;
-			}
-
 			LEARNING_RATE = original_learning_rate / (EPOCH - TRANSITION_EPOCH + 1.0f);
 
+		if(EPOCH == TRANSITION_EPOCH)
+		{
+			m_update_type = NoMomentum;
+			for(int i = 0; i < lDropout.size(); i++)
+				lDropout[i] = lDropout[i] / 2.0;
 		}
+
+
+
 
 
 

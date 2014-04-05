@@ -9,6 +9,8 @@
 #include <util.cuh>
 #include <basicOps.cuh>
 #include <hdf5.h>
+#include <iomanip>
+#include <ios>
 
 using std::string;
 using std::vector;
@@ -53,6 +55,27 @@ Matrix *read_csv (const char* filename)
   out->isSparse = 0;
 
   return out;
+}
+
+void write_csv(const char* filename, Matrix *X, const char* header, Matrix *ids)
+{
+	std::ofstream myfile;
+	myfile.open(filename,std::ios::trunc);
+	myfile << header << "\n";
+	for(int row = 0; row< X->rows; row++)
+	  {
+		  for(int col = 0; col < X->cols; col++)
+		  {
+			  if(col > 0)
+				  myfile << ", ";
+			  else
+				  myfile << (int)ids->data[row] << ", ";
+
+			  myfile << std::fixed << X->data[(row*X->cols)+col];
+		  }
+		  myfile << "\n";
+	  }
+	myfile.close();
 }
 
 Matrix *read_hdf5(const char *filepath){ return read_hdf5(filepath,"/Default"); }

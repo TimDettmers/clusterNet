@@ -767,9 +767,11 @@ int main(int argc, char *argv[])
 	net.train();
 	out = net.predict(test);
 
-	if(gpus.MYGPUID == 0)
-		for(int i = 0; i < 100; i++)
-			cout << out->data[i] << endl;
+	if(gpus.MYRANK == 0)
+	{
+		Matrix *ids =  read_sparse_hdf5("/home/tim/crowdflower_ids.hdf5");
+		write_csv("/home/tim/crowdflower_result.csv",out,"id,s1,s2,s3,s4,s5,w1,w2,w3,w4,k1,k2,k3,k4,k5,k6,k7,k8,k9,k10,k11,k12,k13,k14,k15",ids);
+	}
 
 	gpus.shutdown_MPI();
 
