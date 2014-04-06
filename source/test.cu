@@ -746,24 +746,35 @@ int main(int argc, char *argv[])
 		X = read_sparse_hdf5("/home/tim/crowdflower_X.hdf5");
 		y = read_sparse_hdf5("/home/tim/crowdflower_y.hdf5");
 		test = read_sparse_hdf5("/home/tim/crowdflower_test.hdf5");
+
+		//X = read_hdf5("/home/tim/mnist_full_X.hdf5");
+		//y = to_host(create_t_matrix(to_gpu(read_hdf5("/home/tim/mnist_full_y.hdf5")),10));
+		//test = read_hdf5("/home/tim/mnist_full_X.hdf5");
+
+		//X = read_hdf5("/home/tim/crowdflower_X_dense.hdf5");
+		//y = read_hdf5("/home/tim/crowdflower_y_dense.hdf5");
 	}
 	else
 	{
 		X = empty(1,1);
-		y = empty(1,1);
+		y = empty(1,10);
 		test = empty(1,1);
 	}
 
 	b.init(X,y,0.2,128,512,gpus, Distributed_weights);
+
 	std::vector<int> layers;
-	layers.push_back(4000);
-	layers.push_back(2000);
+	layers.push_back(12000);
+	layers.push_back(8000);
 	b.SKIP_LAST_BATCH = true;
+
+
 	DeepNeuralNetwork net = DeepNeuralNetwork(layers,Regression,gpus,b,24);
-	net.EPOCHS = 1;
-	net.TRANSITION_EPOCH = 10;
-	net.LEARNING_RATE = 0.00001;
+	net.EPOCHS = 5;
+	net.TRANSITION_EPOCH = 5;
+	net.LEARNING_RATE = 0.0001;
 	net.OUTPUT_IS_PROBABILITY = true;
+	//net.PRINT_MISSCLASSIFICATION = true;
 	net.train();
 	out = net.predict(test);
 
@@ -772,6 +783,7 @@ int main(int argc, char *argv[])
 		Matrix *ids =  read_sparse_hdf5("/home/tim/crowdflower_ids.hdf5");
 		write_csv("/home/tim/crowdflower_result.csv",out,"id,s1,s2,s3,s4,s5,w1,w2,w3,w4,k1,k2,k3,k4,k5,k6,k7,k8,k9,k10,k11,k12,k13,k14,k15",ids);
 	}
+
 
 	gpus.shutdown_MPI();
 

@@ -60,6 +60,7 @@ public:
 	int EPOCHS;
 	bool OUTPUT_IS_PROBABILITY;
 	int TRANSITION_EPOCH;
+    bool PRINT_MISSCLASSIFICATION;
 
 private:
 	Costfunction_t m_costFunction;
@@ -78,6 +79,8 @@ private:
 	int m_output_dim;
 	Networktype_t m_net_type;
 	WeightUpdateType_t m_update_type;
+
+	float missclassification_error;
 
 	void init_network_layout(std::vector<int> lLayerSizes);
 	void init_weights();

@@ -145,6 +145,7 @@ void BatchAllocator::init(float cross_validation_size, int batch_size, int batch
 	m_next_batch_cv_y = empty(BATCH_SIZE_CV,m_Cols_y);
 
 
+
 	if(m_mygpuID == 0)
 	{
 		if(BATCH_METHOD == Distributed_weights){ m_myrank = m_cluster.MYRANK; }
@@ -163,8 +164,10 @@ void BatchAllocator::init(float cross_validation_size, int batch_size, int batch
 		m_next_batch_number = 0;
 		m_next_batch_number_cv = 0;
 
+
 		if(m_full_X->isSparse != 1)
 		{
+
 			memcpy(&m_next_buffer_X->data[0],&m_full_X->data[0], m_next_buffer_X->bytes);
 			memcpy(&m_next_buffer_cv_X->data[0],&m_full_X->data[(TRAIN_SET_SIZE * m_full_X->cols)],	m_next_buffer_cv_X->bytes);
 		}
@@ -185,6 +188,7 @@ void BatchAllocator::init(float cross_validation_size, int batch_size, int batch
 			slice_sparse_to_dense(m_full_y,m_next_buffer_cv_y,TRAIN_SET_SIZE,BATCH_SIZE_CV);
 		}
 
+
 		if(BATCH_METHOD == Distributed_weights)
 		{
 			for(int i = 0; i < m_cluster.PCIe_RANKS.size()-1; i++)
@@ -195,9 +199,11 @@ void BatchAllocator::init(float cross_validation_size, int batch_size, int batch
 				MPI_Send(m_next_buffer_cv_y->data,m_next_buffer_cv_y->size, MPI_FLOAT,m_cluster.PCIe_RANKS[i+1],996,MPI_COMM_WORLD);
 			}
 		}
+
 	}
 	else
 	{
+
 		m_myrank = m_cluster.MYRANK;
 		MPI_Recv(m_next_buffer_X->data,m_next_buffer_X->size,MPI_FLOAT,m_cluster.PCIe_RANKS[0],999,MPI_COMM_WORLD,&m_status);
 		MPI_Recv(m_next_buffer_y->data,m_next_buffer_y->size,MPI_FLOAT,m_cluster.PCIe_RANKS[0],998,MPI_COMM_WORLD,&m_status);
@@ -206,6 +212,7 @@ void BatchAllocator::init(float cross_validation_size, int batch_size, int batch
 
 
 	}
+
 	cudaMemcpy(m_next_batch_X->data,m_next_buffer_X->data, m_next_batch_X->bytes, cudaMemcpyHostToDevice);
 	cudaMemcpy(m_next_batch_y->data,m_next_buffer_y->data, m_next_batch_y->bytes, cudaMemcpyHostToDevice);
 	cudaMemcpy(m_next_batch_cv_X->data,m_next_buffer_cv_X->data, m_next_batch_cv_X->bytes, cudaMemcpyHostToDevice);
@@ -218,7 +225,6 @@ void BatchAllocator::init(float cross_validation_size, int batch_size, int batch
 
 	m_next_batch_number += 1;
 	m_next_batch_number_cv += 1;
-
 }
 
 void BatchAllocator::MPI_get_dataset_dimensions()

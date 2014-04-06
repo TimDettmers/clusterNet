@@ -21,6 +21,7 @@ DeepNeuralNetwork::DeepNeuralNetwork(std::vector<int> lLayerSizes, Networktype_t
 	LEARNING_RATE = 0.003;
 	MOMENTUM = 0.5;
 	OUTPUT_IS_PROBABILITY = false;
+	PRINT_MISSCLASSIFICATION = net_type == Classification ? true : false;
 	m_output_dim = categories;
 	m_net_type = net_type;
 	m_update_type = RMSProp;
@@ -94,8 +95,8 @@ void DeepNeuralNetwork::init_weights()
 
 void DeepNeuralNetwork::train()
 {
-	if(OUTPUT_IS_PROBABILITY)
-		lUnits.back() = Double_Rectified_Linear;
+	//if(OUTPUT_IS_PROBABILITY)
+		//lUnits.back() = Double_Rectified_Linear;
 
 	float original_learning_rate = LEARNING_RATE;
 	for(int EPOCH = 0; EPOCH < EPOCHS; EPOCH++)
@@ -114,11 +115,6 @@ void DeepNeuralNetwork::train()
 			for(int i = 0; i < lDropout.size(); i++)
 				lDropout[i] = lDropout[i] / 2.0;
 		}
-
-
-
-
-
 
 		for(int i = 0; i < m_BA.TOTAL_BATCHES; i++)
 		{
@@ -153,6 +149,11 @@ void DeepNeuralNetwork::backprop()
 	  else
 	  {
 		  E.push_back(sub(Z.back(), m_BA.CURRENT_BATCH_Y));
+		  if(lUnits.back() == Double_Rectified_Linear)
+		  {
+			  double_rectified_linear_derivative(Z.back(),Z.back());
+			  mul(Z.back(),E.back(),E.back());
+		  }
 	  }
 	  for(int i = W.size()-1; i > 0; i--)
 	  {
@@ -198,6 +199,7 @@ void DeepNeuralNetwork::weight_updates()
 
 void DeepNeuralNetwork::feedforward(FeedForward_t ff)
 {
+	//scale up the weights
 	if(ff == Dropout)
 	{
 		Z.push_back(m_BA.CURRENT_BATCH);
@@ -217,31 +219,70 @@ void DeepNeuralNetwork::feedforward(FeedForward_t ff)
 		{
 			Z.push_back(m_gpus.dot(Z.back(), W[i]));
 			activation_function(i, Z.back());
+			if(i < W.size() -1)
+				scalarMul(Z.back(), 0.5, Z.back());
 		}
 	}
+
+	if(OUTPUT_IS_PROBABILITY)
+		doubleRectifiedLinear(Z.back(),Z.back());
 
 }
 
 float DeepNeuralNetwork::get_errors(Batchtype_t batch_t)
 {
 	float errors = 0;
-	if(m_net_type == Classification)
+	if(m_net_type == Classification || PRINT_MISSCLASSIFICATION)
 	{
+		/*
+		if(m_gpus.MYRANK == 2)
+		{
+			cout << "out:" << endl;
+			printmat(Z.back(),1,10);
+			cout << "batch:" << endl;
+			printmat(batch_t == Train ? m_BA.CURRENT_BATCH_Y : m_BA.CURRENT_BATCH_CV_Y,1,10);
+		}
+		*/
+
 		Matrix *result = argmax(Z.back());
 		Matrix *eq;
-		if(batch_t == Train){	eq = equal(result,m_BA.CURRENT_BATCH_Y);}
-		else{	eq = equal(result,m_BA.CURRENT_BATCH_CV_Y);}
+		if(m_net_type == Classification)
+		{
+			if(batch_t == Train){	eq = equal(result,m_BA.CURRENT_BATCH_Y);}
+			else{	eq = equal(result,m_BA.CURRENT_BATCH_CV_Y);}
+		}
+		else
+		{
+			Matrix *argmax_regression_batch;
+			if(batch_t == Train){argmax_regression_batch = argmax(m_BA.CURRENT_BATCH_Y); eq = equal(result,argmax_regression_batch);}
+			else{argmax_regression_batch = argmax(m_BA.CURRENT_BATCH_CV_Y);	eq = equal(result,argmax_regression_batch);}
+		}
 
 		float sum_value = sum(eq);
-		errors = (Z.back()->rows  - sum_value);
+		missclassification_error = (Z.back()->rows  - sum_value);
 		cudaFree(result->data);
 		cudaFree(eq->data);
 	}
-	else
+
+	if(m_net_type == Regression)
 	{
+		/*
+		if(m_gpus.MYRANK == 2)
+		{
+			cout << "out:" << endl;
+			printmat(Z.back(),1,10);
+			cout << "batch:" << endl;
+			printmat(batch_t == Train ? m_BA.CURRENT_BATCH_Y : m_BA.CURRENT_BATCH_CV_Y,1,10);
+		}
+		*/
+
+
+
 		Matrix *sqrErr = squared_error(Z.back(),batch_t == Train ? m_BA.CURRENT_BATCH_Y : m_BA.CURRENT_BATCH_CV_Y);
+
 		errors = sum(sqrErr);
 		errors /=  m_BA.CURRENT_BATCH_Y->cols;
+		errors *= batch_t == Train ? m_BA.CURRENT_BATCH_Y->rows : m_BA.CURRENT_BATCH_CV_Y->rows;
 		errors = sqrt(errors);
 		cudaFree(sqrErr->data);
 	}
@@ -320,6 +361,9 @@ void DeepNeuralNetwork::train_error()
 
 	  if(m_BA.BATCH_METHOD == Single_GPU || (m_BA.BATCH_METHOD != Single_GPU && m_gpus.MYRANK == 0))
 		  std::cout << "Train error: " << errors/m_BA.TRAIN_SET_SIZE << std::endl;
+	  if((m_BA.BATCH_METHOD == Single_GPU || (m_BA.BATCH_METHOD != Single_GPU && m_gpus.MYRANK == 0)) &&
+			  PRINT_MISSCLASSIFICATION)
+		  std::cout << "Train classification error: " << missclassification_error/m_BA.TRAIN_SET_SIZE << std::endl;
 }
 
 
@@ -340,6 +384,9 @@ void DeepNeuralNetwork::cross_validation_error()
 
 	  if(m_BA.BATCH_METHOD == Single_GPU || (m_BA.BATCH_METHOD != Single_GPU && m_gpus.MYRANK == 0))
 		  std::cout << "Cross validation error: " << errors/m_BA.CV_SET_SIZE << std::endl;
+	  if((m_BA.BATCH_METHOD == Single_GPU || (m_BA.BATCH_METHOD != Single_GPU && m_gpus.MYRANK == 0)) &&
+			  PRINT_MISSCLASSIFICATION)
+		  std::cout << "Cross validation classification error: " << missclassification_error/m_BA.CV_SET_SIZE << std::endl;
 }
 
 Matrix* DeepNeuralNetwork::predict(Matrix *X)
@@ -437,7 +484,12 @@ Matrix* DeepNeuralNetwork::predict(Matrix *X)
 		{
 			Z.push_back(m_gpus.dot(Z.back(), W[j]));
 			activation_function(j, Z.back());
+			if(j < W.size() -1)
+				scalarMul(Z.back(),0.5,Z.back());
 		}
+
+		if(OUTPUT_IS_PROBABILITY)
+			doubleRectifiedLinear(Z.back(),Z.back());
 
 		if(m_gpus.MYGPUID == 0)
 		{

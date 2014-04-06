@@ -300,6 +300,21 @@ void run_miniMNIST_test(ClusterNet gpus)
 	{
 		cout << endl;
 		cout << "Train error should be: 0.0025" << endl;
+		cout << "Cross validation error should be: 0.13" << endl;
+	}
+
+	allocator = BatchAllocator();
+	Matrix *t = to_host(create_t_matrix(to_gpu(y),10));
+	allocator.init(X,t,0.2,64,64,gpus, Distributed_weights);
+	net = DeepNeuralNetwork(layers,Regression, gpus, allocator, 10);
+	net.EPOCHS = 10;
+	net.PRINT_MISSCLASSIFICATION = true;
+	net.train();
+
+	if(gpus.MYRANK == 0)
+	{
+		cout << endl;
+		cout << "Train error should be: 0.0025" << endl;
 		cout << "Cross validation error should be: 0.15" << endl;
 	}
 
