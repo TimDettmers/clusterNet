@@ -65,15 +65,23 @@ public:
 private:
 	Costfunction_t m_costFunction;
 	std::vector<Matrix*> D;
+	std::vector<Matrix*> D_B;
 	std::vector<Matrix*> Z;
+	std::vector<Matrix*> Z_B;
 	std::vector<Matrix*> E;
 	std::vector<float> lDropout;
 	std::vector<Unittype_t> lUnits;
 	BatchAllocator m_BA;
 	std::vector<Matrix*> W;
+	std::vector<Matrix*> B;
+	std::vector<Matrix*> B_Activations;
+	std::vector<Matrix*> B_Activations_CV;
 	std::vector<Matrix*> M;
+	std::vector<Matrix*> B_M;
 	std::vector<Matrix*> GRAD;
+	std::vector<Matrix*> B_GRAD;
 	std::vector<Matrix*> MS;
+	std::vector<Matrix*> B_MS;
 	std::vector<int> m_lLayers;
 	ClusterNet m_gpus;
 	int m_output_dim;

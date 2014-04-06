@@ -606,6 +606,23 @@ Matrix *ClusterNet::distributed_zeros(int rows, int cols)
 	return W;
 }
 
+Matrix *ClusterNet::distributed_ones(int rows, int cols)
+{
+	assert(m_hasMPI);
+	Matrix *W;
+	int split_size = cols / MPI_SIZE;
+	int remainder = cols - (split_size * MPI_SIZE);
+	if (MYRANK < MPI_SIZE - 1)
+		W = ones(rows, split_size);
+	else
+		W = ones(rows, split_size + remainder);
+
+	W->isDistributed = 1;
+	W->cols_distributed = cols;
+
+	return W;
+}
+
 Matrix *ClusterNet::distributed_sparseInitWeight(int rows, int cols)
 {
 	assert(m_hasMPI);

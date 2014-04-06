@@ -27,6 +27,7 @@ __global__ void kSoftMax(float* A, float* out, unsigned int rows, unsigned int c
 __device__ void reduceToMax(float* sdata, unsigned int tid);
 __device__ void reduceToSumLocal(float* sdata, unsigned int tid);
 __global__ void kSubMatrixVector(float *A, float *v, float *out, int rows, int size);
+__global__ void kAddMatrixVector(float *A, float *v, float *out, int rows, int size);
 __global__ void kArgmax(float* A, float* out, unsigned int height, unsigned int width);
 __global__ void kCreate_t_matrix(float *labels, float *out, int rows, int size);
 __global__ void kEqual(float *A, float *B, float *out, int size);

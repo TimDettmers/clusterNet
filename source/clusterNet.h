@@ -50,6 +50,7 @@ public:
 	 Matrix *distributed_uniformSqrtWeight(int rows, int cols);
 	 Matrix *distributed_sparseInitWeight(int rows, int cols);
 	 Matrix *distributed_zeros(int rows, int cols);
+	 Matrix *distributed_ones(int rows, int cols);
 	 Matrix *uniformSqrtWeight(int rows, int cols);
 	 Matrix *sparseInitWeight(int rows, int cols);
 	 Matrix *sparseInitWeight(int rows, int cols, int connections);

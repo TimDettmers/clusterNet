@@ -749,6 +749,7 @@ int main(int argc, char *argv[])
 
 		//X = read_hdf5("/home/tim/mnist_full_X.hdf5");
 		//y = to_host(create_t_matrix(to_gpu(read_hdf5("/home/tim/mnist_full_y.hdf5")),10));
+		//y = read_hdf5("/home/tim/mnist_full_y.hdf5");
 		//test = read_hdf5("/home/tim/mnist_full_X.hdf5");
 
 		//X = read_hdf5("/home/tim/crowdflower_X_dense.hdf5");
@@ -764,14 +765,14 @@ int main(int argc, char *argv[])
 	b.init(X,y,0.2,128,512,gpus, Distributed_weights);
 
 	std::vector<int> layers;
-	layers.push_back(12000);
-	layers.push_back(8000);
+	layers.push_back(4000);
+	layers.push_back(4000);
 	b.SKIP_LAST_BATCH = true;
 
 
 	DeepNeuralNetwork net = DeepNeuralNetwork(layers,Regression,gpus,b,24);
-	net.EPOCHS = 5;
-	net.TRANSITION_EPOCH = 5;
+	net.EPOCHS = 4;
+	net.TRANSITION_EPOCH = 4;
 	net.LEARNING_RATE = 0.0001;
 	net.OUTPUT_IS_PROBABILITY = true;
 	//net.PRINT_MISSCLASSIFICATION = true;

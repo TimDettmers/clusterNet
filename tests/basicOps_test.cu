@@ -305,6 +305,17 @@ int run_basicOps_test()
   {
 	  assert(test_eq(m_host->data[i],-1.0f, "Matrix - vector, equal data test"));
   }
+  m3 = gpu.rand(13,17);
+  Matrix *m4 = gpu.rand(1,17);
+  m_host = to_host(addMatrixVector(m3,m4));
+  m3 = to_host(m3);
+  m4 = to_host(m4);
+  assert(test_matrix(m_host,13,17));
+  for(int row = 0; row < m_host->rows; row++)
+  {
+	  for(int col = 0; col < m_host->cols; col++)
+		  assert(test_eq(m_host->data[(row*m_host->cols) + col], m3->data[(row*m_host->cols) + col] + m4->data[col], "Matrix + vector, equal data test"));
+  }
 
   //      0 2    3
   // m1 = 0 0.83 59.1387

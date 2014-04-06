@@ -613,6 +613,24 @@ void subMatrixVector(Matrix *A, Matrix *v, Matrix *out)
 	kSubMatrixVector<<<blocks,THREADS_PER_BLOCKS>>>(A->data, v->data, out->data, A->rows, A->size);
 }
 
+Matrix *addMatrixVector(Matrix *A, Matrix *v)
+{
+	Matrix *out = empty(A->rows,A->cols);
+	addMatrixVector(A, v, out);
+
+	return out;
+}
+
+void addMatrixVector(Matrix *A, Matrix *v, Matrix *out)
+{
+	if(A->cols != v->cols)
+		printf("Error dimensions do not match: %i columns for matrix vs. %i for vector",A->cols,v->cols);
+
+	assert(A->cols == v->cols);
+	int blocks = (A->size/THREADS_PER_BLOCKS) + 1;
+	kAddMatrixVector<<<blocks,THREADS_PER_BLOCKS>>>(A->data, v->data, out->data, A->rows, A->size);
+}
+
 void softmax(Matrix *A, Matrix *out)
 {
     kSoftMax<<<1, A->rows > THREADS_PER_BLOCKS ? THREADS_PER_BLOCKS : A->rows>>>(A->data, out->data, A->rows, A->cols);

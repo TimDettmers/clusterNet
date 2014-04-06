@@ -61,19 +61,19 @@ void write_csv(const char* filename, Matrix *X, const char* header, Matrix *ids)
 {
 	std::ofstream myfile;
 	myfile.open(filename,std::ios::trunc);
-	myfile << header << "\n";
+	myfile << header << "\r\n";
 	for(int row = 0; row< X->rows; row++)
 	  {
 		  for(int col = 0; col < X->cols; col++)
 		  {
 			  if(col > 0)
-				  myfile << ", ";
+				  myfile << ",";
 			  else
-				  myfile << (int)ids->data[row] << ", ";
+				  myfile << (int)ids->data[row] << ",";
 
 			  myfile << std::fixed << X->data[(row*X->cols)+col];
 		  }
-		  myfile << "\n";
+		  myfile << "\r\n";
 	  }
 	myfile.close();
 }
