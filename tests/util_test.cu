@@ -2,6 +2,10 @@
 #include <stdio.h>
 #include <assert.h>
 #include <string>
+#include <iostream>
+
+using std::cout;
+using std::endl;
 
 void run_util_test()
 {
@@ -34,6 +38,8 @@ void run_util_test()
 		assert(test_eq(X->ptr_rows[i],row_ptr,"HDF5 read sparse for h5py data."));
 		row_ptr += i == 0 ? 49 : 50;
 	}
+
+	ASSERT(determine_max_sparsity(X,X->rows) == (float)((X->rows*X->cols)-1)/(float)(X->rows*X->cols),"max sparsity test");
 
 	Matrix *out = empty_pinned(X->rows,X->cols);
 	slice_sparse_to_dense(X,out,0,X->rows);

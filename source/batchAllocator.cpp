@@ -129,26 +129,14 @@ void BatchAllocator::init(float cross_validation_size, int batch_size, int batch
 		cudaStreamCreate(&m_streamNext_batch_cv_y);
 	}
 
-	CURRENT_BATCH = empty(BATCH_SIZE,m_Cols_X);
-	CURRENT_BATCH_Y = empty(BATCH_SIZE,m_Cols_y);
-	CURRENT_BATCH_CV = empty(BATCH_SIZE_CV,m_Cols_X);
-	CURRENT_BATCH_CV_Y = empty(BATCH_SIZE_CV,m_Cols_y);
-
-	m_next_buffer_X = empty_pinned(BATCH_SIZE,m_Cols_X);
-	m_next_buffer_y = empty_pinned(BATCH_SIZE,m_Cols_y);
-	m_next_buffer_cv_X = empty_pinned(BATCH_SIZE_CV,m_Cols_X);
-	m_next_buffer_cv_y = empty_pinned(BATCH_SIZE_CV,m_Cols_y);
-
-	m_next_batch_X = empty(BATCH_SIZE,m_Cols_X);
-	m_next_batch_y = empty(BATCH_SIZE,m_Cols_y);
-	m_next_batch_cv_X = empty(BATCH_SIZE_CV,m_Cols_X);
-	m_next_batch_cv_y = empty(BATCH_SIZE_CV,m_Cols_y);
-
+	init_batch_buffer();
 
 
 	if(m_mygpuID == 0)
 	{
-		if(BATCH_METHOD == Distributed_weights){ m_myrank = m_cluster.MYRANK; }
+		if(BATCH_METHOD == Distributed_weights ||
+		   BATCH_METHOD == Distributed_weights_sparse)
+		{ m_myrank = m_cluster.MYRANK; }
 
 		for(int i = 0; i < m_cluster.PCIe_RANKS.size()-1;i++)
 		{
@@ -226,6 +214,72 @@ void BatchAllocator::init(float cross_validation_size, int batch_size, int batch
 	m_next_batch_number += 1;
 	m_next_batch_number_cv += 1;
 }
+
+void BatchAllocator::init_batch_buffer()
+{
+	float sparsity_X = 1.0;
+	float sparsity_y = 1.0;
+	if(m_full_X->isSparse == 1)
+		sparsity_X = determine_max_sparsity(m_full_X,BATCH_SIZE);
+	if(m_full_y->isSparse == 1)
+		sparsity_y = determine_max_sparsity(m_full_y,BATCH_SIZE);
+
+
+	if(BATCH_METHOD != Distributed_weights_sparse)
+	{
+
+		CURRENT_BATCH = empty(BATCH_SIZE,m_Cols_X);
+		CURRENT_BATCH_Y = empty(BATCH_SIZE,m_Cols_y);
+		CURRENT_BATCH_CV = empty(BATCH_SIZE_CV,m_Cols_X);
+		CURRENT_BATCH_CV_Y = empty(BATCH_SIZE_CV,m_Cols_y);
+
+		m_next_buffer_X = empty_pinned(BATCH_SIZE,m_Cols_X);
+		m_next_buffer_y = empty_pinned(BATCH_SIZE,m_Cols_y);
+		m_next_buffer_cv_X = empty_pinned(BATCH_SIZE_CV,m_Cols_X);
+		m_next_buffer_cv_y = empty_pinned(BATCH_SIZE_CV,m_Cols_y);
+
+		m_next_batch_X = empty(BATCH_SIZE,m_Cols_X);
+		m_next_batch_y = empty(BATCH_SIZE,m_Cols_y);
+		m_next_batch_cv_X = empty(BATCH_SIZE_CV,m_Cols_X);
+		m_next_batch_cv_y = empty(BATCH_SIZE_CV,m_Cols_y);
+	}
+	else
+	{		CURRENT_BATCH = empty_sparse(BATCH_SIZE,m_Cols_X,sparsity_X,0.0f);
+			CURRENT_BATCH_CV = empty_sparse(BATCH_SIZE_CV,m_Cols_X,sparsity_X,0.0f);
+
+			m_next_buffer_X = empty_pinned_sparse(BATCH_SIZE,m_Cols_X,sparsity_X,0.0f);
+			m_next_buffer_cv_X = empty_pinned_sparse(BATCH_SIZE_CV,m_Cols_X,sparsity_X,0.0f);
+
+			m_next_batch_X = empty_sparse(BATCH_SIZE,m_Cols_X,sparsity_X,0.0f);
+			m_next_batch_cv_X = empty_sparse(BATCH_SIZE_CV,m_Cols_X,sparsity_X,0.0f);
+
+			if(m_full_y->isSparse == 1)
+			{
+				CURRENT_BATCH_Y = empty_sparse(BATCH_SIZE,m_Cols_y, sparsity_y, 0.0f);
+				CURRENT_BATCH_CV_Y = empty_sparse(BATCH_SIZE_CV,m_Cols_y, sparsity_y, 0.0f);
+
+				m_next_buffer_y = empty_pinned_sparse(BATCH_SIZE,m_Cols_y, sparsity_y, 0.0f);
+				m_next_buffer_cv_y = empty_pinned_sparse(BATCH_SIZE_CV,m_Cols_y, sparsity_y, 0.0f);
+
+				m_next_batch_y = empty_sparse(BATCH_SIZE,m_Cols_y, sparsity_y, 0.0f);
+				m_next_batch_cv_y = empty_sparse(BATCH_SIZE_CV,m_Cols_y, sparsity_y, 0.0f);
+			}
+			else
+			{
+				CURRENT_BATCH_Y = empty(BATCH_SIZE,m_Cols_y);
+				CURRENT_BATCH_CV_Y = empty(BATCH_SIZE_CV,m_Cols_y);
+
+				m_next_buffer_y = empty_pinned(BATCH_SIZE,m_Cols_y);
+				m_next_buffer_cv_y = empty_pinned(BATCH_SIZE_CV,m_Cols_y);
+
+				m_next_batch_y = empty(BATCH_SIZE,m_Cols_y);
+				m_next_batch_cv_y = empty(BATCH_SIZE_CV,m_Cols_y);
+			}
+
+	}
+}
+
+
 
 void BatchAllocator::MPI_get_dataset_dimensions()
 {

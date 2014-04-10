@@ -182,6 +182,79 @@ Matrix *empty(int rows, int cols)
   return out;
 }
 
+Matrix *empty_sparse(int rows, int cols, float max_sparsity, float sparsity_buffer)
+{
+	int elements = ceil(rows*cols*(max_sparsity + sparsity_buffer)) + 1;
+	float *data;
+	int *idx_cols;
+	int *ptr_rows;
+	size_t bytes = elements*sizeof(float);
+	size_t idx_bytes = elements*sizeof(int);
+	size_t ptr_bytes = (rows+1)*sizeof(int);
+	cudaMalloc((void**)&data, bytes);
+	cudaMalloc((void**)&idx_cols, idx_bytes);
+	cudaMalloc((void**)&ptr_rows, ptr_bytes);
+
+	kFill_with<<<(elements/THREADS_PER_BLOCKS) + 1, THREADS_PER_BLOCKS>>>(data,0.0f,elements);
+	kFill_with<<<(elements/THREADS_PER_BLOCKS) + 1, THREADS_PER_BLOCKS>>>(idx_cols,0,elements);
+	kFill_with<<<(rows/THREADS_PER_BLOCKS) + 1, THREADS_PER_BLOCKS>>>(ptr_rows,0,rows + 1);
+
+	Matrix *out = (Matrix*)malloc(sizeof(Matrix));
+	out->rows = rows;
+	out->cols = cols;
+	out->bytes = bytes;
+	out->size = elements;
+	out->data = data;
+	out->isDistributed = 0;
+	out->cols_distributed = 0;
+	out->isSparse = 1;
+	out->idx_bytes = idx_bytes;
+	out->idx_cols = idx_cols;
+	out->ptr_bytes = ptr_bytes;
+	out->ptr_rows = ptr_rows;
+
+	return out;
+}
+
+Matrix *empty_pinned_sparse(int rows, int cols, float max_sparsity, float sparsity_buffer)
+{
+	int elements = ceil(rows*cols*(max_sparsity + sparsity_buffer)) +1;
+	float *data;
+	int *idx_cols;
+	int *ptr_rows;
+	int size = elements;
+	size_t bytes = elements*sizeof(float);
+	size_t idx_bytes = elements*sizeof(int);
+	size_t ptr_bytes = (rows+1)*sizeof(int);
+	cudaHostAlloc(&data, bytes, cudaHostAllocPortable);
+	cudaHostAlloc(&idx_cols, idx_bytes, cudaHostAllocPortable);
+	cudaHostAlloc(&ptr_rows, ptr_bytes, cudaHostAllocPortable);
+
+	for(int i = 0; i < elements; i++)
+	{
+		data[i] = 0.0f;
+		idx_cols[i] = 0.0f;
+	}
+	for(int i = 0; i < rows +1; i++)
+		ptr_rows[i] = 0.0f;
+
+	Matrix *out = (Matrix*)malloc(sizeof(Matrix));
+	out->rows = rows;
+	out->cols = cols;
+	out->bytes = bytes;
+	out->size = size;
+	out->data = data;
+	out->isDistributed = 0;
+	out->cols_distributed = 0;
+	out->isSparse = 1;
+	out->idx_bytes = idx_bytes;
+	out->idx_cols = idx_cols;
+	out->ptr_bytes = ptr_bytes;
+	out->ptr_rows = ptr_rows;
+
+	return out;
+}
+
 Matrix *empty_pinned(int rows, int cols)
 {
   float *pinned_data;

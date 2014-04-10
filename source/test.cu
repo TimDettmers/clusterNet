@@ -754,6 +754,7 @@ int main(int argc, char *argv[])
 
 		//X = read_hdf5("/home/tim/crowdflower_X_dense.hdf5");
 		//y = read_hdf5("/home/tim/crowdflower_y_dense.hdf5");
+		cout << determine_max_sparsity(X,128) << endl;
 	}
 	else
 	{
@@ -762,7 +763,11 @@ int main(int argc, char *argv[])
 		test = empty(1,1);
 	}
 
+
+
+	/*
 	b.init(X,y,0.2,128,512,gpus, Distributed_weights);
+
 
 	std::vector<int> layers;
 	layers.push_back(4000);
@@ -785,6 +790,7 @@ int main(int argc, char *argv[])
 		write_csv("/home/tim/crowdflower_result.csv",out,"id,s1,s2,s3,s4,s5,w1,w2,w3,w4,k1,k2,k3,k4,k5,k6,k7,k8,k9,k10,k11,k12,k13,k14,k15",ids);
 	}
 
+*/
 
 	gpus.shutdown_MPI();
 

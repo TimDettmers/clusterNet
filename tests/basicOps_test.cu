@@ -449,6 +449,37 @@ int run_basicOps_test()
 		  printf("%i: %f\n",i, m_host->data[i]);
 	  ASSERT((m_host->data[i] <=1.0f) && (m_host->data[i] >=0.0f),"cutoff to probability test.");
   }
+
+  m1 = empty_sparse(17,83,0.01783,0.0);
+  int elements = ceil(17*83*0.01783) + 1;
+  ASSERT(m1->rows == 17, "empty sparse rows");
+  ASSERT(m1->cols == 83, "empty sparse cols");
+  ASSERT(m1->size == elements, "empty sparse size");
+  ASSERT(m1->isSparse == 1, "empty sparse");
+  ASSERT(m1->idx_bytes == sizeof(float)*elements, "empty sparse bytes");
+  ASSERT(m1->bytes == sizeof(float)*elements, "empty sparse bytes");
+  ASSERT(m1->ptr_bytes == sizeof(float)*(m1->rows + 1), "empty sparse bytes");
+
+
+  m1 = empty_pinned_sparse(171,837,0.01783,0.001110);
+  elements = ceil(171*837*(0.01783+0.001110)) + 1;
+  ASSERT(m1->rows == 171, "empty sparse rows");
+  ASSERT(m1->cols == 837, "empty sparse cols");
+  ASSERT(m1->size == elements, "empty sparse size");
+  ASSERT(m1->isSparse == 1, "empty sparse");
+  ASSERT(m1->idx_bytes == sizeof(float)*elements, "empty sparse bytes");
+  ASSERT(m1->bytes == sizeof(float)*elements, "empty sparse bytes");
+  ASSERT(m1->ptr_bytes == sizeof(float)*(m1->rows + 1), "empty sparse bytes");
+
+  for(int i = 0; i < m1->size; i++)
+  {
+	  ASSERT(m1->data[i] == 0.0f,"empty sparse data");
+	  ASSERT(m1->idx_cols[i] == 0.0f,"empty sparse data");
+  }
+
+
+
+
   return 0;
 }
 

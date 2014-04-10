@@ -13,6 +13,15 @@ __global__ void kFill_with(float *m, float fill_value, int size)
        m[i] = fill_value;
 }
 
+__global__ void kFill_with(int *m, int fill_value, int size)
+{
+  const unsigned int numThreads = blockDim.x * gridDim.x;
+  const int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
+
+  for (unsigned int i = idx;i < size; i += numThreads)
+       m[i] = fill_value;
+}
+
 __global__ void kCreateRdmSqrtWeight_Logistic(float *A, int in, int out, int size)
 {
   const unsigned int numThreads = blockDim.x * gridDim.x;

@@ -15,7 +15,8 @@ typedef enum BatchAllocationMethod_t
 {
 	Single_GPU = 0,
 	Batch_split = 1,
-	Distributed_weights = 2
+	Distributed_weights = 2,
+	Distributed_weights_sparse = 4
 } BatchAllocationMethod_t;
 
 class BatchAllocator
@@ -89,6 +90,7 @@ private:
 
 	 void MPI_get_dataset_dimensions();
 	 void init(float cross_validation_size, int batch_size, int cv_batch_size);
+	 void init_batch_buffer();
 
 
 };

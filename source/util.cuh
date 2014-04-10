@@ -34,5 +34,6 @@ void printmat(Matrix *A, int end_rows, int end_cols);
 void print_matrix(Matrix *A, int end_rows, int end_cols);
 bool replace(std::string& str, const std::string& from, const std::string& to);
 void slice_sparse_to_dense(Matrix *X, Matrix *out, int start, int length);
+float determine_max_sparsity(Matrix *X, int batch_size);
 #endif
 

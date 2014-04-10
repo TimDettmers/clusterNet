@@ -349,4 +349,48 @@ void slice_sparse_to_dense(Matrix *X, Matrix *out, int start, int length)
 
 }
 
+float determine_max_sparsity(Matrix *X, int batch_size)
+{
+
+	float max_sparsity = 0.0;
+
+	Matrix *dense_batch = empty_cpu(batch_size,X->cols);
+	Matrix *off_batch;
+	int batches = (X->rows / batch_size);
+	int off_batch_size = X->rows % batch_size;
+
+	if(off_batch_size > 0)
+	{
+		batches+=1;
+		off_batch = empty_cpu(X->rows % batch_size,X->cols);
+	}
+
+	float nonzero_count = 0.0f;
+	for(int i = 0; i < batches; i++)
+	{
+		if((i+1) < batches && off_batch_size > 0)
+		{
+			slice_sparse_to_dense(X,off_batch,i*batch_size,off_batch_size);
+
+			if(max_sparsity < (nonzero_count / off_batch->size))
+				max_sparsity = (nonzero_count / off_batch->size);
+		}
+		else
+		{
+			slice_sparse_to_dense(X, dense_batch, i*batch_size,batch_size);
+			for(int j = 0; j < dense_batch->size; j++)
+				if(dense_batch->data[j] != 0.0f)
+					nonzero_count +=1.0f;
+
+			if(max_sparsity < (nonzero_count / dense_batch->size))
+				max_sparsity = (nonzero_count / dense_batch->size);
+		}
+
+		nonzero_count = 0.0f;
+	}
+
+	return max_sparsity;
+
+}
+
 

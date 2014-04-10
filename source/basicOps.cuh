@@ -43,6 +43,8 @@ Matrix *zeros(int rows, int cols);
 Matrix *empty(int rows, int cols);
 Matrix *empty_pinned(int rows, int cols);
 Matrix *empty_cpu(int rows, int cols);
+Matrix *empty_pinned_sparse(int rows, int cols, float max_sparsity, float sparsity_buffer);
+Matrix *empty_sparse(int rows, int cols, float max_sparsity, float sparsity_buffer);
 Matrix *arange(int rows, int cols);
 Matrix *arange(int start, int rows, int cols);
 
