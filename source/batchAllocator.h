@@ -70,6 +70,9 @@ private:
 	 int m_mygpuID;
 	 int m_myrank;
 
+	 int m_sparse_matrix_info_X[5];
+	 int m_sparse_matrix_info_y[5];
+
 	 ClusterNet m_cluster;
 	 MPI_Status m_status;
 
@@ -83,16 +86,20 @@ private:
 	 std::vector<MPI_Request> m_requests_send_cv_X;
 	 std::vector<MPI_Request> m_requests_send_cv_y;
 
-	 MPI_Request m_request_X;
-	 MPI_Request m_request_y;
-	 MPI_Request m_request_cv_X;
-	 MPI_Request m_request_cv_y;
+	 std::vector<MPI_Request>  m_request_X;
+	 std::vector<MPI_Request>  m_request_y;
+	 std::vector<MPI_Request>  m_request_cv_X;
+	 std::vector<MPI_Request>  m_request_cv_y;
 
 	 void MPI_get_dataset_dimensions();
 	 void init(float cross_validation_size, int batch_size, int cv_batch_size);
 	 void init_batch_buffer();
+	 void init_copy_to_buffer();
+	 void update_next_batch_matrix_info();
+	 void update_next_buffer_matrix_info();
 
 
 };
 #endif
+
 

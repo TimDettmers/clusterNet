@@ -765,10 +765,27 @@ int main(int argc, char *argv[])
 
 
 
-	/*
-	b.init(X,y,0.2,128,512,gpus, Distributed_weights);
+
+	b.init(X,y,0.2,128,512,gpus, Distributed_weights_sparse);
 
 
+	size_t total, free;
+	for(int i = 0; i < b.TOTAL_BATCHES; i++)
+	{
+		cudaMemGetInfo(&free,&total);
+		//cout << "free memory: " << free << endl;
+		b.broadcast_batch_to_processes();
+		b.allocate_next_batch_async();
+		b.replace_current_batch_with_next();
+
+		if(gpus.MYRANK == 3)
+			cout << "BATCHNO: " << i << " myrank: " << gpus.MYRANK << " " << b.CURRENT_BATCH->size << endl;
+	}
+
+
+
+
+/*
 	std::vector<int> layers;
 	layers.push_back(4000);
 	layers.push_back(4000);
