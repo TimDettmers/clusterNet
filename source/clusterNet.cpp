@@ -322,7 +322,6 @@ void ClusterNet::dot(Matrix *A, Matrix *B, Matrix *out, cublasOperation_t T1, cu
 
 	if (status != CUBLAS_STATUS_SUCCESS)
 	{
-		//printmat(out);
 		std::cout << "CUBLAS ERROR: Status " << status << std::endl;
 		throw "CUBLAS ERROR";
 
@@ -725,9 +724,20 @@ Matrix *ClusterNet::dense_to_sparse(Matrix *A)
 	cusparseCreateMatDescr(&descriptor_A);
 	cusparseSetMatType(descriptor_A,CUSPARSE_MATRIX_TYPE_GENERAL);
     cusparseSetMatIndexBase(descriptor_A,CUSPARSE_INDEX_BASE_ZERO);
-    int nonzeros = getNonZeroElements(A);
+    int nonzeros = 0;
+    int *nonzerosPerRow;
 
-    //empty_sparse()
+    cudaMalloc((void**)&nonzerosPerRow,sizeof(int)*A->rows);
 
-	//cusparseSdense2csr(m_sparse_handle,A->rows,A->cols,descriptor_A,A,A->rows,)
+    cusparseSnnz(m_sparse_handle,CUSPARSE_DIRECTION_ROW,
+    			A->rows, A->cols,descriptor_A,
+    			A->data,A->rows,nonzerosPerRow,&nonzeros);
+
+    Matrix *out = empty_sparse(A->rows,A->cols,nonzeros);
+
+	cusparseSdense2csr(m_sparse_handle,A->rows,A->cols,
+					   descriptor_A,A->data,A->rows,nonzerosPerRow,
+					   out->data,out->ptr_rows,out->idx_cols);
+
+	return out;
 }

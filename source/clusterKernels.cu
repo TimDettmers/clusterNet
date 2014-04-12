@@ -14,6 +14,8 @@ __global__ void kGetNonZeroElements(float *A, float *out, int size)
 		 atomicAdd(&out[0],A[i] != 0.0f ? 1.0f : 0.0f);
 }
 
+
+
 __global__ void kFill_with(float *m, float fill_value, int size)
 {
   const unsigned int numThreads = blockDim.x * gridDim.x;

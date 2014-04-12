@@ -37,7 +37,24 @@ int run_clusterNet_test(ClusterNet gpus)
 	Matrix *m1 = to_gpu(m1_cpu);
 	Matrix *m2 = to_gpu(m2_cpu);
 
-	Matrix *m_host = to_host(m1);
+	//dense to sparse and to_host for sparse matrix test
+	Matrix *s1 = gpus.dense_to_sparse(m1);
+	Matrix *m_host = to_host(s1);
+
+	ASSERT(s1->rows == 2, "empty sparse rows");
+	ASSERT(s1->cols == 3, "empty sparse cols");
+	ASSERT(s1->size == 4, "empty sparse size");
+	ASSERT(s1->isSparse == 1, "empty sparse");
+	ASSERT(s1->idx_bytes == sizeof(float)*4, "empty sparse bytes");
+	ASSERT(s1->bytes == sizeof(float)*4, "empty sparse bytes");
+	ASSERT(s1->ptr_bytes == sizeof(float)*(s1->rows + 1), "empty sparse bytes");
+	assert(test_eq(m_host->data[0], 2.0f,"sparse data."));
+	assert(test_eq(m_host->data[1], 3.0f,"sparse data."));
+	assert(test_eq(m_host->data[2], 0.83f,"sparse data."));
+	assert(test_eq(m_host->data[3], 59.1387f,"sparse data."));
+
+
+	m_host = to_host(m1);
 
 
 	Matrix *m3 = gpu.dot(m1,m2);

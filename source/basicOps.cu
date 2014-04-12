@@ -50,7 +50,6 @@ Matrix *to_host(Matrix *A, int is_row_major)
   }
   else
   {
-
 	  cpu_data = (float*)malloc(row_major->bytes);
 	  int *idx_cols = (int*)malloc(sizeof(int)*row_major->size);
 	  int *ptr_rows = (int*)malloc(sizeof(int)*(row_major->rows+1));
@@ -703,6 +702,8 @@ Matrix *softmax(Matrix *A)
 	softmax(A, out);
 	return out;
 }
+
+
 
 Matrix *subMatrixVector(Matrix *A, Matrix *v)
 {
