@@ -33,6 +33,9 @@ public:
 	 void TdotMPI(Matrix *A, Matrix *B, Matrix *out);
 	 void dotTMPI(Matrix *A, Matrix *B, Matrix *out);
 
+	 Matrix *dot_sparse(Matrix *A, Matrix *B);
+	 Matrix *Tdot_sparse(Matrix *A, Matrix *B);
+	 Matrix *dotT_sparse(Matrix *A, Matrix *B);
 	 void dot_sparse(Matrix *A, Matrix *B, Matrix *out);
 	 void dotT_sparse(Matrix *A, Matrix *B, Matrix *out);
 	 void Tdot_sparse(Matrix *A, Matrix *B, Matrix *out);

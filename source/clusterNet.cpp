@@ -215,6 +215,10 @@ void ClusterNet::dot(Matrix *A, Matrix *B, Matrix *out)
 		dot(A, B, out, CUBLAS_OP_N, CUBLAS_OP_N);
 }
 
+
+Matrix *ClusterNet::dot_sparse(Matrix *A, Matrix *B){ Matrix *out = empty(A->rows, B->cols); dot_sparse(A,B, out, CUBLAS_OP_N, CUBLAS_OP_N); return out; }
+Matrix *ClusterNet::Tdot_sparse(Matrix *A, Matrix *B){ Matrix *out = empty(A->rows, B->cols); dot_sparse(A,B, out, CUBLAS_OP_T, CUBLAS_OP_N); return out; }
+Matrix *ClusterNet::dotT_sparse(Matrix *A, Matrix *B){ Matrix *out = empty(A->rows, B->cols); dot_sparse(A,B, out, CUBLAS_OP_N, CUBLAS_OP_T); return out; }
 void ClusterNet::Tdot_sparse(Matrix *A, Matrix *B, Matrix *out){ dot_sparse(A, B, out, CUBLAS_OP_T, CUBLAS_OP_N); }
 void ClusterNet::dotT_sparse(Matrix *A, Matrix *B, Matrix *out){ dot_sparse(A, B, out, CUBLAS_OP_N, CUBLAS_OP_T); }
 void ClusterNet::dot_sparse(Matrix *A, Matrix *B, Matrix *out){ dot_sparse(A, B, out, CUBLAS_OP_N, CUBLAS_OP_N); }
@@ -235,34 +239,26 @@ void ClusterNet::dot_sparse(Matrix *A, Matrix *B, Matrix *out, cublasOperation_t
 
     const float alpha = 1;
     const float beta = 0;
-	int A_rows = A->rows, B_rows = B->rows, A_cols = A->cols, B_cols = B->cols;
-	if (T1 == CUBLAS_OP_T)
-	{
-		A_rows = A->cols;
-		A_cols = A->rows;
-	}
-	if (T2 == CUBLAS_OP_T)
-	{
-		B_rows = B->cols;
-		B_cols = B->rows;
-	}
+	int B_cols = T2 == CUBLAS_OP_T ? B->rows : B->cols;
 
+	/*
 	 cout << "T1: " << T1 << endl;
 	 cout << "T2: " << T2 << endl;
 	 cout << "A rows: " << A_rows << endl;
-	 cout << "A cols: " << B_cols << endl;
+	 cout << "A cols: " << A_cols << endl;
 	 cout << "B rows: " << B->rows << endl;
-	 cout << "B cols: " << A_cols << endl;
+	 cout << "B cols: " << B_cols << endl;
 	 cout << "out rows: " << out->rows << endl;
 	 cout << "out cols: " << out->cols << endl;
 	 cout << "sum A: " << sum(A) << endl;
 	 cout << "sum B: "  << sum(B) << endl;
 	 cout << "sum out: " << sum(out) << endl;
+	 */
 
 	status = cusparseScsrmm2(m_sparse_handle,
 		T1 == CUBLAS_OP_N ? CUSPARSE_OPERATION_NON_TRANSPOSE : CUSPARSE_OPERATION_TRANSPOSE,
 		T2 == CUBLAS_OP_N ? CUSPARSE_OPERATION_NON_TRANSPOSE : CUSPARSE_OPERATION_TRANSPOSE,
-				A_rows, B_cols, A_cols,
+				A->rows, B_cols, A->cols,
 		A->size, &alpha, descriptor_A,
 		A->data, A->ptr_rows, A->idx_cols,
 		B->data, B->rows,  &beta,
@@ -290,17 +286,15 @@ void ClusterNet::dot(Matrix *A, Matrix *B, Matrix *out, cublasOperation_t T1, cu
 
 	const float alpha = 1.0f;
 	const float beta = 0.0f;
-	int A_rows = A->rows, B_rows = B->rows, A_cols = A->cols, B_cols = B->cols;
+	int A_rows = A->rows, A_cols = A->cols, B_cols = B->cols;
 	if (T1 == CUBLAS_OP_T)
 	{
 		A_rows = A->cols;
 		A_cols = A->rows;
 	}
 	if (T2 == CUBLAS_OP_T)
-	{
-		B_rows = B->cols;
 		B_cols = B->rows;
-	}
+
 
 /*
 	 cout << "T1: " << T1 << endl;

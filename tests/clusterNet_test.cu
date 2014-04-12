@@ -56,7 +56,7 @@ int run_clusterNet_test(ClusterNet gpus)
 
 	m_host = to_host(m1);
 
-
+	//dot test
 	Matrix *m3 = gpu.dot(m1,m2);
 	Matrix *out = zeros(2,2);
 	m_host = to_host(m3);
@@ -69,6 +69,25 @@ int run_clusterNet_test(ClusterNet gpus)
 
 	gpu.dot(m1,m2,out);
 	m_host = to_host(out);
+	assert(test_eq(m_host->data[0], 6.0f,"Dot data."));
+	assert(test_eq(m_host->data[1], 8.0f,"Dot data."));
+	assert(test_eq(m_host->data[2], 2.49f,"Dot data."));
+	assert(test_eq(m_host->data[3], 3.32f,"Dot data."));
+	assert(test_matrix(m_host,2,2));
+
+	//dot sparse test
+	m3 = gpu.dot_sparse(s1,m2);
+	m_host = to_host(m3);
+
+	assert(test_eq(m_host->data[0], 6.0f,"Dot data."));
+	assert(test_eq(m_host->data[1], 8.0f,"Dot data."));
+	assert(test_eq(m_host->data[2], 2.49f,"Dot data."));
+	assert(test_eq(m_host->data[3], 3.32f,"Dot data."));
+	assert(test_matrix(m_host,2,2));
+
+	gpu.dot_sparse(s1,m2, out);
+	m_host = to_host(out);
+
 	assert(test_eq(m_host->data[0], 6.0f,"Dot data."));
 	assert(test_eq(m_host->data[1], 8.0f,"Dot data."));
 	assert(test_eq(m_host->data[2], 2.49f,"Dot data."));
@@ -99,8 +118,42 @@ int run_clusterNet_test(ClusterNet gpus)
 	assert(test_eq(m_host->data[2], 12.0f,"Dot data."));
 	assert(test_eq(m_host->data[3], 16.0f,"Dot data."));
 	assert(test_matrix(m_host,2,2));
+
+	//Tdot sparse test
+
+	out = zeros(3,3);
+	gpu.Tdot_sparse(s1,m1,out);
+	m_host = to_host(out);
+	assert(test_eq(m_host->data[0], 0.0f,"Dot data."));
+	assert(test_eq(m_host->data[1], 0.0f,"Dot data."));
+	assert(test_eq(m_host->data[2], 0.0f,"Dot data."));
+	assert(test_eq(m_host->data[3], 0.0f,"Dot data."));
+	assert(test_eq(m_host->data[4], 4.6889f,"Dot data."));
+	assert(test_eq(m_host->data[5], 55.085117f,"Dot data."));
+	assert(test_eq(m_host->data[6], 0.0f,"Dot data."));
+	assert(test_eq(m_host->data[7], 55.085117f,"Dot data."));
+	assert(test_eq(m_host->data[8], 3506.385742f,"Dot data."));
+	assert(test_matrix(m_host,3,3));
+
+	out = zeros(2,2);
+	gpu.Tdot_sparse(gpus.dense_to_sparse(m2),m2,out);
+	m_host = to_host(out);
+	assert(test_eq(m_host->data[0], 298.0f,"Dot data."));
+	assert(test_eq(m_host->data[1], 12.0f,"Dot data."));
+	assert(test_eq(m_host->data[2], 12.0f,"Dot data."));
+	assert(test_eq(m_host->data[3], 16.0f,"Dot data."));
+	assert(test_matrix(m_host,2,2));
 	//dot T test
 	gpu.dotT(m1,m1,out);
+	m_host = to_host(out);
+	assert(test_eq(m_host->data[0], 13.0f,"Dot data."));
+	assert(test_eq(m_host->data[1], 179.0761f,"Dot data."));
+	assert(test_eq(m_host->data[2], 179.0761f,"Dot data."));
+	assert(test_eq(m_host->data[3], 3498.074463f,"Dot data."));
+	assert(test_matrix(m_host,2,2));
+
+	//dot T sparse test
+	gpu.dotT_sparse(s1,m1,out);
 	m_host = to_host(out);
 	assert(test_eq(m_host->data[0], 13.0f,"Dot data."));
 	assert(test_eq(m_host->data[1], 179.0761f,"Dot data."));
