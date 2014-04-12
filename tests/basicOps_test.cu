@@ -464,6 +464,15 @@ int run_basicOps_test()
   ASSERT(m1->bytes == sizeof(float)*elements, "empty sparse bytes");
   ASSERT(m1->ptr_bytes == sizeof(float)*(m1->rows + 1), "empty sparse bytes");
 
+  m1 = empty_sparse(17,83,500);
+  elements = 500;
+  ASSERT(m1->rows == 17, "empty sparse rows");
+  ASSERT(m1->cols == 83, "empty sparse cols");
+  ASSERT(m1->size == elements, "empty sparse size");
+  ASSERT(m1->isSparse == 1, "empty sparse");
+  ASSERT(m1->idx_bytes == sizeof(float)*elements, "empty sparse bytes");
+  ASSERT(m1->bytes == sizeof(float)*elements, "empty sparse bytes");
+  ASSERT(m1->ptr_bytes == sizeof(float)*(m1->rows + 1), "empty sparse bytes");
 
   m1 = empty_pinned_sparse(171,837,0.01783,0.001110);
   elements = ceil(171*837*(0.01783+0.001110)) + 1;

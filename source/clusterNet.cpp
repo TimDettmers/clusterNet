@@ -725,6 +725,9 @@ Matrix *ClusterNet::dense_to_sparse(Matrix *A)
 	cusparseCreateMatDescr(&descriptor_A);
 	cusparseSetMatType(descriptor_A,CUSPARSE_MATRIX_TYPE_GENERAL);
     cusparseSetMatIndexBase(descriptor_A,CUSPARSE_INDEX_BASE_ZERO);
+    int nonzeros = getNonZeroElements(A);
+
+    //empty_sparse()
 
 	//cusparseSdense2csr(m_sparse_handle,A->rows,A->cols,descriptor_A,A,A->rows,)
 }

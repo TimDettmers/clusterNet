@@ -210,8 +210,10 @@ Matrix *empty(int rows, int cols)
 }
 
 Matrix *empty_sparse(int rows, int cols, float max_sparsity, float sparsity_buffer)
+{ return empty_sparse(rows, cols, ceil(rows*cols*(max_sparsity + sparsity_buffer)) + 1); }
+Matrix *empty_sparse(int rows, int cols, int nonzeros)
 {
-	int elements = ceil(rows*cols*(max_sparsity + sparsity_buffer)) + 1;
+	int elements = nonzeros;
 	float *data;
 	int *idx_cols;
 	int *ptr_rows;
@@ -241,7 +243,10 @@ Matrix *empty_sparse(int rows, int cols, float max_sparsity, float sparsity_buff
 	out->ptr_rows = ptr_rows;
 
 	return out;
+
 }
+
+
 
 Matrix *empty_pinned_sparse(int rows, int cols, float max_sparsity, float sparsity_buffer)
 {
