@@ -3,6 +3,7 @@
 
 #include "curand.h"
 #include "curand_kernel.h"
+__global__ void kGetNonZeroElements(float *A, float *out, int size);
 __global__ void kFill_with(float *m, float fill_value, int size);
 __global__ void kFill_with(int *m, int fill_value, int size);
 __global__ void kAdd(float *A,float *B, float *out, int size);
@@ -47,4 +48,5 @@ __global__ void kRectifiedLinear_Derivative(float *A, float *out, int size);
 __global__ void kSquaredError(float *A, float *t, float *out, int size);
 __global__ void kDoubleRectifiedLinear(float* A, float* out, int size);
 __global__ void kDoubleRectifiedLinear_Derivative(float *A, float *out, int size);
+
 #endif

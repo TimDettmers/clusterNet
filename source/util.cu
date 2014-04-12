@@ -285,16 +285,29 @@ int test_matrix(Matrix *A, int rows, int cols)
 
 void print_matrix(Matrix *A, int end_rows, int end_cols)
 {
-	for(int row = 0; row< end_rows; row++)
-	  {
-		  printf("[");
-		  for(int col =0; col < end_cols; col++)
+	if(A->isSparse != 1)
+	{
+		for(int row = 0; row< end_rows; row++)
 		  {
-			  printf("%f ",A->data[(row*A->cols)+col]);
+			  printf("[");
+			  for(int col =0; col < end_cols; col++)
+			  {
+				  printf("%f ",A->data[(row*A->cols)+col]);
+			  }
+			  printf("]\n");
 		  }
-		  printf("]\n");
-	  }
-	  printf("\n");
+		  printf("\n");
+	}
+	else
+	{
+		printf("A.size: %i",A->size);
+		printf("A.bytes: %i",(int)A->bytes);
+		printf("[");
+		for(int i = 0; i < A->size; i++)
+			printf("%f ",A->data[i]);
+
+		printf("]\n");
+	}
 }
 
 void printmat(Matrix *A)
@@ -355,36 +368,16 @@ float determine_max_sparsity(Matrix *X, int batch_size)
 	float max_sparsity = 0.0;
 
 	Matrix *dense_batch = empty_cpu(batch_size,X->cols);
-	Matrix *off_batch;
 	int batches = (X->rows / batch_size);
-	int off_batch_size = X->rows % batch_size;
-
-	if(off_batch_size > 0)
-	{
-		batches+=1;
-		off_batch = empty_cpu(X->rows % batch_size,X->cols);
-	}
+	float batch_elements = batch_size*X->cols;
 
 	float nonzero_count = 0.0f;
 	for(int i = 0; i < batches; i++)
 	{
-		if((i+1) < batches && off_batch_size > 0)
-		{
-			slice_sparse_to_dense(X,off_batch,i*batch_size,off_batch_size);
+		nonzero_count = (X->ptr_rows[(i+1)*batch_size] - X->ptr_rows[i*batch_size]);
 
-			if(max_sparsity < (nonzero_count / off_batch->size))
-				max_sparsity = (nonzero_count / off_batch->size);
-		}
-		else
-		{
-			slice_sparse_to_dense(X, dense_batch, i*batch_size,batch_size);
-			for(int j = 0; j < dense_batch->size; j++)
-				if(dense_batch->data[j] != 0.0f)
-					nonzero_count +=1.0f;
-
-			if(max_sparsity < (nonzero_count / dense_batch->size))
-				max_sparsity = (nonzero_count / dense_batch->size);
-		}
+		if(max_sparsity < (nonzero_count / batch_elements))
+			max_sparsity = (nonzero_count / batch_elements);
 
 		nonzero_count = 0.0f;
 	}

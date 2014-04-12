@@ -740,12 +740,11 @@ int main(int argc, char *argv[])
 	Matrix *X;
 	Matrix *y;
 	Matrix *test;
-	Matrix *out;
 	if(gpus.MYGPUID == 0)
 	{
 		X = read_sparse_hdf5("/home/tim/crowdflower_X.hdf5");
 		y = read_sparse_hdf5("/home/tim/crowdflower_y.hdf5");
-		test = read_sparse_hdf5("/home/tim/crowdflower_test.hdf5");
+		//test = read_sparse_hdf5("/home/tim/crowdflower_test.hdf5");
 
 		//X = read_hdf5("/home/tim/mnist_full_X.hdf5");
 		//y = to_host(create_t_matrix(to_gpu(read_hdf5("/home/tim/mnist_full_y.hdf5")),10));
@@ -754,32 +753,46 @@ int main(int argc, char *argv[])
 
 		//X = read_hdf5("/home/tim/crowdflower_X_dense.hdf5");
 		//y = read_hdf5("/home/tim/crowdflower_y_dense.hdf5");
-		cout << determine_max_sparsity(X,128) << endl;
 	}
 	else
 	{
-		X = empty(1,1);
-		y = empty(1,10);
-		test = empty(1,1);
+		X = empty_sparse(1,1,1,0);
+		y = empty_sparse(1,10,1,0);
+		test = empty_sparse(1,1,1,0);
 	}
 
 
 
 
 	b.init(X,y,0.2,128,512,gpus, Distributed_weights_sparse);
+	b.SKIP_LAST_BATCH = true;
+	Matrix *B = gpus.rand(b.CURRENT_BATCH->cols,20);
+	Matrix *out = empty(128,20);
+
+	//cout << sum(b.CURRENT_BATCH) << endl;
+
 
 
 	size_t total, free;
 	for(int i = 0; i < b.TOTAL_BATCHES; i++)
 	{
-		cudaMemGetInfo(&free,&total);
-		//cout << "free memory: " << free << endl;
+
+		//cout << i << endl;
 		b.broadcast_batch_to_processes();
 		b.allocate_next_batch_async();
 		b.replace_current_batch_with_next();
 
-		if(gpus.MYRANK == 3)
-			cout << "BATCHNO: " << i << " myrank: " << gpus.MYRANK << " " << b.CURRENT_BATCH->size << endl;
+		cudaMemGetInfo(&free, &total);
+		cout << "free memory: " << free << endl;
+
+		if (sum(b.CURRENT_BATCH) > 600 || sum(b.CURRENT_BATCH) < 500)
+			cout << "Sum: " << sum(b.CURRENT_BATCH) << endl;
+
+		gpus.dot_sparse(b.CURRENT_BATCH,B,out);
+
+
+
+
 	}
 
 

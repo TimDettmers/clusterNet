@@ -43,6 +43,8 @@ int run_basicOps_test()
   assert(test_eq(test[4], 3.0f,"To col major data."));
   assert(test_eq(test[5], 59.1387f,"To col major data."));
 
+
+
    m1 = to_row_major(m1);
    cudaMemcpy(test,m1->data,m1->bytes,cudaMemcpyDefault);
 
@@ -52,6 +54,8 @@ int run_basicOps_test()
    assert(test_eq(test[3], 0.0f,"To row major data."));
    assert(test_eq(test[4], 0.83f,"To row major data."));
    assert(test_eq(test[5], 59.1387f,"To row major data."));
+
+   assert(test_eq(getNonZeroElements(m1),4 ,"Get non-zero elements."));
 
 
   //test to_host

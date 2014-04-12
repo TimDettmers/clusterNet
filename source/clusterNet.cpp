@@ -1,4 +1,5 @@
 #include <cublas_v2.h>
+#include <cusparse_v2.h>
 #include <clusterNet.h>
 #include <basicOps.cuh>
 #include <util.cuh>
@@ -55,6 +56,7 @@ void ClusterNet::init(int seed)
 	curandSetPseudoRandomGeneratorSeed(m_generator, seed);
 	curandSetGeneratorOffset(m_generator, 100);
 	m_cublasInitialized = false;
+	m_cusparseInitialized = false;
 
 	if (!m_hasMPI)
 	{
@@ -212,11 +214,74 @@ void ClusterNet::dot(Matrix *A, Matrix *B, Matrix *out)
 	else
 		dot(A, B, out, CUBLAS_OP_N, CUBLAS_OP_N);
 }
+
+void ClusterNet::Tdot_sparse(Matrix *A, Matrix *B, Matrix *out){ dot_sparse(A, B, out, CUBLAS_OP_T, CUBLAS_OP_N); }
+void ClusterNet::dotT_sparse(Matrix *A, Matrix *B, Matrix *out){ dot_sparse(A, B, out, CUBLAS_OP_N, CUBLAS_OP_T); }
+void ClusterNet::dot_sparse(Matrix *A, Matrix *B, Matrix *out){ dot_sparse(A, B, out, CUBLAS_OP_N, CUBLAS_OP_N); }
+void ClusterNet::dot_sparse(Matrix *A, Matrix *B, Matrix *out, cublasOperation_t T1, cublasOperation_t T2)
+{
+	if(!m_cusparseInitialized)
+	{
+		m_cusparseInitialized = true;
+		cusparseCreate(&m_sparse_handle);
+	}
+
+	cusparseStatus_t status;
+	cusparseMatDescr_t descriptor_A;
+	cusparseCreateMatDescr(&descriptor_A);
+
+	cusparseSetMatType(descriptor_A,CUSPARSE_MATRIX_TYPE_GENERAL);
+    cusparseSetMatIndexBase(descriptor_A,CUSPARSE_INDEX_BASE_ZERO);
+
+    const float alpha = 1;
+    const float beta = 0;
+	int A_rows = A->rows, B_rows = B->rows, A_cols = A->cols, B_cols = B->cols;
+	if (T1 == CUBLAS_OP_T)
+	{
+		A_rows = A->cols;
+		A_cols = A->rows;
+	}
+	if (T2 == CUBLAS_OP_T)
+	{
+		B_rows = B->cols;
+		B_cols = B->rows;
+	}
+
+	 cout << "T1: " << T1 << endl;
+	 cout << "T2: " << T2 << endl;
+	 cout << "A rows: " << A_rows << endl;
+	 cout << "A cols: " << B_cols << endl;
+	 cout << "B rows: " << B->rows << endl;
+	 cout << "B cols: " << A_cols << endl;
+	 cout << "out rows: " << out->rows << endl;
+	 cout << "out cols: " << out->cols << endl;
+	 cout << "sum A: " << sum(A) << endl;
+	 cout << "sum B: "  << sum(B) << endl;
+	 cout << "sum out: " << sum(out) << endl;
+
+	status = cusparseScsrmm2(m_sparse_handle,
+		T1 == CUBLAS_OP_N ? CUSPARSE_OPERATION_NON_TRANSPOSE : CUSPARSE_OPERATION_TRANSPOSE,
+		T2 == CUBLAS_OP_N ? CUSPARSE_OPERATION_NON_TRANSPOSE : CUSPARSE_OPERATION_TRANSPOSE,
+				A_rows, B_cols, A_cols,
+		A->size, &alpha, descriptor_A,
+		A->data, A->ptr_rows, A->idx_cols,
+		B->data, B->rows,  &beta,
+		out->data, out->rows);
+
+	if (status != CUSPARSE_STATUS_SUCCESS)
+	{
+		cout << "CUSPARSE ERROR: " << status <<  "!" << endl;
+		throw "CUSPARSE ERROR!";
+	}
+
+
+}
+
+
 void ClusterNet::dot(Matrix *A, Matrix *B, Matrix *out, cublasOperation_t T1, cublasOperation_t T2)
 {
 	//if(checkMatrixOperation(A, B, out, 1) == 1){ throw "Matrix *size error:\n"; }
 	cublasStatus_t status;
-
 	if(!m_cublasInitialized)
 	{
 		m_cublasInitialized = true;
@@ -646,4 +711,20 @@ Matrix *ClusterNet::distributed_sparseInitWeight(int rows, int cols)
 	W->cols_distributed = cols;
 
 	return W;
+}
+
+Matrix *ClusterNet::dense_to_sparse(Matrix *A)
+{
+	if(!m_cusparseInitialized)
+	{
+		m_cusparseInitialized = true;
+		cusparseCreate(&m_sparse_handle);
+	}
+
+	cusparseMatDescr_t descriptor_A;
+	cusparseCreateMatDescr(&descriptor_A);
+	cusparseSetMatType(descriptor_A,CUSPARSE_MATRIX_TYPE_GENERAL);
+    cusparseSetMatIndexBase(descriptor_A,CUSPARSE_INDEX_BASE_ZERO);
+
+	//cusparseSdense2csr(m_sparse_handle,A->rows,A->cols,descriptor_A,A,A->rows,)
 }

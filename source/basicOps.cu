@@ -31,19 +31,46 @@ Matrix *to_host(Matrix *A){ return to_host(A, 0); }
 Matrix *to_host(Matrix *A, int is_row_major)
 {
   Matrix *row_major = A;
-	 if(is_row_major == 0)
+	 if(is_row_major == 0 && A->isSparse == 0)
 		 row_major = to_row_major(A);
-  float *cpu_data;
-  cpu_data = (float*)malloc(row_major->bytes);
-  cudaMemcpy(cpu_data,row_major->data,row_major->bytes,cudaMemcpyDefault);
+
   Matrix *out = (Matrix*)malloc(sizeof(Matrix));
-  out->rows = row_major->rows;
-  out->cols = row_major->cols;
-  out->bytes = row_major->bytes;
-  out->size = row_major->size;
-  out->data = cpu_data;
-  out->isDistributed = 0;
-  out->cols_distributed = 0;
+  float *cpu_data;
+  if(row_major->isSparse != 1)
+  {
+	  cpu_data = (float*)malloc(row_major->bytes);
+	  cudaMemcpy(cpu_data,row_major->data,row_major->bytes,cudaMemcpyDefault);
+	  out->rows = row_major->rows;
+	  out->cols = row_major->cols;
+	  out->bytes = row_major->bytes;
+	  out->size = row_major->size;
+	  out->data = cpu_data;
+	  out->isDistributed = 0;
+	  out->cols_distributed = 0;
+  }
+  else
+  {
+
+	  cpu_data = (float*)malloc(row_major->bytes);
+	  int *idx_cols = (int*)malloc(sizeof(int)*row_major->size);
+	  int *ptr_rows = (int*)malloc(sizeof(int)*(row_major->rows+1));
+	  cudaMemcpy(cpu_data,row_major->data,row_major->bytes,cudaMemcpyDefault);
+	  cudaMemcpy(idx_cols,row_major->idx_cols,row_major->idx_bytes,cudaMemcpyDefault);
+	  cudaMemcpy(ptr_rows,row_major->ptr_rows,row_major->ptr_bytes,cudaMemcpyDefault);
+	  out->rows = row_major->rows;
+	  out->cols = row_major->cols;
+	  out->bytes = row_major->bytes;
+	  out->size = row_major->size;
+	  out->data = cpu_data;
+	  out->isDistributed = 0;
+	  out->cols_distributed = 0;
+	  out->isSparse = 1;
+
+	  out->idx_bytes = sizeof(int)*row_major->size;
+	  out->ptr_bytes = sizeof(int)*(row_major->rows+1);
+	  out->idx_cols = idx_cols;
+	  out->ptr_rows = ptr_rows;
+  }
 
   return out;
 }
@@ -761,18 +788,31 @@ void equal(Matrix *A, Matrix *B, Matrix *out)
 	kEqual<<<blocks,THREADS_PER_BLOCKS>>>(A->data, B->data, out->data, A->size);
 }
 
-float sum(Matrix *v)
+float sum(Matrix *A)
 {
-
 	Matrix *out = empty(1,1);
-	int blocks = (v->size/THREADS_PER_BLOCKS) + 1;
-	kSum<<<blocks,THREADS_PER_BLOCKS>>>(v->data, out->data, v->size);
+	int blocks = (A->size/THREADS_PER_BLOCKS) + 1;
+	kSum<<<blocks,THREADS_PER_BLOCKS>>>(A->data, out->data, A->size);
 	Matrix *host = to_host(out);
 	float out_value = host->data[0];
 	cudaFree(out);
 	free(host->data);
 	free(host);
 	return out_value;
+}
+
+int getNonZeroElements(Matrix *A)
+{
+	Matrix *out = empty(1,1);
+	int blocks = (A->size/THREADS_PER_BLOCKS) + 1;
+	kGetNonZeroElements<<<blocks,THREADS_PER_BLOCKS>>>(A->data, out->data, A->size);
+	Matrix *host = to_host(out);
+	float out_value = host->data[0];
+	cudaFree(out);
+	free(host->data);
+	free(host);
+
+	return (int)out_value;
 }
 
 void dropout(Matrix *A, Matrix *rdm, float dropout_rate)

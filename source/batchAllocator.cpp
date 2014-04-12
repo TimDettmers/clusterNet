@@ -218,12 +218,7 @@ void BatchAllocator::init(float cross_validation_size, int batch_size, int batch
 
 void BatchAllocator::init_batch_buffer()
 {
-	float sparsity_X = 1.0;
-	float sparsity_y = 1.0;
-	if(m_full_X->isSparse == 1)
-		sparsity_X = determine_max_sparsity(m_full_X,BATCH_SIZE);
-	if(m_full_y->isSparse == 1)
-		sparsity_y = determine_max_sparsity(m_full_y,BATCH_SIZE);
+
 
 
 	if(BATCH_METHOD != Distributed_weights_sparse)
@@ -246,12 +241,32 @@ void BatchAllocator::init_batch_buffer()
 	}
 	else
 	{
+		float sparsity_X = 1.0;
+		float sparsity_y = 1.0;
 
-		m_next_buffer_X = empty_pinned_sparse(BATCH_SIZE,m_Cols_X,sparsity_X,0.0f);
-		m_next_buffer_cv_X = empty_pinned_sparse(BATCH_SIZE_CV,m_Cols_X,sparsity_X,0.0f);
+		if(m_mygpuID == 0)
+		{
+			sparsity_X = determine_max_sparsity(m_full_X,BATCH_SIZE);
+			if(m_full_y->isSparse == 1)
+				sparsity_y = determine_max_sparsity(m_full_y,BATCH_SIZE);
 
-		m_next_batch_X = empty_sparse(BATCH_SIZE,m_Cols_X,sparsity_X,0.0f);
-		m_next_batch_cv_X = empty_sparse(BATCH_SIZE_CV,m_Cols_X,sparsity_X,0.0f);
+			for(int i = 1; i < m_cluster.PCIe_RANKS.size() && BATCH_METHOD != Single_GPU; i++)
+			{
+				MPI_Send(&sparsity_X,5,MPI_INT,m_cluster.PCIe_RANKS[i],10,MPI_COMM_WORLD);
+				MPI_Send(&sparsity_y,5,MPI_INT,m_cluster.PCIe_RANKS[i],11,MPI_COMM_WORLD);
+			}
+		}
+		else
+		{
+			MPI_Recv(&sparsity_X,5,MPI_INT,0,10,MPI_COMM_WORLD,&m_status);
+			MPI_Recv(&sparsity_y,5,MPI_INT,0,11,MPI_COMM_WORLD, &m_status);
+		}
+
+		m_next_buffer_X = empty_pinned_sparse(BATCH_SIZE,m_Cols_X,sparsity_X,0.00f);
+		m_next_buffer_cv_X = empty_pinned_sparse(BATCH_SIZE_CV,m_Cols_X,sparsity_X,0.00f);
+
+		m_next_batch_X = empty_sparse(BATCH_SIZE,m_Cols_X,sparsity_X,0.00f);
+		m_next_batch_cv_X = empty_sparse(BATCH_SIZE_CV,m_Cols_X,sparsity_X,0.00f);
 
 		//CURRENT_BATCH = empty_sparse(BATCH_SIZE,m_Cols_X,sparsity_X,0.0f);
 		//CURRENT_BATCH_CV = empty_sparse(BATCH_SIZE_CV,m_Cols_X,sparsity_X,0.0f);
@@ -262,11 +277,11 @@ void BatchAllocator::init_batch_buffer()
 		if(m_full_y->isSparse == 1)
 		{
 
-			m_next_buffer_y = empty_pinned_sparse(BATCH_SIZE,m_Cols_y, sparsity_y, 0.0f);
-			m_next_buffer_cv_y = empty_pinned_sparse(BATCH_SIZE_CV,m_Cols_y, sparsity_y, 0.0f);
+			m_next_buffer_y = empty_pinned_sparse(BATCH_SIZE,m_Cols_y, sparsity_y, 0.00f);
+			m_next_buffer_cv_y = empty_pinned_sparse(BATCH_SIZE_CV,m_Cols_y, sparsity_y, 0.00f);
 
-			m_next_batch_y = empty_sparse(BATCH_SIZE,m_Cols_y, sparsity_y, 0.0f);
-			m_next_batch_cv_y = empty_sparse(BATCH_SIZE_CV,m_Cols_y, sparsity_y, 0.0f);
+			m_next_batch_y = empty_sparse(BATCH_SIZE,m_Cols_y, sparsity_y, 0.00f);
+			m_next_batch_cv_y = empty_sparse(BATCH_SIZE_CV,m_Cols_y, sparsity_y, 0.00f);
 
 			//CURRENT_BATCH_Y = empty_sparse(BATCH_SIZE,m_Cols_y, sparsity_y, 0.0f);
 			//CURRENT_BATCH_CV_Y = empty_sparse(BATCH_SIZE_CV,m_Cols_y, sparsity_y, 0.0f);
@@ -363,8 +378,6 @@ void BatchAllocator::broadcast_batch_to_processes()
 
 	if(BATCH_METHOD != Distributed_weights_sparse)
 	{
-
-
 		if(m_mygpuID == 0)
 		{
 			if(m_full_X->isSparse != 1)
@@ -397,11 +410,12 @@ void BatchAllocator::broadcast_batch_to_processes()
 			int next_batch_start_index = m_next_batch_number*BATCH_SIZE;
 			int idx_from = m_full_X->ptr_rows[next_batch_start_index];
 			int idx_to = m_full_X->ptr_rows[next_batch_start_index + partial_batch_size];
-			int range = (idx_to - idx_from);
+			int range = (idx_to - idx_from) -1;
 
-			memcpy(&m_next_buffer_X->data[0],&m_full_X->data[idx_from],sizeof(float)*range);
-			memcpy(&m_next_buffer_X->idx_cols[0],&m_full_X->idx_cols[idx_from],sizeof(int)*range);
-			memcpy(&m_next_buffer_X->ptr_rows[0],&m_full_X->ptr_rows[idx_from],sizeof(int)*(partial_batch_size +1));
+			assert(m_next_buffer_X->size >= range);
+			memcpy(m_next_buffer_X->data,&m_full_X->data[idx_from],sizeof(float)*range);
+			memcpy(m_next_buffer_X->idx_cols,&m_full_X->idx_cols[idx_from],sizeof(int)*range);
+			memcpy(m_next_buffer_X->ptr_rows,&m_full_X->ptr_rows[idx_from],sizeof(int)*(partial_batch_size +1));
 
 			m_sparse_matrix_info_X[0] = range;
 			m_sparse_matrix_info_X[1] = sizeof(float)*range;
@@ -427,7 +441,7 @@ void BatchAllocator::broadcast_batch_to_processes()
 				m_sparse_matrix_info_y[4] = (partial_batch_size+1)*sizeof(int);
 			}
 
-			update_next_buffer_matrix_info();
+			//update_next_buffer_matrix_info();
 
 			for(int i = 1; i < m_cluster.PCIe_RANKS.size() && BATCH_METHOD != Single_GPU; i++)
 			{
@@ -593,9 +607,8 @@ void BatchAllocator::allocate_next_batch_async()
 
 
 	if(BATCH_METHOD == Distributed_weights_sparse)
-	{
 		update_next_batch_matrix_info();
-	}
+
 
 
 	if(m_mygpuID != 0)
@@ -610,6 +623,7 @@ void BatchAllocator::allocate_next_batch_async()
 			MPI_Wait(&m_request_X[0],&m_status);
 			MPI_Wait(&m_request_X[1],&m_status);
 			MPI_Wait(&m_request_X[2],&m_status);
+
 			if(m_full_y->isSparse != 1)
 				MPI_Wait(&m_request_y[0],&m_status);
 			else
@@ -655,6 +669,7 @@ void BatchAllocator::allocate_next_batch_async()
 	}
 	else
 	{
+
 		cudaMemcpyAsync(&m_next_batch_X->data[0],&m_next_buffer_X->data[0],m_next_buffer_X->bytes, cudaMemcpyHostToDevice,m_streamNext_batch_X);
 		cudaMemcpyAsync(&m_next_batch_X->idx_cols[0],&m_next_buffer_X->idx_cols[0],m_next_buffer_X->idx_bytes, cudaMemcpyHostToDevice,m_streamNext_batch_X);
 		cudaMemcpyAsync(&m_next_batch_X->ptr_rows[0],&m_next_buffer_X->ptr_rows[0],m_next_buffer_X->ptr_bytes, cudaMemcpyHostToDevice,m_streamNext_batch_X);
@@ -709,7 +724,6 @@ void BatchAllocator::allocate_next_cv_batch_async()
 
 void BatchAllocator::replace_current_batch_with_next()
 {
-
 	if(m_next_batch_X->rows != CURRENT_BATCH->rows)
 	{
 		cudaFree(CURRENT_BATCH->data);
@@ -717,8 +731,6 @@ void BatchAllocator::replace_current_batch_with_next()
 		CURRENT_BATCH = empty(m_next_batch_X->rows,m_next_batch_X->cols);
 		CURRENT_BATCH_Y = empty(m_next_batch_y->rows,m_next_batch_y->cols);
 	}
-
-
 
 	cudaStreamSynchronize(m_streamNext_batch_X);
 	cudaStreamSynchronize(m_streamNext_batch_y);
@@ -730,7 +742,7 @@ void BatchAllocator::replace_current_batch_with_next()
 	}
 	else
 	{
-
+		update_next_batch_matrix_info();
 	}
 
 	m_next_batch_number += 1;

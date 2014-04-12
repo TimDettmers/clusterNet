@@ -7,6 +7,7 @@
 #include <mpi.h>
 #include <list>
 #include <vector>
+#include <cusparse_v2.h>
 
 
 class ClusterNet
@@ -32,6 +33,10 @@ public:
 	 void TdotMPI(Matrix *A, Matrix *B, Matrix *out);
 	 void dotTMPI(Matrix *A, Matrix *B, Matrix *out);
 
+	 void dot_sparse(Matrix *A, Matrix *B, Matrix *out);
+	 void dotT_sparse(Matrix *A, Matrix *B, Matrix *out);
+	 void Tdot_sparse(Matrix *A, Matrix *B, Matrix *out);
+
 	 Matrix *rand(int rows, int cols);
 	 void rand(int rows, int cols, Matrix *out);
 	 Matrix *randn(int rows, int cols);
@@ -55,6 +60,8 @@ public:
 	 Matrix *sparseInitWeight(int rows, int cols);
 	 Matrix *sparseInitWeight(int rows, int cols, int connections);
 
+	 Matrix *dense_to_sparse(Matrix *A);
+
 	 int MYRANK;
 	 int NODES;
 	 int MYGPUID;
@@ -63,6 +70,7 @@ public:
 	 std::vector<int> MASTER_GPU_RANKS;
 private:
 	 cublasHandle_t m_handle;
+	 cusparseHandle_t m_sparse_handle;
 	 curandGenerator_t m_generator;
 	 std::map<std::string,cudaEvent_t*> m_dictTickTock;
 	 std::map<std::string,float> m_dictTickTockCumulative;
@@ -77,6 +85,7 @@ private:
 
 	 bool m_hasMPI;
 	 bool m_cublasInitialized;
+	 bool m_cusparseInitialized;
 	 MPI_Status m_status;
 	 MPI_Comm m_MPIWorld;
 
@@ -84,6 +93,7 @@ private:
 	 int m_source;
 
 	 void dot(Matrix *A, Matrix *B, Matrix *out, cublasOperation_t T1, cublasOperation_t T2);
+	 void dot_sparse(Matrix *A, Matrix *B, Matrix *out, cublasOperation_t T1, cublasOperation_t T2);
 	 void dotMPI(Matrix *A, Matrix *B, Matrix *out, bool applyTranspose_A, bool applyTranspose_B);
 	 void init(int seed);
 	 void init_MPI(int argc, char *argv[]);
