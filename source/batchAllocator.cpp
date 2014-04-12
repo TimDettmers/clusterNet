@@ -36,8 +36,16 @@ void BatchAllocator::init(Matrix *X, Matrix *y, float cross_validation_size, int
 	{
 		cudaFree(X->data);
 		cudaFree(y->data);
-		X = zeros(1,1);
-		y = zeros(1,1);
+		if(X->isSparse == 0)
+		{
+			X = zeros(1,1);
+			y = zeros(1,1);
+		}
+		else
+		{
+			X = empty_sparse(1,1,1);
+			y = empty_sparse(1,1,1);
+		}
 	}
 
 	m_full_X = X;

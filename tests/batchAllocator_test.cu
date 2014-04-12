@@ -206,6 +206,74 @@ int run_batchAllocator_test(ClusterNet gpus)
 	  }
 
 
+	char buff[1024] = {0};
+	ssize_t len = ::readlink("/proc/self/exe", buff, sizeof(buff)-1);
+	std::string path = std::string(buff);
+	replace(path,"/build/testSuite.out","/tests/");
+
+
+	Matrix *X;
+	Matrix *y;
+	if(gpus.MYGPUID == 0)
+	{
+		X = read_sparse_hdf5((path + "crowdflower_X_test.hdf5").c_str());
+		y = read_sparse_hdf5((path + "crowdflower_y_test.hdf5").c_str());
+	}
+	else
+	{
+		X = empty_sparse(1,1,1);
+		y = empty_sparse(1,1,1);
+	}
+
+	b = BatchAllocator();
+	b.init(X,y,0.20,128,256,gpus, Distributed_weights_sparse);
+	assert(test_eq(b.CURRENT_BATCH->rows,128,"sparse distributed batch allocator test"));
+	assert(test_eq(b.CURRENT_BATCH->cols,9000,"sparse distributed batch allocator test"));
+	assert(test_eq(b.CURRENT_BATCH_Y->rows,128,"sparse distributed batch allocator test"));
+	assert(test_eq(b.CURRENT_BATCH_Y->cols,24,"sparse distributed batch allocator test"));
+	assert(test_eq(b.CURRENT_BATCH_CV->rows,256,"sparse distributed batch allocator test"));
+	assert(test_eq(b.CURRENT_BATCH_CV->cols,9000,"sparse distributed batch allocator test"));
+	assert(test_eq(b.CURRENT_BATCH_CV_Y->rows,256,"sparse distributed batch allocator test"));
+	assert(test_eq(b.CURRENT_BATCH_CV_Y->cols,24,"sparse distributed batch allocator test"));
+
+	int index = 0;
+	int index_rows = 0;
+	for(int i = 0; i < b.TOTAL_BATCHES; i++)
+	{
+		b.broadcast_batch_to_processes();
+
+		Matrix *s1 = to_host(b.CURRENT_BATCH);
+
+		cout << i << endl;
+
+		for(int j = 0; j < b.CURRENT_BATCH->size; j++)
+		{
+			//cout << "index:" << index << endl;
+			assert(test_eq(X->data[index],s1->data[j],"sparse batch allocator data test"));
+			assert(test_eq(X->idx_cols[index],s1->idx_cols[j],"sparse batch allocator data test"));
+			index++;
+		}
+
+		b.allocate_next_batch_async();
+
+		for(int j = 0; j < b.CURRENT_BATCH->rows+1; j++)
+		{
+			//cout << "index_rows:" << index_rows << endl;
+			assert(test_eq(X->ptr_rows[index_rows],s1->ptr_rows[j],"sparse batch allocator data test"));
+			index_rows++;
+		}
+
+		b.replace_current_batch_with_next();
+
+		cudaFree(s1->data);
+		cudaFree(s1->idx_cols);
+		cudaFree(s1->ptr_rows);
+		free(s1);
+
+		MPI_Barrier(MPI_COMM_WORLD);
+	}
+
+
   return 0;
 }
 

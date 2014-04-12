@@ -16,7 +16,7 @@ void run_miniMNIST_test(ClusterNet gpus)
 	// Tests RMSprop with weight updates, logistic grad.
 	// Additionally tests the interplay between different functions.
 
-	char buff[1024];
+	char buff[1024] = {0};
 	ssize_t len = ::readlink("/proc/self/exe", buff, sizeof(buff)-1);
 	std::string path = std::string(buff);
 	replace(path,"/build/testSuite.out","/tests/");
