@@ -214,15 +214,29 @@ int run_batchAllocator_test(ClusterNet gpus)
 
 	Matrix *X;
 	Matrix *y;
+
+
 	if(gpus.MYGPUID == 0)
 	{
 		X = read_sparse_hdf5((path + "crowdflower_X_test.hdf5").c_str());
 		y = read_sparse_hdf5((path + "crowdflower_y_test.hdf5").c_str());
 	}
-	else
+
+
+	MPI_Barrier(MPI_COMM_WORLD);
+
+	if(gpus.MYGPUID == 1)
 	{
-		X = empty_sparse(1,1,1);
-		y = empty_sparse(1,1,1);
+		X = read_sparse_hdf5((path + "crowdflower_X_test.hdf5").c_str());
+		y = read_sparse_hdf5((path + "crowdflower_y_test.hdf5").c_str());
+	}
+
+	MPI_Barrier(MPI_COMM_WORLD);
+
+	if(gpus.MYGPUID == 2)
+	{
+		X = read_sparse_hdf5((path + "crowdflower_X_test.hdf5").c_str());
+		y = read_sparse_hdf5((path + "crowdflower_y_test.hdf5").c_str());
 	}
 
 	b = BatchAllocator();
@@ -244,33 +258,30 @@ int run_batchAllocator_test(ClusterNet gpus)
 
 		Matrix *s1 = to_host(b.CURRENT_BATCH);
 
-		cout << i << endl;
-
 		for(int j = 0; j < b.CURRENT_BATCH->size; j++)
 		{
-			//cout << "index:" << index << endl;
 			assert(test_eq(X->data[index],s1->data[j],"sparse batch allocator data test"));
 			assert(test_eq(X->idx_cols[index],s1->idx_cols[j],"sparse batch allocator data test"));
 			index++;
 		}
 
-		b.allocate_next_batch_async();
+
 
 		for(int j = 0; j < b.CURRENT_BATCH->rows+1; j++)
 		{
-			//cout << "index_rows:" << index_rows << endl;
 			assert(test_eq(X->ptr_rows[index_rows],s1->ptr_rows[j],"sparse batch allocator data test"));
 			index_rows++;
 		}
+		index_rows--;
 
+		b.allocate_next_batch_async();
 		b.replace_current_batch_with_next();
+
 
 		cudaFree(s1->data);
 		cudaFree(s1->idx_cols);
 		cudaFree(s1->ptr_rows);
 		free(s1);
-
-		MPI_Barrier(MPI_COMM_WORLD);
 	}
 
 

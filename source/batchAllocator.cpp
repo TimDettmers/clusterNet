@@ -34,8 +34,10 @@ void BatchAllocator::init(Matrix *X, Matrix *y, float cross_validation_size, int
 	m_myrank = m_cluster.MYRANK;
 	if(m_cluster.MYGPUID != 0)
 	{
+		/*
 		cudaFree(X->data);
 		cudaFree(y->data);
+
 		if(X->isSparse == 0)
 		{
 			X = zeros(1,1);
@@ -46,6 +48,7 @@ void BatchAllocator::init(Matrix *X, Matrix *y, float cross_validation_size, int
 			X = empty_sparse(1,1,1);
 			y = empty_sparse(1,1,1);
 		}
+		*/
 	}
 
 	m_full_X = X;
@@ -415,15 +418,15 @@ void BatchAllocator::broadcast_batch_to_processes()
 	{
 		if(m_mygpuID == 0)
 		{
-			int next_batch_start_index = m_next_batch_number*BATCH_SIZE;
+			int next_batch_start_index = m_next_batch_number*(BATCH_SIZE);
 			int idx_from = m_full_X->ptr_rows[next_batch_start_index];
 			int idx_to = m_full_X->ptr_rows[next_batch_start_index + partial_batch_size];
-			int range = (idx_to - idx_from) -1;
+			int range = (idx_to - idx_from);
 
 			assert(m_next_buffer_X->size >= range);
 			memcpy(m_next_buffer_X->data,&m_full_X->data[idx_from],sizeof(float)*range);
 			memcpy(m_next_buffer_X->idx_cols,&m_full_X->idx_cols[idx_from],sizeof(int)*range);
-			memcpy(m_next_buffer_X->ptr_rows,&m_full_X->ptr_rows[idx_from],sizeof(int)*(partial_batch_size +1));
+			memcpy(m_next_buffer_X->ptr_rows,&m_full_X->ptr_rows[next_batch_start_index],sizeof(int)*(partial_batch_size + 1));
 
 			m_sparse_matrix_info_X[0] = range;
 			m_sparse_matrix_info_X[1] = sizeof(float)*range;
@@ -440,7 +443,7 @@ void BatchAllocator::broadcast_batch_to_processes()
 				range = (idx_to - idx_from);
 				memcpy(&m_next_buffer_y->data[0],&m_full_y->data[idx_from],sizeof(float)*range);
 				memcpy(&m_next_buffer_y->idx_cols[0],&m_full_y->idx_cols[idx_from],sizeof(int)*range);
-				memcpy(&m_next_buffer_y->ptr_rows[0],&m_full_y->ptr_rows[idx_from],sizeof(int)*(BATCH_SIZE +1));
+				memcpy(&m_next_buffer_y->ptr_rows[0],&m_full_y->ptr_rows[next_batch_start_index],sizeof(int)*(partial_batch_size + 1));
 
 				m_sparse_matrix_info_y[0] = range;
 				m_sparse_matrix_info_y[1] = sizeof(float)*range;
