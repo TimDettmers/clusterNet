@@ -279,10 +279,15 @@ int run_batchAllocator_test(ClusterNet gpus)
 		index_rows--;
 
 
-		gpus.dot_sparse(b.CURRENT_BATCH, B, out);
 		cout << "myrank: " << gpus.MYRANK << " " << sum(out) << endl;
+		gpus.dot_sparse(b.CURRENT_BATCH, B, out);
+		//printmat(out);
+		assert(test_matrix(out,b.CURRENT_BATCH->rows,B->cols));
+		cout << "myrank: " << gpus.MYRANK << " " << sum(out) << endl;
+		cout << "myrank: " << gpus.MYRANK << " " << sum(B) << endl;
 		MPI_Barrier(MPI_COMM_WORLD);
 		ASSERT(sum(out) > -50000 && sum(out) < 50000, "sparse batching sparse dot output test");
+
 
 		b.allocate_next_batch_async();
 		b.replace_current_batch_with_next();

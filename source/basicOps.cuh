@@ -39,6 +39,9 @@ typedef struct Matrix
 
 Matrix *fill_matrix(int rows, int cols, float fill_value);
 void fill_matrix(Matrix *A, const float fill_value);
+void fill_gpuarray(float *A, const float fill_value, int size);
+void fill_gpuarray(int *A, const int fill_value, int size);
+void fill_sparse_with_zeros(Matrix *A);
 Matrix *ones(int rows, int cols);
 Matrix *zeros(int rows, int cols);
 Matrix *empty(int rows, int cols);

@@ -11,6 +11,7 @@
 #include <hdf5.h>
 #include <iomanip>
 #include <ios>
+#include <assert.h>
 
 using std::string;
 using std::vector;
@@ -300,20 +301,38 @@ void print_matrix(Matrix *A, int end_rows, int end_cols)
 	}
 	else
 	{
-		printf("A.size: %i",A->size);
-		printf("A.bytes: %i",(int)A->bytes);
 		printf("[");
-		for(int i = 0; i < A->size; i++)
+		for(int i = end_rows; i < end_cols; i++)
 			printf("%f ",A->data[i]);
 
 		printf("]\n");
 	}
 }
 
+void print_matrix(Matrix *A, int start_row, int end_row, int start_col, int end_col)
+{
+	assert(A->isSparse == 0);
+
+	for(int row = start_row; row< end_row; row++)
+	{
+		printf("[");
+		for(int col =start_col; col < end_col; col++)
+		{
+			printf("%f ",A->data[(row*A->cols)+col]);
+		}
+		printf("]\n");
+	}
+	printf("\n");
+
+}
+
 void printmat(Matrix *A)
 {
   Matrix * m = to_host(A);
-  print_matrix(m,A->rows,A->cols);
+  if(A->isSparse == 0)
+	  print_matrix(m,A->rows,A->cols);
+  else
+	  print_matrix(m,0,A->size);
   free(m->data);
   free(m);
 
@@ -323,6 +342,15 @@ void printmat(Matrix *A, int end_rows, int end_cols)
 {
   Matrix * m = to_host(A);
   print_matrix(m, end_rows, end_cols);
+  free(m->data);
+  free(m);
+
+}
+
+void printmat(Matrix *A, int start_row, int end_row, int start_col, int end_col)
+{
+  Matrix * m = to_host(A);
+  print_matrix(m, start_row, end_row, start_col, end_col);
   free(m->data);
   free(m);
 

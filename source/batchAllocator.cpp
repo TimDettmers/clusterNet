@@ -515,18 +515,37 @@ void BatchAllocator::update_next_batch_matrix_info()
 		MPI_Recv(m_sparse_matrix_info_y,5,MPI_INT,0,11,MPI_COMM_WORLD, &m_status);
 	}
 
-	m_next_batch_y->size = m_sparse_matrix_info_y[0];
-	m_next_batch_y->bytes = m_sparse_matrix_info_y[1];
-	m_next_batch_y->idx_bytes = m_sparse_matrix_info_y[2];
-	m_next_batch_y->rows = m_sparse_matrix_info_y[3];
-	m_next_batch_y->ptr_bytes = m_sparse_matrix_info_y[4];
 
+	if(m_full_y->isSparse == 1)
+	{
+		m_next_batch_y->size = m_sparse_matrix_info_y[0];
+		m_next_batch_y->bytes = m_sparse_matrix_info_y[1];
+		m_next_batch_y->idx_bytes = m_sparse_matrix_info_y[2];
+		m_next_batch_y->rows = m_sparse_matrix_info_y[3];
+		m_next_batch_y->ptr_bytes = m_sparse_matrix_info_y[4];
+		/*
+		fill_sparse_with_zeros(m_next_batch_y);
+
+
+		fill_gpuarray(m_next_batch_y->data,0.0f,m_next_buffer_y->size);
+		fill_gpuarray(m_next_batch_y->ptr_rows,0.0f,m_next_buffer_y->rows + 1);
+		fill_gpuarray(m_next_batch_y->idx_cols,0.0f,m_next_buffer_y->size);
+		*/
+
+	}
 
 	m_next_batch_X->size = m_sparse_matrix_info_X[0];
 	m_next_batch_X->bytes = m_sparse_matrix_info_X[1];
 	m_next_batch_X->idx_bytes = m_sparse_matrix_info_X[2];
 	m_next_batch_X->rows = m_sparse_matrix_info_X[3];
 	m_next_batch_X->ptr_bytes = m_sparse_matrix_info_X[4];
+	/*
+	fill_gpuarray(m_next_batch_X->data,0.0f,m_next_buffer_X->size);
+	fill_gpuarray(m_next_batch_X->ptr_rows,0.0f,m_next_buffer_X->rows + 1);
+	fill_gpuarray(m_next_batch_X->idx_cols,0.0f,m_next_buffer_X->size);
+	*/
+
+	cudaDeviceSynchronize();
 }
 
 void BatchAllocator::update_next_buffer_matrix_info()
@@ -681,17 +700,17 @@ void BatchAllocator::allocate_next_batch_async()
 	else
 	{
 
-		cudaMemcpyAsync(&m_next_batch_X->data[0],&m_next_buffer_X->data[0],m_next_buffer_X->bytes, cudaMemcpyHostToDevice,m_streamNext_batch_X);
-		cudaMemcpyAsync(&m_next_batch_X->idx_cols[0],&m_next_buffer_X->idx_cols[0],m_next_buffer_X->idx_bytes, cudaMemcpyHostToDevice,m_streamNext_batch_X);
-		cudaMemcpyAsync(&m_next_batch_X->ptr_rows[0],&m_next_buffer_X->ptr_rows[0],m_next_buffer_X->ptr_bytes, cudaMemcpyHostToDevice,m_streamNext_batch_X);
+		cudaMemcpyAsync(&m_next_batch_X->data[0],&m_next_buffer_X->data[0],m_next_batch_X->bytes, cudaMemcpyHostToDevice,m_streamNext_batch_X);
+		cudaMemcpyAsync(&m_next_batch_X->idx_cols[0],&m_next_buffer_X->idx_cols[0],m_next_batch_X->idx_bytes, cudaMemcpyHostToDevice,m_streamNext_batch_X);
+		cudaMemcpyAsync(&m_next_batch_X->ptr_rows[0],&m_next_buffer_X->ptr_rows[0],m_next_batch_X->ptr_bytes, cudaMemcpyHostToDevice,m_streamNext_batch_X);
 
 		if(m_full_y->isSparse != 1)
 			cudaMemcpyAsync(m_next_batch_y->data,m_next_buffer_y->data,	copy_range_bytes_y, cudaMemcpyHostToDevice,m_streamNext_batch_y);
 		else
 		{
-			cudaMemcpyAsync(&m_next_batch_y->data[0],&m_next_buffer_y->data[0],m_next_buffer_y->bytes, cudaMemcpyHostToDevice,m_streamNext_batch_y);
-			cudaMemcpyAsync(&m_next_batch_y->idx_cols[0],&m_next_buffer_y->idx_cols[0],m_next_buffer_y->idx_bytes, cudaMemcpyHostToDevice,m_streamNext_batch_y);
-			cudaMemcpyAsync(&m_next_batch_y->ptr_rows[0],&m_next_buffer_y->ptr_rows[0],m_next_buffer_y->ptr_bytes, cudaMemcpyHostToDevice,m_streamNext_batch_y);
+			cudaMemcpyAsync(&m_next_batch_y->data[0],&m_next_buffer_y->data[0],m_next_batch_y->bytes, cudaMemcpyHostToDevice,m_streamNext_batch_y);
+			cudaMemcpyAsync(&m_next_batch_y->idx_cols[0],&m_next_buffer_y->idx_cols[0],m_next_batch_y->idx_bytes, cudaMemcpyHostToDevice,m_streamNext_batch_y);
+			cudaMemcpyAsync(&m_next_batch_y->ptr_rows[0],&m_next_buffer_y->ptr_rows[0],m_next_batch_y->ptr_bytes, cudaMemcpyHostToDevice,m_streamNext_batch_y);
 		}
 	}
 }
@@ -750,10 +769,6 @@ void BatchAllocator::replace_current_batch_with_next()
 	{
 		to_col_major(m_next_batch_X, CURRENT_BATCH);
 		to_col_major(m_next_batch_y, CURRENT_BATCH_Y);
-	}
-	else
-	{
-		update_next_batch_matrix_info();
 	}
 
 	m_next_batch_number += 1;

@@ -244,7 +244,6 @@ void ClusterNet::dot_sparse(Matrix *A, Matrix *B, Matrix *out, cublasOperation_t
     const float beta = 0;
 	int B_cols = T2 == CUBLAS_OP_T ? B->rows : B->cols;
 
-	fill_matrix(out,0.0f);
 
 
 	/*
@@ -261,7 +260,20 @@ void ClusterNet::dot_sparse(Matrix *A, Matrix *B, Matrix *out, cublasOperation_t
 	 cout << "sum out: " << sum(out) << endl;
 	 */
 
+	cout << "pre sparse to dense" << endl;
+	MPI_Barrier(MPI_COMM_WORLD);
+	Matrix *A_dense = sparse_to_dense(A);
+	cout << "post sparse to dense" << endl;
+	MPI_Barrier(MPI_COMM_WORLD);
+	dot(A_dense,B,out,T1,T2);
+	cout << "post dot" << endl;
+	MPI_Barrier(MPI_COMM_WORLD);
 
+	cudaFree(A_dense->data);
+	free(A_dense);
+
+
+	/*
 	status = cusparseScsrmm2(m_sparse_handle,
 		T1 == CUBLAS_OP_N ? CUSPARSE_OPERATION_NON_TRANSPOSE : CUSPARSE_OPERATION_TRANSPOSE,
 		T2 == CUBLAS_OP_N ? CUSPARSE_OPERATION_NON_TRANSPOSE : CUSPARSE_OPERATION_TRANSPOSE,
@@ -276,6 +288,7 @@ void ClusterNet::dot_sparse(Matrix *A, Matrix *B, Matrix *out, cublasOperation_t
 		cout << "CUSPARSE ERROR: " << status <<  "!" << endl;
 		throw "CUSPARSE ERROR!";
 	}
+	*/
 
 
 }
@@ -303,19 +316,20 @@ void ClusterNet::dot(Matrix *A, Matrix *B, Matrix *out, cublasOperation_t T1, cu
 		B_cols = B->rows;
 
 
-/*
+	/*
 	 cout << "T1: " << T1 << endl;
 	 cout << "T2: " << T2 << endl;
 	 cout << "A rows: " << A_rows << endl;
-	 cout << "A cols: " << B_cols << endl;
+	 cout << "A cols: " << A_cols << endl;
 	 cout << "B rows: " << B->rows << endl;
-	 cout << "B cols: " << A_cols << endl;
+	 cout << "B cols: " << B_cols << endl;
 	 cout << "out rows: " << out->rows << endl;
 	 cout << "out cols: " << out->cols << endl;
 	 cout << "sum A: " << sum(A) << endl;
 	 cout << "sum B: "  << sum(B) << endl;
 	 cout << "sum out: " << sum(out) << endl;
-*/
+	 */
+
 
 	status = cublasSgemm(m_handle, T1, T2, A_rows, B_cols,
 			A_cols, &alpha, A->data, A->rows, B->data, B->rows, &beta,
@@ -323,6 +337,8 @@ void ClusterNet::dot(Matrix *A, Matrix *B, Matrix *out, cublasOperation_t T1, cu
 
 	if (status != CUBLAS_STATUS_SUCCESS)
 	{
+		printmat(A,0,1,0,10);
+		printmat(A,A->rows-1,A->rows, A->cols-10,A->cols);
 		std::cout << "CUBLAS ERROR: Status " << status << std::endl;
 		throw "CUBLAS ERROR";
 

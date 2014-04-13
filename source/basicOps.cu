@@ -362,6 +362,29 @@ void fill_matrix(Matrix *A, const float fill_value)
 }
 
 
+void fill_gpuarray(float *A, const float fill_value, int size)
+{
+
+	thrust::device_ptr<float> ptr(A);
+	thrust::fill(ptr, ptr + size,fill_value);
+}
+void fill_gpuarray(int *A, const int fill_value, int size)
+{
+	thrust::device_ptr<int> ptr(A);
+	thrust::fill(ptr, ptr + size,fill_value);
+}
+
+void fill_sparse_with_zeros(Matrix *A)
+{
+	assert(A->isSparse == 1);
+	fill_matrix(A,0.0f);
+	thrust::device_ptr<int> ptr_idx(A->idx_cols);
+	thrust::fill(ptr_idx, ptr_idx + A->size,0);
+	thrust::device_ptr<int> ptr_ptr(A->ptr_rows);
+	thrust::fill(ptr_ptr, ptr_ptr + A->rows + 1,0);
+}
+
+
 Matrix *add(Matrix *A, Matrix *B)
 {
   Matrix *out = empty(A->rows,A->cols);
