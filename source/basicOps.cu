@@ -8,6 +8,7 @@
 #include <thrust/device_ptr.h>
 #include <thrust/device_vector.h>
 #include <thrust/reduce.h>
+#include <thrust/fill.h>
 
 Matrix *to_gpu(Matrix *A){ return to_gpu(A, 0); }
 Matrix *to_gpu(Matrix *A, int is_col_major)
@@ -353,6 +354,13 @@ Matrix *fill_matrix(int rows, int cols, float fill_value)
  
   return out;
 }
+
+void fill_matrix(Matrix *A, const float fill_value)
+{
+	thrust::device_ptr<float> ptr(A->data);
+	thrust::fill(ptr, ptr + A->size,fill_value);
+}
+
 
 Matrix *add(Matrix *A, Matrix *B)
 {

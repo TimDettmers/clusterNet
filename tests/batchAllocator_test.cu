@@ -258,7 +258,7 @@ int run_batchAllocator_test(ClusterNet gpus)
 		b.broadcast_batch_to_processes();
 		Matrix *s1 = to_host(b.CURRENT_BATCH);
 		Matrix *B = ones(b.CURRENT_BATCH->cols,20);
-		Matrix *out = empty(b.CURRENT_BATCH->rows, B->cols);
+		Matrix *out = zeros(b.CURRENT_BATCH->rows, B->cols);
 
 		for(int j = 0; j < b.CURRENT_BATCH->size; j++)
 		{
@@ -279,11 +279,10 @@ int run_batchAllocator_test(ClusterNet gpus)
 		index_rows--;
 
 
-		MPI_Barrier(MPI_COMM_WORLD);
 		gpus.dot_sparse(b.CURRENT_BATCH, B, out);
-		cout << "myrank: " << gpus.MYRANK << " " << sum(b.CURRENT_BATCH) << endl;
-		//cout << "myrank: " << gpus.MYRANK << " " << sum(out) << endl;
+		cout << "myrank: " << gpus.MYRANK << " " << sum(out) << endl;
 		MPI_Barrier(MPI_COMM_WORLD);
+		ASSERT(sum(out) > -50000 && sum(out) < 50000, "sparse batching sparse dot output test");
 
 		b.allocate_next_batch_async();
 		b.replace_current_batch_with_next();
@@ -322,7 +321,7 @@ int run_batchAllocator_test(ClusterNet gpus)
 	for(int i = 0; i < b.TOTAL_BATCHES; i++)
 	{
 		Matrix *B = ones(b.CURRENT_BATCH->cols,20);
-		Matrix *out = empty(b.CURRENT_BATCH->rows, B->cols);
+		Matrix *out = zeros(b.CURRENT_BATCH->rows, B->cols);
 
 		b.broadcast_batch_to_processes();
 		if(gpus.MYGPUID == 0)
@@ -354,10 +353,8 @@ int run_batchAllocator_test(ClusterNet gpus)
 
 		}
 		gpus.dot_sparse(b.CURRENT_BATCH, B, out);
-
-
-		//cout << "myrank: " << gpus.MYRANK << " " << sum(out) << endl;
-		//MPI_Barrier(MPI_COMM_WORLD);
+		cout << "myrank: " << gpus.MYRANK << " " << sum(out) << endl;
+		MPI_Barrier(MPI_COMM_WORLD);
 		ASSERT(sum(out) > -50000 && sum(out) < 50000, "sparse batching sparse dot output test");
 
 		b.allocate_next_batch_async();

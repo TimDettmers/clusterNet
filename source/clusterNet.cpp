@@ -13,6 +13,9 @@
 #include <vector>
 #include <pthread.h>
 #include <sstream>
+#include <thrust/device_ptr.h>
+#include <thrust/device_vector.h>
+#include <thrust/fill.h>
 
 #define SSTR( x ) dynamic_cast< std::ostringstream & >( \
         ( std::ostringstream() << std::dec << x ) ).str()
@@ -241,11 +244,14 @@ void ClusterNet::dot_sparse(Matrix *A, Matrix *B, Matrix *out, cublasOperation_t
     const float beta = 0;
 	int B_cols = T2 == CUBLAS_OP_T ? B->rows : B->cols;
 
+	fill_matrix(out,0.0f);
+
+
 	/*
 	 cout << "T1: " << T1 << endl;
 	 cout << "T2: " << T2 << endl;
-	 cout << "A rows: " << A_rows << endl;
-	 cout << "A cols: " << A_cols << endl;
+	 cout << "A rows: " << A->rows << endl;
+	 cout << "A cols: " << A->cols << endl;
 	 cout << "B rows: " << B->rows << endl;
 	 cout << "B cols: " << B_cols << endl;
 	 cout << "out rows: " << out->rows << endl;
@@ -254,6 +260,7 @@ void ClusterNet::dot_sparse(Matrix *A, Matrix *B, Matrix *out, cublasOperation_t
 	 cout << "sum B: "  << sum(B) << endl;
 	 cout << "sum out: " << sum(out) << endl;
 	 */
+
 
 	status = cusparseScsrmm2(m_sparse_handle,
 		T1 == CUBLAS_OP_N ? CUSPARSE_OPERATION_NON_TRANSPOSE : CUSPARSE_OPERATION_TRANSPOSE,
@@ -732,6 +739,33 @@ Matrix *ClusterNet::dense_to_sparse(Matrix *A)
 	cusparseSdense2csr(m_sparse_handle,A->rows,A->cols,
 					   descriptor_A,A->data,A->rows,nonzerosPerRow,
 					   out->data,out->ptr_rows,out->idx_cols);
+
+	return out;
+}
+
+Matrix *ClusterNet::sparse_to_dense(Matrix *A)
+{
+	if(!m_cusparseInitialized)
+	{
+		m_cusparseInitialized = true;
+		cusparseCreate(&m_sparse_handle);
+	}
+
+	assert(A->isSparse == 1);
+
+	cusparseMatDescr_t descriptor_A;
+	cusparseCreateMatDescr(&descriptor_A);
+	cusparseSetMatType(descriptor_A,CUSPARSE_MATRIX_TYPE_GENERAL);
+    cusparseSetMatIndexBase(descriptor_A,CUSPARSE_INDEX_BASE_ZERO);
+
+    Matrix *out = zeros(A->rows,A->cols);
+
+    cusparseScsr2dense(m_sparse_handle,A->rows,A->cols,
+			   descriptor_A,
+			   A->data,A->ptr_rows,A->idx_cols,
+			   out->data,out->rows);
+
+    //to_col_major(out,out);
 
 	return out;
 }

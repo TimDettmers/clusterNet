@@ -54,6 +54,14 @@ int run_clusterNet_test(ClusterNet gpus)
 	assert(test_eq(m_host->data[3], 59.1387f,"sparse data."));
 
 
+	m_host = to_host(gpus.sparse_to_dense(s1));
+	assert(test_eq(m_host->data[0], 0.0f,"sparse to dense data."));
+	assert(test_eq(m_host->data[1], 2.0f,"sparse to dense data."));
+	assert(test_eq(m_host->data[2], 3.0f,"sparse to dense data."));
+	assert(test_eq(m_host->data[3], 0.0f,"sparse to dense data."));
+	assert(test_eq(m_host->data[4], 0.83f,"sparse to dense data."));
+	assert(test_eq(m_host->data[5], 59.1387f,"sparse to dense data."));
+
 	m_host = to_host(m1);
 
 	//dot test
@@ -85,6 +93,7 @@ int run_clusterNet_test(ClusterNet gpus)
 	assert(test_eq(m_host->data[3], 3.32f,"Dot data."));
 	assert(test_matrix(m_host,2,2));
 
+	out = empty(2,2);
 	gpu.dot_sparse(s1,m2, out);
 	m_host = to_host(out);
 
@@ -153,6 +162,7 @@ int run_clusterNet_test(ClusterNet gpus)
 	assert(test_matrix(m_host,2,2));
 
 	//dot T sparse test
+	out = zeros(2,2);
 	gpu.dotT_sparse(s1,m1,out);
 	m_host = to_host(out);
 	assert(test_eq(m_host->data[0], 13.0f,"Dot data."));

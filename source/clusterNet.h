@@ -64,6 +64,7 @@ public:
 	 Matrix *sparseInitWeight(int rows, int cols, int connections);
 
 	 Matrix *dense_to_sparse(Matrix *A);
+	 Matrix *sparse_to_dense(Matrix *A);
 
 	 int MYRANK;
 	 int NODES;
