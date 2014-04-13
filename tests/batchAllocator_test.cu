@@ -222,7 +222,6 @@ int run_batchAllocator_test(ClusterNet gpus)
 		y = read_sparse_hdf5((path + "crowdflower_y_test.hdf5").c_str());
 	}
 
-
 	MPI_Barrier(MPI_COMM_WORLD);
 
 	if(gpus.MYGPUID == 1)
@@ -252,11 +251,14 @@ int run_batchAllocator_test(ClusterNet gpus)
 
 	int index = 0;
 	int index_rows = 0;
+
 	for(int i = 0; i < b.TOTAL_BATCHES; i++)
 	{
-		b.broadcast_batch_to_processes();
 
+		b.broadcast_batch_to_processes();
 		Matrix *s1 = to_host(b.CURRENT_BATCH);
+		Matrix *B = ones(b.CURRENT_BATCH->cols,20);
+		Matrix *out = empty(b.CURRENT_BATCH->rows, B->cols);
 
 		for(int j = 0; j < b.CURRENT_BATCH->size; j++)
 		{
@@ -265,14 +267,23 @@ int run_batchAllocator_test(ClusterNet gpus)
 			index++;
 		}
 
-
-
+		assert(test_eq(X->ptr_rows[index_rows + b.CURRENT_BATCH->rows] - X->ptr_rows[index_rows],b.CURRENT_BATCH->size,"test sparse batch size"));
+		assert(test_eq((int)(X->ptr_rows[index_rows + b.CURRENT_BATCH->rows] - X->ptr_rows[index_rows])*sizeof(float),(int)b.CURRENT_BATCH->bytes,"test sparse batch bytes"));
+		assert(test_eq((int)(X->ptr_rows[index_rows + b.CURRENT_BATCH->rows] - X->ptr_rows[index_rows])*sizeof(int),(int)b.CURRENT_BATCH->idx_bytes,"test sparse batch bytes"));
+		assert(test_eq((int)(b.CURRENT_BATCH->rows +1)*sizeof(int),(int)b.CURRENT_BATCH->ptr_bytes,"test sparse batch bytes"));
 		for(int j = 0; j < b.CURRENT_BATCH->rows+1; j++)
 		{
 			assert(test_eq(X->ptr_rows[index_rows],s1->ptr_rows[j],"sparse batch allocator data test"));
 			index_rows++;
 		}
 		index_rows--;
+
+
+		MPI_Barrier(MPI_COMM_WORLD);
+		gpus.dot_sparse(b.CURRENT_BATCH, B, out);
+		cout << "myrank: " << gpus.MYRANK << " " << sum(b.CURRENT_BATCH) << endl;
+		//cout << "myrank: " << gpus.MYRANK << " " << sum(out) << endl;
+		MPI_Barrier(MPI_COMM_WORLD);
 
 		b.allocate_next_batch_async();
 		b.replace_current_batch_with_next();
@@ -282,6 +293,80 @@ int run_batchAllocator_test(ClusterNet gpus)
 		cudaFree(s1->idx_cols);
 		cudaFree(s1->ptr_rows);
 		free(s1);
+		cudaFree(B->data);
+		cudaFree(out->data);
+		free(out);
+		free(B);
+	}
+
+	if(gpus.MYGPUID != 0)
+	{
+		X = empty_sparse(1,1,1);
+		y = empty_sparse(1,1,1);
+	}
+
+	b = BatchAllocator();
+	b.init(X,y,0.20,128,256,gpus, Distributed_weights_sparse);
+	assert(test_eq(b.CURRENT_BATCH->rows,128,"sparse distributed batch allocator test"));
+	assert(test_eq(b.CURRENT_BATCH->cols,9000,"sparse distributed batch allocator test"));
+	assert(test_eq(b.CURRENT_BATCH_Y->rows,128,"sparse distributed batch allocator test"));
+	assert(test_eq(b.CURRENT_BATCH_Y->cols,24,"sparse distributed batch allocator test"));
+	assert(test_eq(b.CURRENT_BATCH_CV->rows,256,"sparse distributed batch allocator test"));
+	assert(test_eq(b.CURRENT_BATCH_CV->cols,9000,"sparse distributed batch allocator test"));
+	assert(test_eq(b.CURRENT_BATCH_CV_Y->rows,256,"sparse distributed batch allocator test"));
+	assert(test_eq(b.CURRENT_BATCH_CV_Y->cols,24,"sparse distributed batch allocator test"));
+
+
+	index_rows = 0;
+	index = 0;
+	for(int i = 0; i < b.TOTAL_BATCHES; i++)
+	{
+		Matrix *B = ones(b.CURRENT_BATCH->cols,20);
+		Matrix *out = empty(b.CURRENT_BATCH->rows, B->cols);
+
+		b.broadcast_batch_to_processes();
+		if(gpus.MYGPUID == 0)
+		{
+			Matrix *s1 = to_host(b.CURRENT_BATCH);
+
+			for(int j = 0; j < b.CURRENT_BATCH->size; j++)
+			{
+				assert(test_eq(X->data[index],s1->data[j],"sparse batch allocator data test"));
+				assert(test_eq(X->idx_cols[index],s1->idx_cols[j],"sparse batch allocator data test"));
+				index++;
+			}
+
+			assert(test_eq(X->ptr_rows[index_rows + b.CURRENT_BATCH->rows] - X->ptr_rows[index_rows],b.CURRENT_BATCH->size,"test sparse batch size"));
+			assert(test_eq((int)(X->ptr_rows[index_rows + b.CURRENT_BATCH->rows] - X->ptr_rows[index_rows])*sizeof(float),(int)b.CURRENT_BATCH->bytes,"test sparse batch bytes"));
+			assert(test_eq((int)(X->ptr_rows[index_rows + b.CURRENT_BATCH->rows] - X->ptr_rows[index_rows])*sizeof(int),(int)b.CURRENT_BATCH->idx_bytes,"test sparse batch bytes"));
+			assert(test_eq((int)(b.CURRENT_BATCH->rows +1)*sizeof(int),(int)b.CURRENT_BATCH->ptr_bytes,"test sparse batch bytes"));
+			for(int j = 0; j < b.CURRENT_BATCH->rows+1; j++)
+			{
+				assert(test_eq(X->ptr_rows[index_rows],s1->ptr_rows[j],"sparse batch allocator data test"));
+				index_rows++;
+			}
+			index_rows--;
+
+			cudaFree(s1->data);
+			cudaFree(s1->idx_cols);
+			cudaFree(s1->ptr_rows);
+			free(s1);
+
+		}
+		gpus.dot_sparse(b.CURRENT_BATCH, B, out);
+
+
+		//cout << "myrank: " << gpus.MYRANK << " " << sum(out) << endl;
+		//MPI_Barrier(MPI_COMM_WORLD);
+		ASSERT(sum(out) > -50000 && sum(out) < 50000, "sparse batching sparse dot output test");
+
+		b.allocate_next_batch_async();
+		b.replace_current_batch_with_next();
+
+		cudaFree(B->data);
+		cudaFree(out->data);
+		free(out);
+		free(B);
 	}
 
 

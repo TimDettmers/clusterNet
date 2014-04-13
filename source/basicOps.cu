@@ -5,6 +5,9 @@
 #include <util.cuh>
 #include <cublas_v2.h>
 #include <vector>
+#include <thrust/device_ptr.h>
+#include <thrust/device_vector.h>
+#include <thrust/reduce.h>
 
 Matrix *to_gpu(Matrix *A){ return to_gpu(A, 0); }
 Matrix *to_gpu(Matrix *A, int is_col_major)
@@ -796,15 +799,8 @@ void equal(Matrix *A, Matrix *B, Matrix *out)
 
 float sum(Matrix *A)
 {
-	Matrix *out = empty(1,1);
-	int blocks = (A->size/THREADS_PER_BLOCKS) + 1;
-	kSum<<<blocks,THREADS_PER_BLOCKS>>>(A->data, out->data, A->size);
-	Matrix *host = to_host(out);
-	float out_value = host->data[0];
-	cudaFree(out);
-	free(host->data);
-	free(host);
-	return out_value;
+	thrust::device_ptr<float> ptr(A->data);
+	return thrust::reduce(ptr, ptr+A->size);
 }
 
 int getNonZeroElements(Matrix *A)

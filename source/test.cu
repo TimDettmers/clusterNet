@@ -754,20 +754,43 @@ int main(int argc, char *argv[])
 		//X = read_hdf5("/home/tim/crowdflower_X_dense.hdf5");
 		//y = read_hdf5("/home/tim/crowdflower_y_dense.hdf5");
 	}
-	else
+	MPI_Barrier(MPI_COMM_WORLD);
+
+	if(gpus.MYGPUID == 1)
 	{
-		X = empty_sparse(1,1,1,0);
-		y = empty_sparse(1,10,1,0);
-		test = empty_sparse(1,1,1,0);
+		X = read_sparse_hdf5("/home/tim/crowdflower_X.hdf5");
+		y = read_sparse_hdf5("/home/tim/crowdflower_y.hdf5");
+		//test = read_sparse_hdf5("/home/tim/crowdflower_test.hdf5");
+
+		//X = read_hdf5("/home/tim/mnist_full_X.hdf5");
+		//y = to_host(create_t_matrix(to_gpu(read_hdf5("/home/tim/mnist_full_y.hdf5")),10));
+		//y = read_hdf5("/home/tim/mnist_full_y.hdf5");
+		//test = read_hdf5("/home/tim/mnist_full_X.hdf5");
+
+		//X = read_hdf5("/home/tim/crowdflower_X_dense.hdf5");
+		//y = read_hdf5("/home/tim/crowdflower_y_dense.hdf5");
 	}
+	MPI_Barrier(MPI_COMM_WORLD);
 
+	if(gpus.MYGPUID == 2)
+	{
+		X = read_sparse_hdf5("/home/tim/crowdflower_X.hdf5");
+		y = read_sparse_hdf5("/home/tim/crowdflower_y.hdf5");
+		//test = read_sparse_hdf5("/home/tim/crowdflower_test.hdf5");
 
+		//X = read_hdf5("/home/tim/mnist_full_X.hdf5");
+		//y = to_host(create_t_matrix(to_gpu(read_hdf5("/home/tim/mnist_full_y.hdf5")),10));
+		//y = read_hdf5("/home/tim/mnist_full_y.hdf5");
+		//test = read_hdf5("/home/tim/mnist_full_X.hdf5");
+
+		//X = read_hdf5("/home/tim/crowdflower_X_dense.hdf5");
+		//y = read_hdf5("/home/tim/crowdflower_y_dense.hdf5");
+	}
+	MPI_Barrier(MPI_COMM_WORLD);
 
 
 	b.init(X,y,0.2,128,512,gpus, Distributed_weights_sparse);
-	b.SKIP_LAST_BATCH = true;
 	Matrix *B = gpus.rand(b.CURRENT_BATCH->cols,20);
-	Matrix *out = empty(128,20);
 
 	//cout << sum(b.CURRENT_BATCH) << endl;
 
@@ -782,13 +805,20 @@ int main(int argc, char *argv[])
 		b.allocate_next_batch_async();
 		b.replace_current_batch_with_next();
 
+
+		Matrix *out = empty(b.CURRENT_BATCH->rows,20);
+
+		/*
 		cudaMemGetInfo(&free, &total);
 		cout << "free memory: " << free << endl;
 
 		if (sum(b.CURRENT_BATCH) > 600 || sum(b.CURRENT_BATCH) < 500)
 			cout << "Sum: " << sum(b.CURRENT_BATCH) << endl;
+			*/
 
 		gpus.dot_sparse(b.CURRENT_BATCH,B,out);
+
+		cudaFree(out->data);
 
 
 
