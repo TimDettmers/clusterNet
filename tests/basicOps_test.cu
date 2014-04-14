@@ -487,6 +487,12 @@ int run_basicOps_test()
 	  ASSERT(m1->idx_cols[i] == 0.0f,"empty sparse data");
   }
 
+	//fill_gpuarray test
+	m1 = empty_sparse(10,10,10);
+	fill_gpuarray(m1->ptr_rows,3,m1->rows+1);
+	m1 = to_host(m1);
+	for(int i = 0; i < m1->size; i++)
+		assert(test_eq(m1->ptr_rows[i], 3,"array sub test"));
 
 
 

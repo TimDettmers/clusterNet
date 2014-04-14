@@ -70,8 +70,8 @@ private:
 	 int m_mygpuID;
 	 int m_myrank;
 
-	 int m_sparse_matrix_info_X[5];
-	 int m_sparse_matrix_info_y[5];
+	 int m_sparse_matrix_info_X[6];
+	 int m_sparse_matrix_info_y[6];
 
 	 ClusterNet m_cluster;
 	 MPI_Status m_status;

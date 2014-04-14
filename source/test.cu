@@ -739,7 +739,7 @@ int main(int argc, char *argv[])
 	BatchAllocator b = BatchAllocator();
 	Matrix *X;
 	Matrix *y;
-	Matrix *test;
+	//Matrix *test;
 	if(gpus.MYGPUID == 0)
 	{
 		X = read_sparse_hdf5("/home/tim/crowdflower_X.hdf5");
@@ -796,7 +796,7 @@ int main(int argc, char *argv[])
 
 
 
-	size_t total, free;
+	//size_t total, free;
 	for(int i = 0; i < b.TOTAL_BATCHES; i++)
 	{
 

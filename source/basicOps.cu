@@ -9,6 +9,7 @@
 #include <thrust/device_vector.h>
 #include <thrust/reduce.h>
 #include <thrust/fill.h>
+#include <thrust/transform.h>
 
 Matrix *to_gpu(Matrix *A){ return to_gpu(A, 0); }
 Matrix *to_gpu(Matrix *A, int is_col_major)
@@ -51,6 +52,9 @@ Matrix *to_host(Matrix *A, int is_row_major)
 	  out->data = cpu_data;
 	  out->isDistributed = 0;
 	  out->cols_distributed = 0;
+	  out->isSparse = 0;
+	  out->ptr_bytes = 0;
+	  out->idx_bytes = 0;
   }
   else
   {
@@ -252,8 +256,10 @@ Matrix *empty_sparse(int rows, int cols, int nonzeros)
 
 
 Matrix *empty_pinned_sparse(int rows, int cols, float max_sparsity, float sparsity_buffer)
+{ return empty_pinned_sparse(rows, cols, ceil(rows*cols*(max_sparsity + sparsity_buffer)) + 1); }
+Matrix *empty_pinned_sparse(int rows, int cols, int nonzeros)
 {
-	int elements = ceil(rows*cols*(max_sparsity + sparsity_buffer)) +1;
+	int elements = nonzeros;
 	float *data;
 	int *idx_cols;
 	int *ptr_rows;
@@ -360,7 +366,6 @@ void fill_matrix(Matrix *A, const float fill_value)
 	thrust::device_ptr<float> ptr(A->data);
 	thrust::fill(ptr, ptr + A->size,fill_value);
 }
-
 
 void fill_gpuarray(float *A, const float fill_value, int size)
 {
@@ -510,6 +515,13 @@ Matrix *div(Matrix *A, Matrix *B)
   checkMatrixOperation(A, B, out, 0);
 
   return out;
+}
+
+void printData(Matrix *A)
+{
+	int block_size = (A->size/THREADS_PER_BLOCKS) + 1;
+	kPrintData<<<block_size,THREADS_PER_BLOCKS>>>(A->data, A->size);
+	cudaDeviceSynchronize();
 }
 
 void div(Matrix *A, Matrix *B, Matrix *out)
@@ -914,6 +926,33 @@ void squared_error(Matrix *A, Matrix *targets, Matrix *out)
 {
 	int blocks = (out->size/THREADS_PER_BLOCKS) + 1;
 	kSquaredError<<<blocks,THREADS_PER_BLOCKS>>>(A->data, targets->data, out->data, out->size);
+}
+
+
+void sparse_dot(Matrix *A, Matrix *B, Matrix *out)
+{
+	int m = A->rows,
+	        k = B->cols,
+	        n = A->rows;
+
+	    unsigned int grid_x = m / COPY_BLOCK_SIZE;
+	    if (m % COPY_BLOCK_SIZE)
+	        grid_x++;
+
+	    unsigned int grid_y = n / COPY_BLOCK_SIZE;
+	    if (n % COPY_BLOCK_SIZE)
+	        grid_y++;
+
+	    dim3 grid(grid_y , grid_x , 1);
+	    dim3 threads(COPY_BLOCK_SIZE, COPY_BLOCK_SIZE, 1);
+
+	    kSparseDot<<<grid, threads>>>(m, n, k, A->data,
+	        A->ptr_rows ,
+	        A->idx_cols,
+	        B->data, out->data, 0.0f, 1.0f);
+
+	    cudaDeviceSynchronize();
+
 }
 
 

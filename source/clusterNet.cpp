@@ -260,20 +260,13 @@ void ClusterNet::dot_sparse(Matrix *A, Matrix *B, Matrix *out, cublasOperation_t
 	 cout << "sum out: " << sum(out) << endl;
 	 */
 
-	cout << "pre sparse to dense" << endl;
-	MPI_Barrier(MPI_COMM_WORLD);
-	Matrix *A_dense = sparse_to_dense(A);
-	cout << "post sparse to dense" << endl;
-	MPI_Barrier(MPI_COMM_WORLD);
-	dot(A_dense,B,out,T1,T2);
-	cout << "post dot" << endl;
-	MPI_Barrier(MPI_COMM_WORLD);
-
-	cudaFree(A_dense->data);
-	free(A_dense);
+	//size_t freemem, total;
+	//cudaMemGetInfo(&freemem,&total);
+	//cout << "pre memory: " << freemem << endl;
 
 
-	/*
+
+
 	status = cusparseScsrmm2(m_sparse_handle,
 		T1 == CUBLAS_OP_N ? CUSPARSE_OPERATION_NON_TRANSPOSE : CUSPARSE_OPERATION_TRANSPOSE,
 		T2 == CUBLAS_OP_N ? CUSPARSE_OPERATION_NON_TRANSPOSE : CUSPARSE_OPERATION_TRANSPOSE,
@@ -283,12 +276,18 @@ void ClusterNet::dot_sparse(Matrix *A, Matrix *B, Matrix *out, cublasOperation_t
 		B->data, B->rows,  &beta,
 		out->data, out->rows);
 
+
+	//cudaMemGetInfo(&freemem,&total);
+	//cout << "post memory: " << freemem << endl;
+
+
+
 	if (status != CUSPARSE_STATUS_SUCCESS)
 	{
 		cout << "CUSPARSE ERROR: " << status <<  "!" << endl;
 		throw "CUSPARSE ERROR!";
 	}
-	*/
+
 
 
 }
@@ -328,7 +327,7 @@ void ClusterNet::dot(Matrix *A, Matrix *B, Matrix *out, cublasOperation_t T1, cu
 	 cout << "sum A: " << sum(A) << endl;
 	 cout << "sum B: "  << sum(B) << endl;
 	 cout << "sum out: " << sum(out) << endl;
-	 */
+*/
 
 
 	status = cublasSgemm(m_handle, T1, T2, A_rows, B_cols,

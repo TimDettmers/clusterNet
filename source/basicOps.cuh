@@ -48,6 +48,7 @@ Matrix *empty(int rows, int cols);
 Matrix *empty_pinned(int rows, int cols);
 Matrix *empty_cpu(int rows, int cols);
 Matrix *empty_pinned_sparse(int rows, int cols, float max_sparsity, float sparsity_buffer);
+Matrix *empty_pinned_sparse(int rows, int cols, int nonzeros);
 Matrix *empty_sparse(int rows, int cols, float max_sparsity, float sparsity_buffer);
 Matrix *empty_sparse(int rows, int cols, int nonzeros);
 Matrix *arange(int rows, int cols);
@@ -128,6 +129,7 @@ int blnFaultySizes(Matrix *A, Matrix *B, Matrix *C);
 int blnFaultyMatrixProductSizes(Matrix *A, Matrix *B, Matrix *C);
 void printFaultySizeError(Matrix *A, Matrix *B, Matrix *C);
 void printFaultyMatrixProductSizeError(Matrix *A, Matrix *B, Matrix *C);
+void printData(Matrix *A);
 
 Matrix *slice_rows(Matrix *A, int start, int end);
 Matrix *slice_cols(Matrix *A, int start, int end);
@@ -136,4 +138,6 @@ Matrix *vStack(Matrix *A, Matrix *B);
 void hStack(Matrix *A, Matrix *B, Matrix *out);
 Matrix *hStack(Matrix *A, Matrix *B);
 void hStackN(float** arrA, int general_size, Matrix *out, int matrices_count);
+
+void sparse_dot(Matrix *A, Matrix *B, Matrix *out);
 #endif

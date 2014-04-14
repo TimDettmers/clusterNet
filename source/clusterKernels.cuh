@@ -48,5 +48,7 @@ __global__ void kRectifiedLinear_Derivative(float *A, float *out, int size);
 __global__ void kSquaredError(float *A, float *t, float *out, int size);
 __global__ void kDoubleRectifiedLinear(float* A, float* out, int size);
 __global__ void kDoubleRectifiedLinear_Derivative(float *A, float *out, int size);
+__global__ void kSparseDot(int m, int n, int k, float *data, int* indptr, int* indices, float *dense_data, float* target, float beta, float alpha);
+__global__ void kPrintData(float *A, int size);
 
 #endif

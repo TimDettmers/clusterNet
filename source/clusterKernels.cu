@@ -668,5 +668,89 @@ __global__ void kRMSprop_with_nesterov_weight_update(float *RMS, float *grad, fl
 	  }
 }
 
+__global__ void kSparseDot(int m, int n, int k, float *data, int* indptr, int* indices, float *dense_data, float* target, float beta, float alpha)
+{
+  const unsigned int row = blockIdx.x * blockDim.x + threadIdx.x;
+  const unsigned int col = blockIdx.y * blockDim.y + threadIdx.y;
+
+  if (row < m && col < n)
+  {
+	  /*
+	  for(int i = 0; i < indptr[m+1];i++)
+		  if(indices[i] > 23)
+		  {
+			  printf("ERROR: \n");
+			  printf("%i \n", indices[i]);
+	    	  printf("col: %i \n", col);
+	    	  printf("row: %i \n", row);
+		  }
+		  */
+
+	  int max_idx = indptr[m+1];
+	  for(int i = 0; i < m+1;i++)
+		  if(indptr[i] > max_idx)
+		  {
+			  printf("ERROR: \n");
+			  printf("%i \n", indptr[i]);
+	    	  printf("max_idx: %i \n", max_idx);
+		  }
+
+
+    const int start = indptr[row];
+    const int end = indptr[row + 1];
+    float sum = 0.f;
+    for (int i = start; i < end; i++)
+    {
+    	/*
+    	for(int a = start; a < end;a++)
+    			  if(indices[a] > 23)
+    			  {
+    				  printf("ERROR: \n");
+    				  printf("%i \n", indices[a]);
+    		    	  printf("a: %i \n", a);
+    			  }
+    			  */
+
+
+      sum += data[i]  * dense_data[(col * k) + indices[i]];
+      if(sum > 500000 || sum < -500000)
+      {
+/*
+    	  printf("start: %i ", start);
+    	  printf("end: %i ", end);
+    	  printf("i: %i ", i);
+    	  printf("k: %i ", k);
+    	  printf("col: %i ", col);
+    	  printf("data idx %i ", indices[i]);
+    	  printf("full idx %i ", (col * k) + indices[i]);
+    	  printf("data sparse %f ", data[i]);
+    	  printf("data dense %f ", dense_data[col * k + indices[i]]);
+    	 printf("data point %f ", data[i]  * dense_data[col * k + indices[i]]);
+         printf(" sum %f\n", sum);
+         */
+
+
+         return;
+      }
+    }
+    const int pos = col * m + row;
+    target[pos] = alpha * sum + ((beta == 0) ? 0 : beta * target[pos]);
+  }
+}
+
+__global__ void kPrintData(float *A, int size)
+{
+	const unsigned int numThreads = blockDim.x * gridDim.x;
+	const int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
+	__syncthreads();
+	if(idx == 0)
+		printf("[");
+	for (unsigned int i = idx;i < size; i += numThreads)
+		 printf("%f ",A[i]);
+	__syncthreads();
+	if(idx == 0)
+	printf("]\n");
+}
+
 
 
