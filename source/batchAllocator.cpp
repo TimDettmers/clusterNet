@@ -661,7 +661,6 @@ void BatchAllocator::allocate_next_batch_async()
 		update_next_batch_matrix_info();
 
 
-
 	if(m_mygpuID != 0)
 	{
 		if(BATCH_METHOD != Distributed_weights_sparse)

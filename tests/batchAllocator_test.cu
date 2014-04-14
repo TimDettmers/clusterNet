@@ -307,6 +307,9 @@ int run_batchAllocator_test(ClusterNet gpus)
 		ASSERT(sum(out) > -15000 && sum(out) < 15000, "sparse batching sparse dot output test");
 
 
+		if((i +1) == b.TOTAL_BATCHES)
+			assert(test_eq(b.CURRENT_BATCH->rows,((int)ceil((X->rows*0.8))) % b.BATCH_SIZE,"after all sparse batches test: partial batch size"));
+
 		b.allocate_next_batch_async();
 		b.replace_current_batch_with_next();
 
@@ -320,6 +323,10 @@ int run_batchAllocator_test(ClusterNet gpus)
 		free(out);
 		free(B);
 	}
+
+	assert(test_eq(index_rows+1,((int)ceil((X->rows*0.8))) +1,"after all sparse batches test: rows idx."));
+	assert(test_eq(index_y,y->ptr_rows[((int)ceil((y->rows*0.8))) ],"after all sparse batches test: data idx y"));
+	assert(test_eq(index,X->ptr_rows[((int)ceil((y->rows*0.8)))],"after all sparse batches test: data idx X"));
 
 	if(gpus.MYGPUID != 0)
 	{
@@ -397,6 +404,8 @@ int run_batchAllocator_test(ClusterNet gpus)
 		free(out);
 		free(B);
 	}
+
+
 
   return 0;
 }
