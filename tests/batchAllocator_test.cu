@@ -328,6 +328,87 @@ int run_batchAllocator_test(ClusterNet gpus)
 	assert(test_eq(index_y,y->ptr_rows[((int)ceil((y->rows*0.8))) ],"after all sparse batches test: data idx y"));
 	assert(test_eq(index,X->ptr_rows[((int)ceil((y->rows*0.8)))],"after all sparse batches test: data idx X"));
 
+	for(int i = 0; i < b.TOTAL_BATCHES_CV; i++)
+	{
+
+		Matrix *s1 = to_host(b.CURRENT_BATCH_CV);
+		Matrix *s2 = to_host(b.CURRENT_BATCH_CV_Y);
+		Matrix *B = ones(b.CURRENT_BATCH_CV->cols,20);
+		Matrix *out = zeros(b.CURRENT_BATCH_CV->rows, B->cols);
+
+		b.broadcast_batch_cv_to_processes();
+
+		printmat(b.CURRENT_BATCH_CV,b.CURRENT_BATCH_CV->size-10,b.CURRENT_BATCH_CV->size);
+		MPI_Barrier(MPI_COMM_WORLD);
+
+		cout << i << endl;
+		for(int j = 0; j < b.CURRENT_BATCH_CV->size; j++)
+		{
+			//cout << X->data[index] << " vs. " << s1->data[j] << endl;
+			MPI_Barrier(MPI_COMM_WORLD);
+			assert(test_eq(X->data[index],s1->data[j],"sparse batch allocator data test"));
+			//assert(test_eq(X->idx_cols[index],s1->idx_cols[j],"sparse batch allocator data test"));
+			index++;
+		}
+		/*
+
+		for(int j = 0; j < b.CURRENT_BATCH_CV_Y->size; j++)
+		{
+			assert(test_eq(y->data[index_y],s2->data[j],"sparse batch allocator data test"));
+			assert(test_eq(y->idx_cols[index_y],s2->idx_cols[j],"sparse batch allocator data test"));
+			index_y++;
+		}
+		*/
+		/*
+
+		assert(test_eq(X->ptr_rows[index_rows + b.CURRENT_BATCH->rows] - X->ptr_rows[index_rows],b.CURRENT_BATCH->size,"test sparse batch size"));
+		assert(test_eq((int)(X->ptr_rows[index_rows + b.CURRENT_BATCH->rows] - X->ptr_rows[index_rows])*sizeof(float),(int)b.CURRENT_BATCH->bytes,"test sparse batch bytes"));
+		assert(test_eq((int)b.CURRENT_BATCH->idx_bytes,(int)b.CURRENT_BATCH->bytes,"test sparse batch bytes"));
+		assert(test_eq((int)(X->ptr_rows[index_rows + b.CURRENT_BATCH->rows] - X->ptr_rows[index_rows])*sizeof(int),(int)b.CURRENT_BATCH->idx_bytes,"test sparse batch bytes"));
+		assert(test_eq((int)(b.CURRENT_BATCH->rows +1)*sizeof(int),(int)b.CURRENT_BATCH->ptr_bytes,"test sparse batch bytes"));
+
+		assert(test_eq(y->ptr_rows[index_rows + b.CURRENT_BATCH_Y->rows] - y->ptr_rows[index_rows],b.CURRENT_BATCH_Y->size,"test sparse batch size"));
+		assert(test_eq((int)(y->ptr_rows[index_rows + b.CURRENT_BATCH_Y->rows] - y->ptr_rows[index_rows])*sizeof(float),(int)b.CURRENT_BATCH_Y->bytes,"test sparse batch bytes"));
+		assert(test_eq((int)b.CURRENT_BATCH_Y->idx_bytes,(int)b.CURRENT_BATCH_Y->bytes,"test sparse batch bytes"));
+		assert(test_eq((int)(y->ptr_rows[index_rows + b.CURRENT_BATCH_Y->rows] - y->ptr_rows[index_rows])*sizeof(int),(int)b.CURRENT_BATCH_Y->idx_bytes,"test sparse batch bytes"));
+		assert(test_eq((int)(b.CURRENT_BATCH_Y->rows +1)*sizeof(int),(int)b.CURRENT_BATCH_Y->ptr_bytes,"test sparse batch bytes"));
+
+		for(int j = 0; j < b.CURRENT_BATCH_Y->rows+1; j++)
+		{
+			assert(test_eq(X->ptr_rows[index_rows],s1->ptr_rows[j] + row_ptr_offset,"sparse batch allocator data test"));
+			assert(test_eq(y->ptr_rows[index_rows],s2->ptr_rows[j]+ row_ptr_offset_y,"sparse batch allocator data test"));
+			index_rows++;
+		}
+		index_rows--;
+		row_ptr_offset += b.CURRENT_BATCH->size;
+		row_ptr_offset_y += b.CURRENT_BATCH_Y->size;
+
+		gpus.dot_sparse(b.CURRENT_BATCH, B, out);
+		ASSERT(sum(out) > -15000 && sum(out) < 15000, "sparse batching sparse dot output test");
+
+
+		if((i +1) == b.TOTAL_BATCHES)
+			assert(test_eq(b.CURRENT_BATCH->rows,((int)ceil((X->rows*0.8))) % b.BATCH_SIZE,"after all sparse batches test: partial batch size"));
+		*/
+
+		b.allocate_next_cv_batch_async();
+		b.replace_current_cv_batch_with_next();
+
+
+		cudaFree(s1->data);
+		cudaFree(s1->idx_cols);
+		cudaFree(s1->ptr_rows);
+		free(s1);
+		cudaFree(B->data);
+		cudaFree(out->data);
+		free(out);
+		free(B);
+	}
+
+	assert(test_eq(index_rows+1,((int)ceil((X->rows*0.8))) +1,"after all sparse batches test: rows idx."));
+	assert(test_eq(index_y,y->ptr_rows[((int)ceil((y->rows*0.8))) ],"after all sparse batches test: data idx y"));
+	assert(test_eq(index,X->ptr_rows[((int)ceil((y->rows*0.8)))],"after all sparse batches test: data idx X"));
+
 	if(gpus.MYGPUID != 0)
 	{
 		X = empty_sparse(1,1,1);

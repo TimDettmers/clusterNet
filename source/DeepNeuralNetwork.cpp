@@ -379,10 +379,10 @@ void DeepNeuralNetwork::train_error()
 
 
 	  if((m_BA.BATCH_METHOD == Single_GPU || (m_BA.BATCH_METHOD != Single_GPU && m_gpus.MYRANK == 0)) && m_net_type != Classification)
-		  std::cout << "Train error: " << errors/m_BA.TRAIN_SET_SIZE << std::endl;
+		  std::cout << "Train error: " << errors/m_BA.TRAIN_SET_ROWS << std::endl;
 	  if((m_BA.BATCH_METHOD == Single_GPU || (m_BA.BATCH_METHOD != Single_GPU && m_gpus.MYRANK == 0)) &&
 			  PRINT_MISSCLASSIFICATION)
-		  std::cout << "Train classification error: " << missclassification_error/m_BA.TRAIN_SET_SIZE << std::endl;
+		  std::cout << "Train classification error: " << missclassification_error/m_BA.TRAIN_SET_ROWS << std::endl;
 }
 
 
@@ -405,10 +405,10 @@ void DeepNeuralNetwork::cross_validation_error()
 	 // cout << "Number of errors: " << missclassification_error << endl;
 
 	  if((m_BA.BATCH_METHOD == Single_GPU || (m_BA.BATCH_METHOD != Single_GPU && m_gpus.MYRANK == 0)) && m_net_type != Classification)
-		  std::cout << "Cross validation error: " << errors/m_BA.CV_SET_SIZE << std::endl;
+		  std::cout << "Cross validation error: " << errors/m_BA.CV_SET_ROWS << std::endl;
 	  if((m_BA.BATCH_METHOD == Single_GPU || (m_BA.BATCH_METHOD != Single_GPU && m_gpus.MYRANK == 0)) &&
 			  PRINT_MISSCLASSIFICATION)
-		  std::cout << "Cross validation classification error: " << missclassification_error/m_BA.CV_SET_SIZE << std::endl;
+		  std::cout << "Cross validation classification error: " << missclassification_error/m_BA.CV_SET_ROWS << std::endl;
 }
 
 Matrix* DeepNeuralNetwork::predict(Matrix *X)

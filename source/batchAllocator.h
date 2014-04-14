@@ -32,8 +32,8 @@ public:
 	 int TOTAL_BATCHES_CV;
 	 int BATCH_SIZE;
 	 int BATCH_SIZE_CV;
-	 int TRAIN_SET_SIZE;
-	 int CV_SET_SIZE;
+	 int TRAIN_SET_ROWS;
+	 int CV_SET_ROWS;
 
 	 bool SKIP_LAST_BATCH;
 
@@ -72,6 +72,8 @@ private:
 
 	 int m_sparse_matrix_info_X[6];
 	 int m_sparse_matrix_info_y[6];
+	 int m_sparse_matrix_info_cv_X[6];
+	 int m_sparse_matrix_info_cv_y[6];
 
 	 ClusterNet m_cluster;
 	 MPI_Status m_status;
@@ -96,7 +98,7 @@ private:
 	 void init_batch_buffer();
 	 void init_copy_to_buffer();
 	 void update_next_batch_matrix_info();
-	 void update_next_buffer_matrix_info();
+	 void update_next_cv_batch_matrix_info();
 
 
 };
