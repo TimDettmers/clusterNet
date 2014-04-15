@@ -452,10 +452,6 @@ void BatchAllocator::broadcast_batch_to_processes()
 			m_sparse_matrix_info_X[5] += range;
 
 
-
-
-
-
 			if(m_full_y->isSparse != 1)
 				memcpy(m_next_buffer_y->data,&m_full_y->data[(m_full_y->cols * (m_next_batch_number) * BATCH_SIZE)], copy_range_bytes_y);
 			else
@@ -612,6 +608,7 @@ void BatchAllocator::broadcast_batch_cv_to_processes()
 		copy_range_bytes_X = partial_batch_size*m_Cols_X*sizeof(float);
 		copy_range_bytes_y = partial_batch_size*m_Cols_y*sizeof(float);
 	}
+
 	if(BATCH_METHOD != Distributed_weights_sparse)
 	{
 		if(m_mygpuID == 0)
@@ -644,7 +641,7 @@ void BatchAllocator::broadcast_batch_cv_to_processes()
 	{
 		if(m_mygpuID == 0)
 		{
-			int next_batch_start_index = (m_next_batch_number_cv*BATCH_SIZE) + TRAIN_SET_ROWS;
+			int next_batch_start_index = (m_next_batch_number_cv*BATCH_SIZE_CV) + TRAIN_SET_ROWS;
 			int idx_from = m_full_X->ptr_rows[next_batch_start_index];
 			int idx_to = m_full_X->ptr_rows[next_batch_start_index + partial_batch_size];
 			int range = (idx_to - idx_from);
@@ -654,11 +651,13 @@ void BatchAllocator::broadcast_batch_cv_to_processes()
 			memcpy(&m_next_buffer_cv_X->idx_cols[0],&m_full_X->idx_cols[idx_from],sizeof(int)*range);
 			memcpy(&m_next_buffer_cv_X->ptr_rows[0],&m_full_X->ptr_rows[next_batch_start_index],sizeof(int)*(partial_batch_size + 1));
 
+
 			if(m_next_batch_number_cv == 0)
 				m_sparse_matrix_info_cv_X[5] = m_full_X->ptr_rows[TRAIN_SET_ROWS];
 
 			for(int i = 0; i < partial_batch_size + 1; i++)
 				m_next_buffer_cv_X->ptr_rows[i] -= m_sparse_matrix_info_cv_X[5];
+
 
 			m_sparse_matrix_info_cv_X[0] = range;
 			m_sparse_matrix_info_cv_X[1] = sizeof(float)*range;
@@ -684,7 +683,7 @@ void BatchAllocator::broadcast_batch_cv_to_processes()
 					m_sparse_matrix_info_cv_y[5] = m_full_y->ptr_rows[TRAIN_SET_ROWS];
 
 				for(int i = 0; i < partial_batch_size + 1; i++)
-					m_next_buffer_cv_y->ptr_rows[i] -= m_sparse_matrix_info_y[5];
+					m_next_buffer_cv_y->ptr_rows[i] -= m_sparse_matrix_info_cv_y[5];
 
 				m_sparse_matrix_info_cv_y[0] = range;
 				m_sparse_matrix_info_cv_y[1] = sizeof(float)*range;
@@ -698,9 +697,9 @@ void BatchAllocator::broadcast_batch_cv_to_processes()
 			for(int i = 1; i < m_cluster.PCIe_RANKS.size() && BATCH_METHOD != Single_GPU; i++)
 			{
 				int k = 3*(i-1);
-				MPI_Isend(m_next_buffer_cv_X->data,m_next_buffer_cv_y->size,MPI_FLOAT,m_cluster.PCIe_RANKS[i],999,MPI_COMM_WORLD,&m_requests_send_cv_X[k + 0]);
-				MPI_Isend(m_next_buffer_cv_X->idx_cols,m_next_buffer_cv_y->size,MPI_FLOAT,m_cluster.PCIe_RANKS[i],9991,MPI_COMM_WORLD,&m_requests_send_cv_X[k + 1]);
-				MPI_Isend(m_next_buffer_cv_X->ptr_rows,m_next_buffer_cv_y->rows+1,MPI_FLOAT,m_cluster.PCIe_RANKS[i],9992,MPI_COMM_WORLD,&m_requests_send_cv_X[k + 2]);
+				MPI_Isend(m_next_buffer_cv_X->data,m_next_buffer_cv_X->size,MPI_FLOAT,m_cluster.PCIe_RANKS[i],999,MPI_COMM_WORLD,&m_requests_send_cv_X[k + 0]);
+				MPI_Isend(m_next_buffer_cv_X->idx_cols,m_next_buffer_cv_X->size,MPI_FLOAT,m_cluster.PCIe_RANKS[i],9991,MPI_COMM_WORLD,&m_requests_send_cv_X[k + 1]);
+				MPI_Isend(m_next_buffer_cv_X->ptr_rows,m_next_buffer_cv_X->rows+1,MPI_FLOAT,m_cluster.PCIe_RANKS[i],9992,MPI_COMM_WORLD,&m_requests_send_cv_X[k + 2]);
 
 				if(m_full_y->isSparse != 1)
 					MPI_Isend(m_next_buffer_cv_y->data,m_next_buffer_cv_y->size,MPI_FLOAT,m_cluster.PCIe_RANKS[i],998,MPI_COMM_WORLD,&m_requests_send_cv_y[k]);
@@ -926,10 +925,10 @@ void BatchAllocator::allocate_next_cv_batch_async()
 		}
 	}
 
-	cout << "buffer data: ";
-	for(int i = m_next_buffer_cv_X->size-10; i < m_next_buffer_cv_X->size; i++)
-		cout << m_next_buffer_cv_X->data[i] << " ";
-	cout << endl;
+	//cout << "buffer data: ";
+	//for(int i = m_next_buffer_cv_X->size-10; i < m_next_buffer_cv_X->size; i++)
+		//cout << m_next_buffer_cv_X->data[i] << " ";
+	//cout << endl;
 
 
 	if(BATCH_METHOD != Distributed_weights_sparse)

@@ -338,19 +338,13 @@ int run_batchAllocator_test(ClusterNet gpus)
 
 		b.broadcast_batch_cv_to_processes();
 
-		printmat(b.CURRENT_BATCH_CV,b.CURRENT_BATCH_CV->size-10,b.CURRENT_BATCH_CV->size);
-		MPI_Barrier(MPI_COMM_WORLD);
-
-		cout << i << endl;
 		for(int j = 0; j < b.CURRENT_BATCH_CV->size; j++)
 		{
-			//cout << X->data[index] << " vs. " << s1->data[j] << endl;
-			MPI_Barrier(MPI_COMM_WORLD);
 			assert(test_eq(X->data[index],s1->data[j],"sparse batch allocator data test"));
-			//assert(test_eq(X->idx_cols[index],s1->idx_cols[j],"sparse batch allocator data test"));
+			assert(test_eq(X->idx_cols[index],s1->idx_cols[j],"sparse batch allocator data test"));
 			index++;
 		}
-		/*
+
 
 		for(int j = 0; j < b.CURRENT_BATCH_CV_Y->size; j++)
 		{
@@ -358,38 +352,37 @@ int run_batchAllocator_test(ClusterNet gpus)
 			assert(test_eq(y->idx_cols[index_y],s2->idx_cols[j],"sparse batch allocator data test"));
 			index_y++;
 		}
-		*/
-		/*
 
-		assert(test_eq(X->ptr_rows[index_rows + b.CURRENT_BATCH->rows] - X->ptr_rows[index_rows],b.CURRENT_BATCH->size,"test sparse batch size"));
-		assert(test_eq((int)(X->ptr_rows[index_rows + b.CURRENT_BATCH->rows] - X->ptr_rows[index_rows])*sizeof(float),(int)b.CURRENT_BATCH->bytes,"test sparse batch bytes"));
-		assert(test_eq((int)b.CURRENT_BATCH->idx_bytes,(int)b.CURRENT_BATCH->bytes,"test sparse batch bytes"));
-		assert(test_eq((int)(X->ptr_rows[index_rows + b.CURRENT_BATCH->rows] - X->ptr_rows[index_rows])*sizeof(int),(int)b.CURRENT_BATCH->idx_bytes,"test sparse batch bytes"));
-		assert(test_eq((int)(b.CURRENT_BATCH->rows +1)*sizeof(int),(int)b.CURRENT_BATCH->ptr_bytes,"test sparse batch bytes"));
+		assert(test_eq(X->ptr_rows[index_rows + b.CURRENT_BATCH_CV->rows] - X->ptr_rows[index_rows],b.CURRENT_BATCH_CV->size,"test sparse batch size"));
+		assert(test_eq((int)(X->ptr_rows[index_rows + b.CURRENT_BATCH_CV->rows] - X->ptr_rows[index_rows])*sizeof(float),(int)b.CURRENT_BATCH_CV->bytes,"test sparse batch bytes"));
+		assert(test_eq((int)b.CURRENT_BATCH_CV->idx_bytes,(int)b.CURRENT_BATCH_CV->bytes,"test sparse batch bytes"));
+		assert(test_eq((int)(X->ptr_rows[index_rows + b.CURRENT_BATCH_CV->rows] - X->ptr_rows[index_rows])*sizeof(int),(int)b.CURRENT_BATCH_CV->idx_bytes,"test sparse batch bytes"));
+		assert(test_eq((int)(b.CURRENT_BATCH_CV->rows +1)*sizeof(int),(int)b.CURRENT_BATCH_CV->ptr_bytes,"test sparse batch bytes"));
 
-		assert(test_eq(y->ptr_rows[index_rows + b.CURRENT_BATCH_Y->rows] - y->ptr_rows[index_rows],b.CURRENT_BATCH_Y->size,"test sparse batch size"));
-		assert(test_eq((int)(y->ptr_rows[index_rows + b.CURRENT_BATCH_Y->rows] - y->ptr_rows[index_rows])*sizeof(float),(int)b.CURRENT_BATCH_Y->bytes,"test sparse batch bytes"));
-		assert(test_eq((int)b.CURRENT_BATCH_Y->idx_bytes,(int)b.CURRENT_BATCH_Y->bytes,"test sparse batch bytes"));
-		assert(test_eq((int)(y->ptr_rows[index_rows + b.CURRENT_BATCH_Y->rows] - y->ptr_rows[index_rows])*sizeof(int),(int)b.CURRENT_BATCH_Y->idx_bytes,"test sparse batch bytes"));
-		assert(test_eq((int)(b.CURRENT_BATCH_Y->rows +1)*sizeof(int),(int)b.CURRENT_BATCH_Y->ptr_bytes,"test sparse batch bytes"));
+		assert(test_eq(y->ptr_rows[index_rows + b.CURRENT_BATCH_CV_Y->rows] - y->ptr_rows[index_rows],b.CURRENT_BATCH_CV_Y->size,"test sparse batch size"));
+		assert(test_eq((int)(y->ptr_rows[index_rows + b.CURRENT_BATCH_CV_Y->rows] - y->ptr_rows[index_rows])*sizeof(float),(int)b.CURRENT_BATCH_CV_Y->bytes,"test sparse batch bytes"));
+		assert(test_eq((int)b.CURRENT_BATCH_CV_Y->idx_bytes,(int)b.CURRENT_BATCH_CV_Y->bytes,"test sparse batch bytes"));
+		assert(test_eq((int)(y->ptr_rows[index_rows + b.CURRENT_BATCH_CV_Y->rows] - y->ptr_rows[index_rows])*sizeof(int),(int)b.CURRENT_BATCH_CV_Y->idx_bytes,"test sparse batch bytes"));
+		assert(test_eq((int)(b.CURRENT_BATCH_CV_Y->rows +1)*sizeof(int),(int)b.CURRENT_BATCH_CV_Y->ptr_bytes,"test sparse batch bytes"));
 
-		for(int j = 0; j < b.CURRENT_BATCH_Y->rows+1; j++)
+		for(int j = 0; j < b.CURRENT_BATCH_CV_Y->rows+1; j++)
 		{
 			assert(test_eq(X->ptr_rows[index_rows],s1->ptr_rows[j] + row_ptr_offset,"sparse batch allocator data test"));
 			assert(test_eq(y->ptr_rows[index_rows],s2->ptr_rows[j]+ row_ptr_offset_y,"sparse batch allocator data test"));
 			index_rows++;
 		}
 		index_rows--;
-		row_ptr_offset += b.CURRENT_BATCH->size;
-		row_ptr_offset_y += b.CURRENT_BATCH_Y->size;
-
-		gpus.dot_sparse(b.CURRENT_BATCH, B, out);
-		ASSERT(sum(out) > -15000 && sum(out) < 15000, "sparse batching sparse dot output test");
+		row_ptr_offset += b.CURRENT_BATCH_CV->size;
+		row_ptr_offset_y += b.CURRENT_BATCH_CV_Y->size;
 
 
-		if((i +1) == b.TOTAL_BATCHES)
-			assert(test_eq(b.CURRENT_BATCH->rows,((int)ceil((X->rows*0.8))) % b.BATCH_SIZE,"after all sparse batches test: partial batch size"));
-		*/
+		gpus.dot_sparse(b.CURRENT_BATCH_CV, B, out);
+		ASSERT(sum(out) > -25000 && sum(out) < 25000, "sparse batching sparse dot output test");
+
+
+		if((i +1) == b.TOTAL_BATCHES_CV)
+			assert(test_eq(b.CURRENT_BATCH_CV->rows,(X->rows - (int)ceil((X->rows*0.8))) % b.BATCH_SIZE_CV,"after all sparse batches test: partial batch size"));
+
 
 		b.allocate_next_cv_batch_async();
 		b.replace_current_cv_batch_with_next();
@@ -405,9 +398,9 @@ int run_batchAllocator_test(ClusterNet gpus)
 		free(B);
 	}
 
-	assert(test_eq(index_rows+1,((int)ceil((X->rows*0.8))) +1,"after all sparse batches test: rows idx."));
-	assert(test_eq(index_y,y->ptr_rows[((int)ceil((y->rows*0.8))) ],"after all sparse batches test: data idx y"));
-	assert(test_eq(index,X->ptr_rows[((int)ceil((y->rows*0.8)))],"after all sparse batches test: data idx X"));
+	assert(test_eq(index_rows+1,X->rows  +1,"after all sparse batches test: rows idx."));
+	assert(test_eq(index_y,y->ptr_rows[y->rows ],"after all sparse batches test: data idx y"));
+	assert(test_eq(index,X->ptr_rows[y->rows],"after all sparse batches test: data idx X"));
 
 	if(gpus.MYGPUID != 0)
 	{
