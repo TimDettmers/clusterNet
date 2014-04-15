@@ -246,6 +246,7 @@ void ClusterNet::dot_sparse(Matrix *A, Matrix *B, Matrix *out, cublasOperation_t
 
 
 
+
 	/*
 	 cout << "T1: " << T1 << endl;
 	 cout << "T2: " << T2 << endl;
@@ -258,11 +259,21 @@ void ClusterNet::dot_sparse(Matrix *A, Matrix *B, Matrix *out, cublasOperation_t
 	 cout << "sum A: " << sum(A) << endl;
 	 cout << "sum B: "  << sum(B) << endl;
 	 cout << "sum out: " << sum(out) << endl;
-	 */
+	 MPI_Barrier(MPI_COMM_WORLD);
 
-	//size_t freemem, total;
-	//cudaMemGetInfo(&freemem,&total);
-	//cout << "pre memory: " << freemem << endl;
+
+	size_t freemem, total;
+	cudaMemGetInfo(&freemem,&total);
+	cout << "pre memory: " << freemem << endl;
+	 MPI_Barrier(MPI_COMM_WORLD);
+
+	 Matrix *s1 = to_host(A);
+
+	 cout << "[";
+	 for(int i = 0; i < A->size+1;i++)
+		 cout << s1->data[i] << " ";
+	 cout << "]" << endl;
+	 */
 
 
 
@@ -277,8 +288,11 @@ void ClusterNet::dot_sparse(Matrix *A, Matrix *B, Matrix *out, cublasOperation_t
 		out->data, out->rows);
 
 
-	//cudaMemGetInfo(&freemem,&total);
-	//cout << "post memory: " << freemem << endl;
+	/*
+	cudaMemGetInfo(&freemem,&total);
+	cout << "post memory: " << freemem << endl;
+	 MPI_Barrier(MPI_COMM_WORLD);
+	 */
 
 
 
@@ -295,7 +309,6 @@ void ClusterNet::dot_sparse(Matrix *A, Matrix *B, Matrix *out, cublasOperation_t
 
 void ClusterNet::dot(Matrix *A, Matrix *B, Matrix *out, cublasOperation_t T1, cublasOperation_t T2)
 {
-
 	if(A->isSparse == 0)
 	{
 		//if(checkMatrixOperation(A, B, out, 1) == 1){ throw "Matrix *size error:\n"; }
@@ -318,19 +331,27 @@ void ClusterNet::dot(Matrix *A, Matrix *B, Matrix *out, cublasOperation_t T1, cu
 			B_cols = B->rows;
 
 
+
 		/*
+		 int B_rows = T2 == CUBLAS_OP_T ? B->cols : B->rows;
 		 cout << "T1: " << T1 << endl;
 		 cout << "T2: " << T2 << endl;
 		 cout << "A rows: " << A_rows << endl;
 		 cout << "A cols: " << A_cols << endl;
-		 cout << "B rows: " << B->rows << endl;
+		 cout << "B rows: " << B_rows << endl;
 		 cout << "B cols: " << B_cols << endl;
 		 cout << "out rows: " << out->rows << endl;
 		 cout << "out cols: " << out->cols << endl;
 		 cout << "sum A: " << sum(A) << endl;
 		 cout << "sum B: "  << sum(B) << endl;
 		 cout << "sum out: " << sum(out) << endl;
-	*/
+		 */
+
+		 //MPI_Barrier(MPI_COMM_WORLD);
+
+
+
+
 
 
 		status = cublasSgemm(m_handle, T1, T2, A_rows, B_cols,
@@ -485,6 +506,9 @@ void ClusterNet::dotMPI(Matrix *A, Matrix *B, Matrix *out, bool applyTranspose_A
 			dot(A, B, m_matrixCache[strMatrixName][MYRANK], CUBLAS_OP_N, CUBLAS_OP_N);
 		else
 		{
+			if(A->isSparse == 1)
+				cout << "Sparse distributed dotT is not supported!" << endl;
+			assert(A->isSparse == 0);
 			if (MYRANK == MPI_SIZE - 1)
 				A1 = slice_cols(A, col_split_size * MYRANK,	col_split_size * (MYRANK + 1) - 1 + remainder);
 			else
@@ -631,7 +655,10 @@ Matrix *ClusterNet::dropout(Matrix *A, float dropout_rate)
 	if(A->isSparse == 0)
 		out = rand(A->rows, A->cols);
 	else
-		out = rand(A->size,1);
+	{
+		out = empty_sparse(A->rows,A->cols,A->size);
+		curandGenerateUniform(m_generator, out->data, A->size);
+	}
 	::dropout(A, out, dropout_rate);
 	return out;
 }

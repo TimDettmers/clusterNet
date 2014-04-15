@@ -50,7 +50,6 @@ void DeepNeuralNetwork::init_network_layout(std::vector<int> lLayerSizes)
 
 void DeepNeuralNetwork::init_weights()
 {
-
 	int output_size = m_output_dim;
 	if(m_net_type == Regression)
 		output_size = m_BA.CURRENT_BATCH_Y->cols;
@@ -115,12 +114,14 @@ void DeepNeuralNetwork::init_weights()
 		GRAD.push_back(zeros(m_lLayers.back(),output_size));
 		B_GRAD.push_back(zeros(1,output_size));
 	}
+
 }
 
 void DeepNeuralNetwork::train()
 {
 	//if(OUTPUT_IS_PROBABILITY)
 		//lUnits.back() = Double_Rectified_Linear;
+
 
 	float original_learning_rate = LEARNING_RATE;
 	for(int EPOCH = 0; EPOCH < EPOCHS; EPOCH++)
@@ -145,18 +146,30 @@ void DeepNeuralNetwork::train()
 		{
 		  nesterov_updates();
 		  m_BA.broadcast_batch_to_processes();
+		  cout << "pre feed forward" << endl;
+		  MPI_Barrier(MPI_COMM_WORLD);
 		  feedforward(Dropout);
 
 		  //if(i == 0)
 			//  printmat(Z.back(),1,100);
-		  m_BA.allocate_next_batch_async();
+		  cout << "pre backprop" << endl;
+		  MPI_Barrier(MPI_COMM_WORLD);
+		  if(m_BA.CURRENT_BATCH->isSparse == 0)
+			  m_BA.allocate_next_batch_async();
 		  backprop();
+		  cout << "post backprop" << endl;
+		  MPI_Barrier(MPI_COMM_WORLD);
 
 		  weight_updates();
 		  free_variables();
 
+		  if(m_BA.CURRENT_BATCH->isSparse == 1)
+			  m_BA.allocate_next_batch_async();
 		  m_BA.replace_current_batch_with_next();
 		}
+
+		cout << "pre train and cv calc" << endl;
+		MPI_Barrier(MPI_COMM_WORLD);
 
 		train_error();
 		cross_validation_error();
@@ -180,16 +193,25 @@ void DeepNeuralNetwork::backprop()
 	  }
 	  for(int i = W.size()-1; i > 0; i--)
 	  {
-		  Matrix *bias_activation = m_gpus.distributed_ones(1,E.back()->rows);
+		  Matrix *bias_activation = ones(1,E.back()->rows);
 		  m_gpus.Tdot(Z[i],E.back(),GRAD[i]);
 		  m_gpus.dot(bias_activation,E.back(),B_GRAD[i]);
 		  cudaFree(bias_activation->data);
 		  derivative_function(i, Z[i]);
 		  E.push_back(m_gpus.dotT(E.back(), W[i]));
+		  cout << "sum Z[i]: " << sum(Z[i]) << endl;
 		  mul(E.back(),Z[i],E.back());
 	  }
-	  Matrix *bias_activation = m_gpus.distributed_ones(1,E.back()->rows);
+	  size_t free, total;
+	  cudaMemGetInfo(&free,&total);
+	  cout << free << endl;
+	  Matrix *bias_activation = ones(1,E.back()->rows);
+	  cout << "sum pre: " << sum(bias_activation) << endl;
+	  cout << "sum E.back(): " << sum(E.back()) << endl;
 	  m_gpus.Tdot(Z[0],E.back(),GRAD[0]);
+	  cudaMemGetInfo(&free,&total);
+	  cout << free << endl;
+	  cout << "sum post: " << sum(bias_activation) << endl;
 	  m_gpus.dot(bias_activation,E.back(),B_GRAD[0]);
 	  cudaFree(bias_activation->data);
 
@@ -198,11 +220,31 @@ void DeepNeuralNetwork::backprop()
 void DeepNeuralNetwork::free_variables()
 {
 	  for(int i = 0; i < D.size(); i++)
+	  {
+		  if(D[i]->isSparse == 0)
 			cudaFree(D[i]->data);
+		  else
+		  {
+			  cudaFree(D[i]->data);
+			  cudaFree(D[i]->idx_cols);
+			  cudaFree(D[i]->ptr_rows);
+		  }
+	  }
 	  D.clear();
+
 	  for(int i = 1; i < Z.size(); i++)
+	  {
+		  if(Z[i]->isSparse == 0)
 			cudaFree(Z[i]->data);
+		  else
+		  {
+			  cudaFree(Z[i]->data);
+			  cudaFree(Z[i]->idx_cols);
+			  cudaFree(Z[i]->ptr_rows);
+		  }
+	  }
 	  Z.clear();
+
 	  for(int i = 0; i < E.size(); i++)
 			cudaFree(E[i]->data);
 	  E.clear();
@@ -292,7 +334,10 @@ float DeepNeuralNetwork::get_errors(Batchtype_t batch_t)
 
 	if(m_net_type == Regression)
 	{
-		Matrix *sqrErr = squared_error(Z.back(),batch_t == Train ? m_BA.CURRENT_BATCH_Y : m_BA.CURRENT_BATCH_CV_Y);
+		//Matrix *sqrErr = squared_error(Z.back(),batch_t == Train ? m_BA.CURRENT_BATCH_Y : m_BA.CURRENT_BATCH_CV_Y);
+		Matrix *sqrErr = sub(Z.back(), batch_t == Train ? m_BA.CURRENT_BATCH_Y : m_BA.CURRENT_BATCH_CV_Y);
+		square(sqrErr,sqrErr);
+
 
 		errors = sum(sqrErr);
 		errors /=  m_BA.CURRENT_BATCH_Y->cols;

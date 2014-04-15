@@ -391,6 +391,70 @@ int run_clusterNet_test(ClusterNet gpus)
 		scalarAdd(m1,1.0,m1);
 	}
 
+	m1 = gpus.distributed_zeros(8783,317);
+	scalarAdd(m1,1.0,m1);
+	m2 = gpus.dropout(gpus.rand(111,8783),0.5);
+	m3 = gpus.dropout(gpus.rand(17,317),0.5);
+	m4 = gpus.dropout(gpus.rand(8783,17),0.5);
+	Matrix *s2 = gpus.dense_to_sparse(m2);
+	Matrix *s3 = gpus.dense_to_sparse(m3);
+	Matrix *s4 = gpus.dense_to_sparse(m4);
+	Matrix *sHost;
+	for(int epoch = 0; epoch < 5; epoch++)
+	{
+		//indirect dotMPIs
+		m_host = to_host(gpus.dot(m2,m1));
+		sHost = to_host(gpus.dot(s2,m1));
+		assert(test_matrix(m_host,111,317));
+		for(int i = 0; i < m_host->size; i++)
+		{
+			ASSERT(m_host->data[i] + 0.1 > sHost->data[i] &&
+				   m_host->data[i] - 0.1 < sHost->data[i],"dotMPI test");
+		}
+		/*
+		 * NOT SUPPORTED YET
+		 *
+		m_host = to_host(gpus.dotTMPI(m3,m1));
+		sHost = to_host(gpus.dotT(s3,m1));
+		for(int i = 0; i < m_host->size; i++)
+		{
+			printf("%f vs %f\n",m_host->data[i],sHost->data[i]);
+			ASSERT(m_host->data[i] + 0.1 > sHost->data[i] &&
+				   m_host->data[i] - 0.1 < sHost->data[i],"dotMPI test");
+		}
+		*/
+
+		gpus.dot(m4,m3,m1);
+		m_host = to_host(m1);
+		gpus.dot(s4,m3,m1);
+		sHost = to_host(m1);
+		for(int i = 0; i < m_host->size; i++)
+		{
+			ASSERT(m_host->data[i] + 0.1 > sHost->data[i] &&
+				   m_host->data[i] - 0.1 < sHost->data[i],"dotMPI test");
+		}
+
+		m4 = gpus.dropout(gpus.rand(111,317),0.5);
+		gpus.Tdot(m2,m4,m1);
+		m_host = to_host(m1);
+		gpus.Tdot(s2,m4,m1);
+		sHost = to_host(m1);
+		for(int i = 0; i < m_host->size; i++)
+		{
+			if(0 == (m_host->data[i] + 0.1 > sHost->data[i] &&
+				   m_host->data[i] - 0.1 < sHost->data[i]))
+				printf("%f vs %f\n",m_host->data[i],sHost->data[i]);
+
+			ASSERT(m_host->data[i] + 0.1 > sHost->data[i] &&
+				   m_host->data[i] - 0.1 < sHost->data[i],"dotMPI test");
+		}
+
+		m1 = gpus.distributed_zeros(8783,317);
+		scalarAdd(m1,1.0,m1);
+		m4 = gpus.dropout(gpus.rand(8783,17),0.5);
+		s4 = gpus.dense_to_sparse(m4);
+	}
+
 
 
 	//dropout test

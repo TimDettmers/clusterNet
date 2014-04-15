@@ -789,7 +789,7 @@ int main(int argc, char *argv[])
 	MPI_Barrier(MPI_COMM_WORLD);
 
 
-	b.init(X,y,0.2,128,512,gpus, Distributed_weights_sparse);
+	/*
 	Matrix *B = gpus.rand(b.CURRENT_BATCH->cols,20);
 
 	//cout << sum(b.CURRENT_BATCH) << endl;
@@ -808,32 +808,27 @@ int main(int argc, char *argv[])
 
 		Matrix *out = empty(b.CURRENT_BATCH->rows,20);
 
-		/*
-		cudaMemGetInfo(&free, &total);
-		cout << "free memory: " << free << endl;
 
-		if (sum(b.CURRENT_BATCH) > 600 || sum(b.CURRENT_BATCH) < 500)
-			cout << "Sum: " << sum(b.CURRENT_BATCH) << endl;
-			*/
-
-		gpus.dot_sparse(b.CURRENT_BATCH,B,out);
-
-		cudaFree(out->data);
+*/
 
 
+	Matrix *A = ones(10,10);
+	gpus.dropout(A,0.5);
+	A = gpus.dense_to_sparse(A);
+	Matrix *B = zeros(10,10);
+	Matrix *C = empty(10,10);
+
+	gpus.dot(A,B,C);
+	gpus.dot(A,B,C);
 
 
-	}
+	/*
 
 
-
-
-/*
+	b.init(X,y,0.2,128,512,gpus, Distributed_weights_sparse);
 	std::vector<int> layers;
 	layers.push_back(4000);
 	layers.push_back(4000);
-	b.SKIP_LAST_BATCH = true;
-
 
 	DeepNeuralNetwork net = DeepNeuralNetwork(layers,Regression,gpus,b,24);
 	net.EPOCHS = 4;
@@ -842,17 +837,19 @@ int main(int argc, char *argv[])
 	net.OUTPUT_IS_PROBABILITY = true;
 	//net.PRINT_MISSCLASSIFICATION = true;
 	net.train();
-	out = net.predict(test);
+	//out = net.predict(test);
 
+	/*
 	if(gpus.MYRANK == 0)
 	{
 		Matrix *ids =  read_sparse_hdf5("/home/tim/crowdflower_ids.hdf5");
 		write_csv("/home/tim/crowdflower_result.csv",out,"id,s1,s2,s3,s4,s5,w1,w2,w3,w4,k1,k2,k3,k4,k5,k6,k7,k8,k9,k10,k11,k12,k13,k14,k15",ids);
 	}
-
 */
 
+
 	gpus.shutdown_MPI();
+
 
 
 }

@@ -494,21 +494,37 @@ int run_basicOps_test()
 	for(int i = 0; i < m1->size; i++)
 		assert(test_eq(m1->ptr_rows[i], 3,"fill_gpuarray test"));
 
-
+	//sparse sub test
 	m1 = ones(100,100);
 	m2 = ones(100,100);
 	m1 = gpu.dropout(m1,0.5);
 	Matrix *s1 = gpu.dense_to_sparse(m1);
-	m3 = sub(m2,m1);
+	m3 = sub(m2,s1);
+	m4 = sub(m2,m1);
 	m_host = to_host(m3);
+	m4 = to_host(m4);
 	int count = 0;
 	for(int i = 0; i < m_host->size; i++)
 	{
 		ASSERT(m_host->data[i] == 1.0f || m_host->data[i] == 0.0f, "sub sparse test");
+		assert(test_eq(m_host->data[i], m4->data[i], "sub sparse test"));
 		if(m_host->data[i] == 0.0f)
 			count++;
 	}
 	ASSERT(count > 4500 && count < 5500, "sub sparse test");
+
+
+	m1 = gpu.rand(100,100);
+	m2 = gpu.rand(100,100);
+	m1 = gpu.dropout(m1,0.5);
+	s1 = gpu.dense_to_sparse(m1);
+	m3 = sub(m2,s1);
+	m4 = sub(m2,m1);
+	m_host = to_host(m3);
+	m4 = to_host(m4);
+	for(int i = 0; i < m_host->size; i++)
+		assert(test_eq(m_host->data[i], m4->data[i], "sub sparse test"));
+
 
 
 

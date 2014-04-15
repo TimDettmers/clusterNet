@@ -39,7 +39,7 @@ void run_miniMNIST_test(ClusterNet gpus)
 
 	BatchAllocator b = BatchAllocator();
 	b.init(X, y, 0.2, 32, 64);
-	int epochs  = 11;
+	int epochs  = 12;
 	float learning_rate = 0.003;
 	float momentum = 0.5;
 	for(int EPOCH = 1; EPOCH < epochs; EPOCH++)
@@ -151,8 +151,8 @@ void run_miniMNIST_test(ClusterNet gpus)
 
 	}
 
-	ASSERT(train_error < 0.01f,"mini-MNIST train error 11 epochs < 0.01.");
-	ASSERT(cv_error < 0.22f, "mini-MNIST train error 11 epochs < 0.22.");
+	ASSERT(train_error < 0.01f,"mini-MNIST train error 12 epochs < 0.01.");
+	ASSERT(cv_error < 0.22f, "mini-MNIST train error 12 epochs < 0.22.");
 
 	b.finish_batch_allocator();
 
@@ -319,7 +319,29 @@ void run_miniMNIST_test(ClusterNet gpus)
 	}
 
 
+	if(gpus.MYGPUID == 0)
+	{
+		X = read_sparse_hdf5((path + "crowdflower_X_test.hdf5").c_str());
+		y = read_sparse_hdf5((path + "crowdflower_y_test.hdf5").c_str());
+	}
+	else
+	{
+		X = empty_pinned_sparse(1,1,1);
+		y = empty_pinned_sparse(1,1,1);
+	}
 
+	b = BatchAllocator();
+	b.init(X,y,0.2,128,512,gpus, Distributed_weights_sparse);
+	layers.clear();
+	layers.push_back(400);
+	layers.push_back(400);
+
+	net = DeepNeuralNetwork(layers,Regression,gpus,b,24);
+	net.EPOCHS = 4;
+	net.TRANSITION_EPOCH = 4;
+	net.LEARNING_RATE = 0.0001;
+	net.OUTPUT_IS_PROBABILITY = true;
+	net.train();
 
 
 }

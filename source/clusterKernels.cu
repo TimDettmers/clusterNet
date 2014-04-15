@@ -183,17 +183,20 @@ __global__ void kSub_Sparse(float *A, float *data, int *ptr_rows, int *idx_cols,
   const int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
   int row_idx = 0;
 
+  for (unsigned int i = idx;i < rows*cols; i += numThreads)
+	  out[i] = A[i];
+
   for (unsigned int i = idx;i < size; i += numThreads)
   {
-	  for(int j = 0; j < rows; j++)
+	  for(int j = 0; j < rows + 1; j++)
 	  {
 		  if(ptr_rows[j] > i)
 		  {
 			  row_idx = j-1;
+			  break;
 		  }
 	  }
-
-      out[i] = A[(idx_cols[i] * rows) + row_idx] - data[i];
+      out[(idx_cols[i] * rows) + row_idx] = A[(idx_cols[i] * rows) + row_idx] - data[i];
   }
 }
 

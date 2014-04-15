@@ -355,8 +355,8 @@ Matrix *fill_matrix(int rows, int cols, float fill_value)
  
   Matrix *out = empty(rows, cols);
   
-  int block_size = (out->size/THREADS_PER_BLOCKS) + 1;
-  kFill_with<<<block_size,THREADS_PER_BLOCKS>>>(out->data, fill_value, out->size);
+  thrust::device_ptr<float> ptr(out->data);
+  thrust::fill(ptr, ptr + out->size,fill_value);
  
   return out;
 }
@@ -410,7 +410,6 @@ Matrix *sub(Matrix *A, Matrix *B)
   Matrix *out = empty(A->rows,A->cols);
   sub(A, B, out);
   checkMatrixOperation(A, B, out, 0);
-
   return out;
 }
 
@@ -491,7 +490,7 @@ void sub(Matrix *A, Matrix *B, Matrix *out)
 	if(B->isSparse == 0)
 		kSub<<<block_size,THREADS_PER_BLOCKS>>>(A->data, B->data, out->data, A->size);
 	else
-		kSub_Sparse<<<block_size,THREADS_PER_BLOCKS>>>(A->data, B->data,B->ptr_rows,B->idx_cols,out->data, A->rows,A->cols, A->size);
+		kSub_Sparse<<<block_size,THREADS_PER_BLOCKS>>>(A->data, B->data,B->ptr_rows,B->idx_cols,out->data, A->rows,A->cols, B->size);
 }
 
 Matrix *mul(Matrix *A, Matrix *B)
