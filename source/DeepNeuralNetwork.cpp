@@ -55,7 +55,7 @@ void DeepNeuralNetwork::init_weights()
 	if(m_net_type == Regression)
 		output_size = m_BA.CURRENT_BATCH_Y->cols;
 
-	if(m_BA.BATCH_METHOD == Distributed_weights)
+	if(m_BA.BATCH_METHOD == Distributed_weights || m_BA.BATCH_METHOD == Distributed_weights_sparse)
 	{
 		W.push_back(m_gpus.distributed_uniformSqrtWeight(m_BA.CURRENT_BATCH->cols,m_lLayers[0]));
 		B.push_back(zeros(1,m_lLayers[0]));

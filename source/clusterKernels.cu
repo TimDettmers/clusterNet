@@ -177,6 +177,26 @@ __global__ void kSub(float *A, float *B, float *out, int size)
        out[i] = A[i] - B[i];
 }
 
+__global__ void kSub_Sparse(float *A, float *data, int *ptr_rows, int *idx_cols, float *out, int rows, int cols, int size)
+{
+  const unsigned int numThreads = blockDim.x * gridDim.x;
+  const int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
+  int row_idx = 0;
+
+  for (unsigned int i = idx;i < size; i += numThreads)
+  {
+	  for(int j = 0; j < rows; j++)
+	  {
+		  if(ptr_rows[j] > i)
+		  {
+			  row_idx = j-1;
+		  }
+	  }
+
+      out[i] = A[(idx_cols[i] * rows) + row_idx] - data[i];
+  }
+}
+
 __global__ void kDiv(float *A, float *B, float *out, int size)
 {
   const unsigned int numThreads = blockDim.x * gridDim.x;
@@ -751,6 +771,8 @@ __global__ void kPrintData(float *A, int size)
 	if(idx == 0)
 	printf("]\n");
 }
+
+
 
 
 

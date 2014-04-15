@@ -488,7 +488,10 @@ void sub(Matrix *A, Matrix *B, Matrix *out)
 {
 	checkMatrixOperation(A, B, out, 0);
 	int block_size = (A->size/THREADS_PER_BLOCKS) + 1;
-	kSub<<<block_size,THREADS_PER_BLOCKS>>>(A->data, B->data, out->data, A->size);
+	if(B->isSparse == 0)
+		kSub<<<block_size,THREADS_PER_BLOCKS>>>(A->data, B->data, out->data, A->size);
+	else
+		kSub_Sparse<<<block_size,THREADS_PER_BLOCKS>>>(A->data, B->data,B->ptr_rows,B->idx_cols,out->data, A->rows,A->cols, A->size);
 }
 
 Matrix *mul(Matrix *A, Matrix *B)

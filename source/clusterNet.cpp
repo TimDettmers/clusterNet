@@ -295,52 +295,60 @@ void ClusterNet::dot_sparse(Matrix *A, Matrix *B, Matrix *out, cublasOperation_t
 
 void ClusterNet::dot(Matrix *A, Matrix *B, Matrix *out, cublasOperation_t T1, cublasOperation_t T2)
 {
-	//if(checkMatrixOperation(A, B, out, 1) == 1){ throw "Matrix *size error:\n"; }
-	cublasStatus_t status;
-	if(!m_cublasInitialized)
+
+	if(A->isSparse == 0)
 	{
-		m_cublasInitialized = true;
-		cublasCreate_v2(&m_handle);
+		//if(checkMatrixOperation(A, B, out, 1) == 1){ throw "Matrix *size error:\n"; }
+		cublasStatus_t status;
+		if(!m_cublasInitialized)
+		{
+			m_cublasInitialized = true;
+			cublasCreate_v2(&m_handle);
+		}
+
+		const float alpha = 1.0f;
+		const float beta = 0.0f;
+		int A_rows = A->rows, A_cols = A->cols, B_cols = B->cols;
+		if (T1 == CUBLAS_OP_T)
+		{
+			A_rows = A->cols;
+			A_cols = A->rows;
+		}
+		if (T2 == CUBLAS_OP_T)
+			B_cols = B->rows;
+
+
+		/*
+		 cout << "T1: " << T1 << endl;
+		 cout << "T2: " << T2 << endl;
+		 cout << "A rows: " << A_rows << endl;
+		 cout << "A cols: " << A_cols << endl;
+		 cout << "B rows: " << B->rows << endl;
+		 cout << "B cols: " << B_cols << endl;
+		 cout << "out rows: " << out->rows << endl;
+		 cout << "out cols: " << out->cols << endl;
+		 cout << "sum A: " << sum(A) << endl;
+		 cout << "sum B: "  << sum(B) << endl;
+		 cout << "sum out: " << sum(out) << endl;
+	*/
+
+
+		status = cublasSgemm(m_handle, T1, T2, A_rows, B_cols,
+				A_cols, &alpha, A->data, A->rows, B->data, B->rows, &beta,
+				out->data, out->rows);
+
+		if (status != CUBLAS_STATUS_SUCCESS)
+		{
+			printmat(A,0,1,0,10);
+			printmat(A,A->rows-1,A->rows, A->cols-10,A->cols);
+			std::cout << "CUBLAS ERROR: Status " << status << std::endl;
+			throw "CUBLAS ERROR";
+
+		}
 	}
-
-	const float alpha = 1.0f;
-	const float beta = 0.0f;
-	int A_rows = A->rows, A_cols = A->cols, B_cols = B->cols;
-	if (T1 == CUBLAS_OP_T)
+	else
 	{
-		A_rows = A->cols;
-		A_cols = A->rows;
-	}
-	if (T2 == CUBLAS_OP_T)
-		B_cols = B->rows;
-
-
-	/*
-	 cout << "T1: " << T1 << endl;
-	 cout << "T2: " << T2 << endl;
-	 cout << "A rows: " << A_rows << endl;
-	 cout << "A cols: " << A_cols << endl;
-	 cout << "B rows: " << B->rows << endl;
-	 cout << "B cols: " << B_cols << endl;
-	 cout << "out rows: " << out->rows << endl;
-	 cout << "out cols: " << out->cols << endl;
-	 cout << "sum A: " << sum(A) << endl;
-	 cout << "sum B: "  << sum(B) << endl;
-	 cout << "sum out: " << sum(out) << endl;
-*/
-
-
-	status = cublasSgemm(m_handle, T1, T2, A_rows, B_cols,
-			A_cols, &alpha, A->data, A->rows, B->data, B->rows, &beta,
-			out->data, out->rows);
-
-	if (status != CUBLAS_STATUS_SUCCESS)
-	{
-		printmat(A,0,1,0,10);
-		printmat(A,A->rows-1,A->rows, A->cols-10,A->cols);
-		std::cout << "CUBLAS ERROR: Status " << status << std::endl;
-		throw "CUBLAS ERROR";
-
+		dot_sparse(A,B,out,T1,T2);
 	}
 }
 
@@ -619,7 +627,11 @@ void ClusterNet::tock(std::string name)
 
 Matrix *ClusterNet::dropout(Matrix *A, float dropout_rate)
 {
-	Matrix *out = rand(A->rows, A->cols);
+	Matrix *out;
+	if(A->isSparse == 0)
+		out = rand(A->rows, A->cols);
+	else
+		out = rand(A->size,1);
 	::dropout(A, out, dropout_rate);
 	return out;
 }
