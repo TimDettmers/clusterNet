@@ -131,6 +131,7 @@ int run_clusterNet_test(ClusterNet gpus)
 	//Tdot sparse test
 
 	out = zeros(3,3);
+	assert(out->rows == s1->cols && out->cols == m1->cols);
 	gpu.Tdot_sparse(s1,m1,out);
 	m_host = to_host(out);
 	assert(test_eq(m_host->data[0], 0.0f,"Dot data."));
@@ -145,7 +146,9 @@ int run_clusterNet_test(ClusterNet gpus)
 	assert(test_matrix(m_host,3,3));
 
 	out = zeros(2,2);
-	gpu.Tdot_sparse(gpus.dense_to_sparse(m2),m2,out);
+	Matrix *s5 = gpus.dense_to_sparse(m2);
+	assert(out->rows == s5->cols && out->cols == m2->cols);
+	gpu.Tdot_sparse(s5,m2,out);
 	m_host = to_host(out);
 	assert(test_eq(m_host->data[0], 298.0f,"Dot data."));
 	assert(test_eq(m_host->data[1], 12.0f,"Dot data."));
@@ -396,10 +399,16 @@ int run_clusterNet_test(ClusterNet gpus)
 	m2 = gpus.dropout(gpus.rand(111,8783),0.5);
 	m3 = gpus.dropout(gpus.rand(17,317),0.5);
 	m4 = gpus.dropout(gpus.rand(8783,17),0.5);
+	Matrix *m5 = gpus.dropout(gpus.rand(111,317),0.5);
+
+
 	Matrix *s2 = gpus.dense_to_sparse(m2);
+	gpus.dropout(s2,0.5);
+	m2 = gpus.sparse_to_dense(s2);
 	Matrix *s3 = gpus.dense_to_sparse(m3);
 	Matrix *s4 = gpus.dense_to_sparse(m4);
 	Matrix *sHost;
+	s5 = gpus.dense_to_sparse(m5);
 	for(int epoch = 0; epoch < 5; epoch++)
 	{
 		//indirect dotMPIs
@@ -434,10 +443,9 @@ int run_clusterNet_test(ClusterNet gpus)
 				   m_host->data[i] - 0.1 < sHost->data[i],"dotMPI test");
 		}
 
-		m4 = gpus.dropout(gpus.rand(111,317),0.5);
-		gpus.Tdot(m2,m4,m1);
+		gpus.Tdot(m2,m5,m1);
 		m_host = to_host(m1);
-		gpus.Tdot(s2,m4,m1);
+		gpus.Tdot(s2,m5,m1);
 		sHost = to_host(m1);
 		for(int i = 0; i < m_host->size; i++)
 		{
@@ -568,6 +576,47 @@ int run_clusterNet_test(ClusterNet gpus)
 	}
 	//average should be bigger than 65 (there is a high chance of re-rolling the same number)
 	ASSERT(count/2000.0f > 65.0f,"sparse weight test");
+
+	//Tdot_sparse test for large matricies
+	m1 = gpus.dropout(gpus.rand(128,9000),0.9);
+	s1 = gpus.dense_to_sparse(m1);
+	m2 = gpus.rand(128,100);
+	m3 = empty(9000,100);
+
+	gpus.Tdot(m1,m2,m3);
+	m_host = to_host(m3);
+	gpus.Tdot(s1,m2,m3);
+	sHost = to_host(m3);
+	for(int i = 0; i < sHost->size; i++)
+		ASSERT(m_host->data[i] + 0.1 > sHost->data[i] &&
+			   m_host->data[i] - 0.1 < sHost->data[i],"large matrix sparse Tdot test.");
+
+
+	//sparse to dense equal test
+	m1 = gpus.dropout(gpus.rand(128,9000),0.9);
+	s1 = gpus.dense_to_sparse(m1);
+	assert(test_eq((int)s1->ptr_bytes,(int)129*sizeof(int),"dense to sparse dimension test"));
+	s3 = to_host(gpus.dense_to_sparse(m1));
+	assert(test_eq((int)s3->ptr_bytes,(int)129*sizeof(int),"dense to sparse dimension test"));
+	s4 = to_host(gpus.dense_to_sparse(gpus.sparse_to_dense(s1)));
+	assert(test_eq((int)s4->ptr_bytes,(int)129*sizeof(int),"dense to sparse dimension test"));
+	m2 = to_host(gpus.sparse_to_dense(s1));
+	m1 = to_host(m1);
+
+	for(int i = 0; i < m1->size; i++)
+		assert(test_eq(m1->data[i],m2->data[i],"dense to sparse and back equality."));
+
+	for(int i = 0; i < s3->size; i++)
+	{
+		assert(test_eq(s3->data[i],s4->data[i],"dense to sparse and back equality."));
+		assert(test_eq(s3->idx_cols[i],s4->idx_cols[i],"dense to sparse and back equality."));
+	}
+
+	for(int i = 0; i < s3->rows + 1; i++)
+		assert(test_eq(s3->ptr_rows[i],s4->ptr_rows[i],"dense to sparse and back equality."));
+
+
+
 
 
 	//This should just pass without error

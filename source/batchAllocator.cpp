@@ -289,11 +289,11 @@ void BatchAllocator::init_batch_buffer()
 		m_next_batch_X = empty_sparse(BATCH_SIZE,m_Cols_X,sparsity_X,0.00f);
 		m_next_batch_cv_X = empty_sparse(BATCH_SIZE_CV,m_Cols_X,sparsity_X,0.00f);
 
-		//CURRENT_BATCH = empty_sparse(BATCH_SIZE,m_Cols_X,sparsity_X,0.0f);
-		//CURRENT_BATCH_CV = empty_sparse(BATCH_SIZE_CV,m_Cols_X,sparsity_X,0.0f);
+		CURRENT_BATCH = empty_sparse(BATCH_SIZE,m_Cols_X,sparsity_X,0.0f);
+		CURRENT_BATCH_CV = empty_sparse(BATCH_SIZE_CV,m_Cols_X,sparsity_X,0.0f);
 
-		CURRENT_BATCH = m_next_batch_X;
-		CURRENT_BATCH_CV = m_next_batch_cv_X;
+		//CURRENT_BATCH = m_next_batch_X;
+		//CURRENT_BATCH_CV = m_next_batch_cv_X;
 
 		if(m_full_y->isSparse == 1)
 		{
@@ -304,11 +304,11 @@ void BatchAllocator::init_batch_buffer()
 			m_next_batch_y = empty_sparse(BATCH_SIZE,m_Cols_y, sparsity_y, 0.00f);
 			m_next_batch_cv_y = empty_sparse(BATCH_SIZE_CV,m_Cols_y, sparsity_y, 0.00f);
 
-			//CURRENT_BATCH_Y = empty_sparse(BATCH_SIZE,m_Cols_y, sparsity_y, 0.0f);
-			//CURRENT_BATCH_CV_Y = empty_sparse(BATCH_SIZE_CV,m_Cols_y, sparsity_y, 0.0f);
+			CURRENT_BATCH_Y = empty_sparse(BATCH_SIZE,m_Cols_y, sparsity_y, 0.0f);
+			CURRENT_BATCH_CV_Y = empty_sparse(BATCH_SIZE_CV,m_Cols_y, sparsity_y, 0.0f);
 
-			CURRENT_BATCH_Y = m_next_batch_y;
-			CURRENT_BATCH_CV_Y = m_next_batch_cv_y;
+			//CURRENT_BATCH_Y = m_next_batch_y;
+			//CURRENT_BATCH_CV_Y = m_next_batch_cv_y;
 		}
 		else
 		{
@@ -973,6 +973,46 @@ void BatchAllocator::replace_current_batch_with_next()
 		to_col_major(m_next_batch_X, CURRENT_BATCH);
 		to_col_major(m_next_batch_y, CURRENT_BATCH_Y);
 	}
+	else
+	{
+
+
+		/*
+		Matrix *A = m_cluster.sparse_to_dense(m_next_batch_X);
+
+		CURRENT_BATCH = m_cluster.dense_to_sparse(A);
+
+		cudaFree(A->data);
+		free(A);
+
+		*/
+
+		cudaFree(CURRENT_BATCH->data);
+		cudaFree(CURRENT_BATCH->ptr_rows);
+		cudaFree(CURRENT_BATCH->idx_cols);
+		free(CURRENT_BATCH);
+
+		CURRENT_BATCH = empty_sparse(m_next_batch_X->rows,m_next_batch_X->cols,m_next_batch_X->size);
+		cudaMemcpy(CURRENT_BATCH->data,m_next_batch_X->data,CURRENT_BATCH->bytes,cudaMemcpyDefault);
+		cudaMemcpy(CURRENT_BATCH->idx_cols,m_next_batch_X->idx_cols,CURRENT_BATCH->idx_bytes,cudaMemcpyDefault);
+		cudaMemcpy(CURRENT_BATCH->ptr_rows,m_next_batch_X->ptr_rows,CURRENT_BATCH->ptr_bytes,cudaMemcpyDefault);
+
+
+		if(m_full_y->isSparse == 0)
+			to_col_major(m_next_batch_y, CURRENT_BATCH_Y);
+		else
+		{
+			cudaFree(CURRENT_BATCH_Y->data);
+			cudaFree(CURRENT_BATCH_Y->ptr_rows);
+			cudaFree(CURRENT_BATCH_Y->idx_cols);
+			free(CURRENT_BATCH_Y);
+
+			CURRENT_BATCH_Y = empty_sparse(m_next_batch_y->rows,m_next_batch_y->cols,m_next_batch_y->size);
+			cudaMemcpy(CURRENT_BATCH_Y->data,m_next_batch_y->data,CURRENT_BATCH_Y->bytes,cudaMemcpyDefault);
+			cudaMemcpy(CURRENT_BATCH_Y->idx_cols,m_next_batch_y->idx_cols,CURRENT_BATCH_Y->idx_bytes,cudaMemcpyDefault);
+			cudaMemcpy(CURRENT_BATCH_Y->ptr_rows,m_next_batch_y->ptr_rows,CURRENT_BATCH_Y->ptr_bytes,cudaMemcpyDefault);
+		}
+	}
 
 	m_next_batch_number += 1;
 
@@ -1010,6 +1050,33 @@ void BatchAllocator::replace_current_cv_batch_with_next()
 	{
 		to_col_major(m_next_batch_cv_X,CURRENT_BATCH_CV);
 		to_col_major(m_next_batch_cv_y,CURRENT_BATCH_CV_Y);
+	}
+	else
+	{
+		cudaFree(CURRENT_BATCH_CV->data);
+		cudaFree(CURRENT_BATCH_CV->ptr_rows);
+		cudaFree(CURRENT_BATCH_CV->idx_cols);
+		free(CURRENT_BATCH_CV);
+
+		CURRENT_BATCH_CV = empty_sparse(m_next_batch_cv_X->rows,m_next_batch_cv_X->cols,m_next_batch_cv_X->size);
+		cudaMemcpy(CURRENT_BATCH_CV->data,m_next_batch_cv_X->data,CURRENT_BATCH_CV->bytes,cudaMemcpyDefault);
+		cudaMemcpy(CURRENT_BATCH_CV->idx_cols,m_next_batch_cv_X->idx_cols,CURRENT_BATCH_CV->idx_bytes,cudaMemcpyDefault);
+		cudaMemcpy(CURRENT_BATCH_CV->ptr_rows,m_next_batch_cv_X->ptr_rows,CURRENT_BATCH_CV->ptr_bytes,cudaMemcpyDefault);
+
+		if(m_full_y->isSparse == 0)
+			to_col_major(m_next_batch_y, CURRENT_BATCH_Y);
+		else
+		{
+			cudaFree(CURRENT_BATCH_CV_Y->data);
+			cudaFree(CURRENT_BATCH_CV_Y->ptr_rows);
+			cudaFree(CURRENT_BATCH_CV_Y->idx_cols);
+			free(CURRENT_BATCH_CV_Y);
+
+			CURRENT_BATCH_CV_Y = empty_sparse(m_next_batch_cv_y->rows,m_next_batch_cv_y->cols,m_next_batch_cv_y->size);
+			cudaMemcpy(CURRENT_BATCH_CV_Y->data,m_next_batch_cv_y->data,CURRENT_BATCH_CV_Y->bytes,cudaMemcpyDefault);
+			cudaMemcpy(CURRENT_BATCH_CV_Y->idx_cols,m_next_batch_cv_y->idx_cols,CURRENT_BATCH_CV_Y->idx_bytes,cudaMemcpyDefault);
+			cudaMemcpy(CURRENT_BATCH_CV_Y->ptr_rows,m_next_batch_cv_y->ptr_rows,CURRENT_BATCH_CV_Y->ptr_bytes,cudaMemcpyDefault);
+		}
 	}
 
 	m_next_batch_number_cv += 1;

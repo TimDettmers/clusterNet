@@ -382,7 +382,6 @@ int run_batchAllocator_test(ClusterNet gpus)
 			row_ptr_offset += b.CURRENT_BATCH_CV->size;
 			row_ptr_offset_y += b.CURRENT_BATCH_CV_Y->size;
 
-
 			gpus.dot_sparse(b.CURRENT_BATCH_CV, B, out);
 			ASSERT(sum(out) > -25000 && sum(out) < 25000, "sparse batching sparse dot output test");
 
@@ -437,14 +436,33 @@ int run_batchAllocator_test(ClusterNet gpus)
 		row_ptr_offset_y = 0;
 		for(int i = 0; i < b.TOTAL_BATCHES; i++)
 		{
-			Matrix *B = ones(b.CURRENT_BATCH_Y->cols,20);
-			Matrix *out = zeros(b.CURRENT_BATCH_Y->rows, B->cols);
+			Matrix *B = ones(b.CURRENT_BATCH->rows,20);
+			Matrix *out = zeros(b.CURRENT_BATCH->cols, B->cols);
 
 			b.broadcast_batch_to_processes();
 			if(gpus.MYGPUID == 0)
 			{
 				Matrix *s1 = to_host(b.CURRENT_BATCH);
 				Matrix *s2 = to_host(b.CURRENT_BATCH_Y);
+
+				Matrix *m3 = gpus.sparse_to_dense(b.CURRENT_BATCH);
+				Matrix *s3 = to_host((gpus.dense_to_sparse(m3)));
+
+
+				//cout << sum(m3) << " vs " << sum(s3) << endl;
+
+
+				for(int i = 0; i < s3->size; i++)
+				{
+					cout << s1->idx_cols[i] << " vs " << s3->idx_cols[i] << endl;
+					//assert(test_eq(s1->data[i],s3->data[i],"dense to sparse and back equality."));
+					//assert(test_eq(s1->idx_cols[i],s3->idx_cols[i],"dense to sparse and back equality."));
+				}
+
+				cout << "size: " << s1->size << endl;
+				for(int i = 0; i < s3->rows+1; i++)
+					cout << s1->ptr_rows[i] << " vs " << s3->ptr_rows[i] << endl;
+					//assert(test_eq(s1->ptr_rows[i],s3->ptr_rows[i],"dense to sparse and back equality."));
 
 				for(int j = 0; j < b.CURRENT_BATCH->size; j++)
 				{
@@ -485,8 +503,11 @@ int run_batchAllocator_test(ClusterNet gpus)
 				free(s2);
 			}
 
-			gpus.dot_sparse(b.CURRENT_BATCH_Y, B, out);
-			ASSERT(sum(out) > -3000 && sum(out) < 3000, "sparse batching sparse dot output test");
+			cout << "pre Tdot" << endl;
+			gpus.Tdot_sparse(b.CURRENT_BATCH, B, out);
+			cout << "post Tdot" << endl;
+			cout << sum(out) << endl;
+			//ASSERT(sum(out) > -3000 && sum(out) < 3000, "sparse batching sparse dot output test");
 
 			b.allocate_next_batch_async();
 			b.replace_current_batch_with_next();

@@ -738,7 +738,7 @@ __global__ void kSparseDot(int m, int n, int k, float *data, int* indptr, int* i
       sum += data[i]  * dense_data[(col * k) + indices[i]];
       if(sum > 500000 || sum < -500000)
       {
-/*
+
     	  printf("start: %i ", start);
     	  printf("end: %i ", end);
     	  printf("i: %i ", i);
@@ -750,7 +750,7 @@ __global__ void kSparseDot(int m, int n, int k, float *data, int* indptr, int* i
     	  printf("data dense %f ", dense_data[col * k + indices[i]]);
     	 printf("data point %f ", data[i]  * dense_data[col * k + indices[i]]);
          printf(" sum %f\n", sum);
-         */
+
 
 
          return;

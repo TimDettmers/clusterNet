@@ -167,7 +167,7 @@ Matrix *ClusterNet::dot(Matrix *A, Matrix *B)
 Matrix *ClusterNet::Tdot(Matrix *A, Matrix *B)
 {
 	Matrix *out;
-	if(B->isDistributed == 1)
+	if(B->isDistributed == 1 || out->isDistributed == 1)
 	{
 		out = TdotMPI(A,B);
 	}
@@ -246,34 +246,36 @@ void ClusterNet::dot_sparse(Matrix *A, Matrix *B, Matrix *out, cublasOperation_t
 
 
 
-
-	/*
-	 cout << "T1: " << T1 << endl;
-	 cout << "T2: " << T2 << endl;
-	 cout << "A rows: " << A->rows << endl;
-	 cout << "A cols: " << A->cols << endl;
-	 cout << "B rows: " << B->rows << endl;
-	 cout << "B cols: " << B_cols << endl;
-	 cout << "out rows: " << out->rows << endl;
-	 cout << "out cols: " << out->cols << endl;
-	 cout << "sum A: " << sum(A) << endl;
-	 cout << "sum B: "  << sum(B) << endl;
-	 cout << "sum out: " << sum(out) << endl;
-	 MPI_Barrier(MPI_COMM_WORLD);
+	 /*
+		 if(out->rows == 9000 && out->cols == 100)
+		 {
 
 
-	size_t freemem, total;
-	cudaMemGetInfo(&freemem,&total);
-	cout << "pre memory: " << freemem << endl;
-	 MPI_Barrier(MPI_COMM_WORLD);
+			 Matrix *s1 = sparse_to_dense(A);
+			 s1 = to_host(dense_to_sparse(s1));
+			 Matrix *s2 = to_host(s1);
 
-	 Matrix *s1 = to_host(A);
+			 for(int i = 0; i < s1->size; i++)
+			 {
+				 ASSERT(s1->data[i] ==s2->data[i],"test");
+				 ASSERT(s1->idx_cols[i] ==s2->idx_cols[i],"test");
+			 }
 
-	 cout << "[";
-	 for(int i = 0; i < A->size+1;i++)
-		 cout << s1->data[i] << " ";
-	 cout << "]" << endl;
-	 */
+			 for(int i = 0; i < s1->rows+1; i++)
+				 ASSERT(s1->ptr_rows[i] == s2->ptr_rows[i],"test");
+				//B = zeros(B->rows,B->cols);
+				//out = zeros(out->rows,out->cols);
+
+
+			 cout << "bytes: " << A->bytes << " vs " << s1->bytes << endl;
+			 cout << "bytes 2: " << A->ptr_bytes << " vs " << s1->ptr_bytes << endl;
+			 cout << "bytes 3: " << A->idx_bytes << " vs " << s1->idx_bytes << endl;
+			 cout << "size: " << A->size << " vs " << s1->size << endl;
+
+
+
+		 }
+		 */
 
 
 
@@ -288,11 +290,24 @@ void ClusterNet::dot_sparse(Matrix *A, Matrix *B, Matrix *out, cublasOperation_t
 		out->data, out->rows);
 
 
+
 	/*
-	cudaMemGetInfo(&freemem,&total);
-	cout << "post memory: " << freemem << endl;
-	 MPI_Barrier(MPI_COMM_WORLD);
-	 */
+		 cout << "T1: " << T1 << endl;
+		 cout << "T2: " << T2 << endl;
+		 cout << "A rows: " << A->rows << endl;
+		 cout << "A cols: " << A->cols << endl;
+		 cout << "B rows: " << B->rows << endl;
+		 cout << "B cols: " << B_cols << endl;
+		 cout << "out rows: " << out->rows << endl;
+		 cout << "out cols: " << out->cols << endl;
+		 cout << "A distributed: " << A->isDistributed << endl;
+		 cout << "B distributed: " << B->isDistributed << endl;
+		 cout << "out distributed: " << out->isDistributed << endl;
+
+		 cout << "sum A: " << sum(A) << endl;
+		 cout << "sum B: "  << sum(B) << endl;
+		 cout << "sum out: " << sum(out) << endl;
+		 */
 
 
 
@@ -402,7 +417,7 @@ void ClusterNet::dotMPI(Matrix *A, Matrix *B, Matrix *out, bool applyTranspose_A
 	int remainder = (B->isDistributed == 1 ? B->cols_distributed : B->cols) - (col_split_size*MPI_SIZE);
 	std::string strMatrixName = SSTR(A->rows) + "x" + SSTR(A->cols) + " * " +
 								SSTR(B->rows) + SSTR((B->isDistributed == 1 ? B->cols_distributed : B->cols)) +
-								"T" + SSTR((applyTranspose_B ? 1 : 0));
+								"T" + SSTR((applyTranspose_B ? 1 : 0)) + " Sparse: "  + SSTR((A->isSparse == 1 ? 1 : 0));
 
 	if(out->isDistributed == 0)
 	{
@@ -823,3 +838,4 @@ Matrix *ClusterNet::sparse_to_dense(Matrix *A)
 
 	return out;
 }
+

@@ -39,7 +39,7 @@ void run_miniMNIST_test(ClusterNet gpus)
 
 	BatchAllocator b = BatchAllocator();
 	b.init(X, y, 0.2, 32, 64);
-	int epochs  = 12;
+	int epochs  = 15;
 	float learning_rate = 0.003;
 	float momentum = 0.5;
 	for(int EPOCH = 1; EPOCH < epochs; EPOCH++)
@@ -151,8 +151,8 @@ void run_miniMNIST_test(ClusterNet gpus)
 
 	}
 
-	ASSERT(train_error < 0.01f,"mini-MNIST train error 12 epochs < 0.01.");
-	ASSERT(cv_error < 0.22f, "mini-MNIST train error 12 epochs < 0.22.");
+	ASSERT(train_error < 0.01f,"mini-MNIST train error 14 epochs < 0.01.");
+	ASSERT(cv_error < 0.22f, "mini-MNIST train error 14 epochs < 0.22.");
 
 	b.finish_batch_allocator();
 
@@ -280,8 +280,8 @@ void run_miniMNIST_test(ClusterNet gpus)
 	}
 
 
-	ASSERT(train_error < 0.01f,"mini-MNIST train error 11 epochs < 0.01.");
-	ASSERT(cv_error < 0.22f, "mini-MNIST train error 11 epochs < 0.22.");
+	ASSERT(train_error < 0.01f,"mini-MNIST train error 14 epochs < 0.01.");
+	ASSERT(cv_error < 0.22f, "mini-MNIST train error 14 epochs < 0.22.");
 
 	b_dist.finish_batch_allocator();
 

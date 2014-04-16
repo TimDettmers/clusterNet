@@ -202,16 +202,14 @@ void DeepNeuralNetwork::backprop()
 		  cout << "sum Z[i]: " << sum(Z[i]) << endl;
 		  mul(E.back(),Z[i],E.back());
 	  }
-	  size_t free, total;
-	  cudaMemGetInfo(&free,&total);
-	  cout << free << endl;
 	  Matrix *bias_activation = ones(1,E.back()->rows);
 	  cout << "sum pre: " << sum(bias_activation) << endl;
-	  cout << "sum E.back(): " << sum(E.back()) << endl;
-	  m_gpus.Tdot(Z[0],E.back(),GRAD[0]);
-	  cudaMemGetInfo(&free,&total);
-	  cout << free << endl;
-	  cout << "sum post: " << sum(bias_activation) << endl;
+	  cout << m_BA.CURRENT_BATCH->cols << " vs " << GRAD[0]->rows << endl;
+	  cout << E.back()->cols << " vs " << GRAD[0]->cols << endl;
+	  m_gpus.Tdot(m_BA.CURRENT_BATCH,E.back(),GRAD[0]);
+	  size_t free, total;
+	  cudaMemGetInfo(&free, &total);
+	  cout << "memory: " << free << endl;
 	  m_gpus.dot(bias_activation,E.back(),B_GRAD[0]);
 	  cudaFree(bias_activation->data);
 
@@ -277,13 +275,48 @@ void DeepNeuralNetwork::feedforward(FeedForward_t ff)
 	if(ff == Dropout)
 	{
 		Z.push_back(m_BA.CURRENT_BATCH);
+
+
+		Matrix *m2 = m_gpus.rand(Z.back()->cols, 100);
+		Matrix *out2 = empty(m_BA.CURRENT_BATCH->rows,100);
+		cout << "DOT TEST NORMAL" << endl;
+		m_gpus.dot(Z.back(),m2,out2);
+		cout << "POST DOT TEST NORMAL" << endl;
+
+
+		Matrix *rogue_copy = m_gpus.rand(Z.back()->rows,Z.back()->cols);
+		Matrix *m1 = m_gpus.rand(Z.back()->rows, 100);
+		Matrix *out = empty(m_BA.CURRENT_BATCH->cols,100);
+		cout << "DOT TEST" << endl;
+		printf("%ix%i vs %ix%i\n",out->rows,out->cols,Z.back()->cols,m1->cols);
+		printf("%ix%i\n",Z.back()->rows,m1->rows);
+		m_gpus.Tdot(rogue_copy,m1,out);
+		cout << "POST rogue dot TEST" << endl;
+
+		size_t free, total;
+		cudaMemGetInfo(&free, &total);
+		cout << "free mem post dot test: " << free << endl;
+
+		m_gpus.Tdot(Z.back(),m1,out);
+		cout << "POST DOT TEST" << endl;
+
+		cudaMemGetInfo(&free, &total);
+		cout << "free mem post dot test: " << free << endl;
+
 		for(int i = 0; i < W.size(); i++)
 		{
+		  //D.push_back(Z.back());
 		  D.push_back(m_gpus.dropout(Z.back(),lDropout[i]));
 		  Z.push_back(m_gpus.dot(D.back(), W[i]));
 		  addMatrixVector(Z.back(),B[i],Z.back());
 		  activation_function(i, Z.back());
 		}
+/*
+		cout << "DOT TEST2" << endl;
+		m_gpus.Tdot(Z.back(),m1,out);
+		cout << "POST DOT TEST2" << endl;
+		*/
+
 	}
 	else
 	{
