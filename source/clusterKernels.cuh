@@ -51,5 +51,7 @@ __global__ void kDoubleRectifiedLinear(float* A, float* out, int size);
 __global__ void kDoubleRectifiedLinear_Derivative(float *A, float *out, int size);
 __global__ void kSparseDot(int m, int n, int k, float *data, int* indptr, int* indices, float *dense_data, float* target, float beta, float alpha);
 __global__ void kPrintData(float *A, int size);
+__global__ void kHardTanH(float *A, float *out, int size);
+__global__ void kHardTanH_Derivative(float *A, float *out, int size);
 
 #endif

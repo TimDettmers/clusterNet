@@ -212,6 +212,7 @@ int run_batchAllocator_test(ClusterNet gpus)
 	replace(path,"/build/testSuite.out","/tests/");
 
 
+	/*
 	Matrix *X;
 	Matrix *y;
 
@@ -592,9 +593,10 @@ int run_batchAllocator_test(ClusterNet gpus)
 			cudaFree(out->data);
 			free(out);
 			free(B);
+
 		}
 	}
-
+*/
 
 
   return 0;

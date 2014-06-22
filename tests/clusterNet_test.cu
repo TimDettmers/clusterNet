@@ -224,7 +224,7 @@ int run_clusterNet_test(ClusterNet gpus)
 	}
 
 	//test normal random
-	r1 = gpu.randn(100,100);
+	r1 = gpu.randn(100,479);
 	m_host = to_host(r1);
 	upper = 0;
 	lower = 0;
@@ -244,6 +244,7 @@ int run_clusterNet_test(ClusterNet gpus)
 	if((m_host->data[i] < 1) && (m_host->data[i] > -1))
 	   middle++;
 	}
+	//printmat(r1);
 	//a z-score of greater than 1.96 should only occur with 2.5% probability
 	assert(upper < r1->size*0.04);
 	assert(lower < r1->size*0.04);
@@ -251,10 +252,7 @@ int run_clusterNet_test(ClusterNet gpus)
 	assert((middle > r1->size*0.65) && (middle < r1->size*0.70));
 	//if there are more than 1% zeros then there is something fishy
 	assert(zeros < r1->size*0.01);
-	assert(m_host->rows==100);
-	assert(m_host->cols==100);
-	assert(m_host->size==100*100);
-	assert(m_host->bytes==r1->size*sizeof(float));
+	assert(test_matrix(m_host,100,479));
 
 	//dotMPI test
 

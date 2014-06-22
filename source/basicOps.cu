@@ -645,6 +645,20 @@ void doubleRectifiedLinear(Matrix *A, Matrix *out)
   kDoubleRectifiedLinear<<<block_size,THREADS_PER_BLOCKS>>>(A->data, out->data, A->size);
 }
 
+Matrix *hardTanH(Matrix *A)
+{
+  Matrix *out = empty(A->rows,A->cols);
+  hardTanH(A, out);
+
+  return out;
+}
+
+void hardTanH(Matrix *A, Matrix *out)
+{
+  int block_size = (A->size/THREADS_PER_BLOCKS) + 1;
+  kHardTanH<<<block_size,THREADS_PER_BLOCKS>>>(A->data, out->data, A->size);
+}
+
 Matrix *square(Matrix *A)
 {
   Matrix *out = empty(A->rows,A->cols);
@@ -916,6 +930,18 @@ void double_rectified_linear_derivative(Matrix *A, Matrix *out)
 {
 	int blocks = (out->size/THREADS_PER_BLOCKS) + 1;
 	kDoubleRectifiedLinear_Derivative<<<blocks,THREADS_PER_BLOCKS>>>(A->data, out->data, out->size);
+}
+
+Matrix *hardTanH_derivative(Matrix *A)
+{
+	Matrix *out = empty(A->rows,A->cols);
+	hardTanH_derivative(A,out);
+	return out;
+}
+void hardTanH_derivative(Matrix *A, Matrix *out)
+{
+	int blocks = (out->size/THREADS_PER_BLOCKS) + 1;
+	kHardTanH_Derivative<<<blocks,THREADS_PER_BLOCKS>>>(A->data, out->data, out->size);
 }
 
 Matrix *squared_error(Matrix *A, Matrix *targets)

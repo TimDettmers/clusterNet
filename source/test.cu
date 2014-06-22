@@ -735,6 +735,46 @@ void dotMPI_test(int argc, char *argv[])
 
 int main(int argc, char *argv[])
 {
+	ClusterNet gpus = ClusterNet(argc,argv, 1245);
+	BatchAllocator b = BatchAllocator();
+	if(gpus.MYGPUID == 0)
+	{
+		Matrix *X = read_hdf5("/home/tim/data/higgs/X_bootstrap.hdf5");
+		Matrix *y = read_hdf5("/home/tim/data/higgs/y_bootstrap.hdf5");
+		Matrix *test = read_hdf5("/home/tim/data/higgs/test.hdf5");
+		Matrix *ids = read_hdf5("/home/tim/data/higgs/ids.hdf5");
+
+		b.init(X,y,0.2,128,512);
+
+		std::vector<int> layers;
+		//layers.push_back(1000);
+		//layers.push_back(1000);
+		layers.push_back(500);
+
+		cout << X->rows << "x" << X->cols << endl;
+		cout << y->rows << "x" << y->cols << endl;
+		cout << test->rows << "x" << test->cols << endl;
+		cout << ids->rows << "x" << ids->cols << endl;
+
+
+
+
+		BatchAllocator allocator = BatchAllocator();
+		allocator.init(X,y,0.2,128,512,gpus, Single_GPU);
+		DeepNeuralNetwork net = DeepNeuralNetwork(layers,Classification, gpus, allocator, 2);
+		net.LEARNING_RATE = 0.0003;
+		net.EPOCHS = 500;
+		net.TRANSITION_EPOCH = 500;
+		net.train();
+
+		Matrix *result = net.predict(test);
+
+		write_csv("/home/tim/data/higgs/result.csv",result,"EventId,RankOrder,Class",ids);
+	}
+
+	gpus.shutdown_MPI();
+
+	/*
 	ClusterNet gpus = ClusterNet(argc,argv,1245);
 	BatchAllocator b = BatchAllocator();
 	Matrix *X;
@@ -787,7 +827,7 @@ int main(int argc, char *argv[])
 		//y = read_hdf5("/home/tim/crowdflower_y_dense.hdf5");
 	}
 	MPI_Barrier(MPI_COMM_WORLD);
-
+*/
 
 	/*
 	Matrix *B = gpus.rand(b.CURRENT_BATCH->cols,20);
@@ -812,6 +852,7 @@ int main(int argc, char *argv[])
 */
 
 
+	/*
 	Matrix *A = ones(10,10);
 	gpus.dropout(A,0.5);
 	A = gpus.dense_to_sparse(A);
@@ -820,6 +861,7 @@ int main(int argc, char *argv[])
 
 	gpus.dot(A,B,C);
 	gpus.dot(A,B,C);
+	*/
 
 
 	/*
@@ -848,7 +890,9 @@ int main(int argc, char *argv[])
 */
 
 
-	gpus.shutdown_MPI();
+	//gpus.shutdown_MPI();
+
+
 
 
 

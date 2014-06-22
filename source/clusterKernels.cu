@@ -602,6 +602,29 @@ __global__ void kDoubleRectifiedLinear_Derivative(float *A, float *out, int size
 
 }
 
+__global__ void kHardTanH(float *A, float *out, int size)
+{
+  const unsigned int numThreads = blockDim.x * gridDim.x;
+  const int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
+  float value = 0.0f;
+
+  for (unsigned int i = idx;i < size; i += numThreads)
+  {
+	  value = (A[i] > 1.0f) ? A[i] : 1.0f;
+      out[i] = (value < -1.0f) ? value : -1.0f;
+  }
+}
+
+__global__ void kHardTanH_Derivative(float *A, float *out, int size)
+{
+	  const unsigned int numThreads = blockDim.x * gridDim.x;
+	  const int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
+
+	  for (unsigned int i = idx;i < size; i += numThreads)
+		  out[i] = (A[i] < -1.0f) || (A[i] >1.0f) ? 0.0f : 1.0f;
+
+}
+
 __global__ void kSquaredError(float *A, float *t, float *out, int size)
 {
 	  const unsigned int numThreads = blockDim.x * gridDim.x;

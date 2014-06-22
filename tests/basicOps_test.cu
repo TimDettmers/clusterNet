@@ -526,7 +526,19 @@ int run_basicOps_test()
 		assert(test_eq(m_host->data[i], m4->data[i], "sub sparse test"));
 
 
+	//hard tanh test
+	m1 = to_host(hardTanH(gpu.randn(137,457)));
+	for(int i = 0; i < m1->size; i++)
+		ASSERT(m1->data[i] >= -1.0 && m1->data[i] <= 1.0, "hardTanH test");
 
+	//hard tanh derivative
+	m3 = gpu.randn(137,400);
+	m2 = to_host(m3);
+	m1 = to_host(hardTanH_derivative(m3));
+	for(int i = 0; i < m3->size; i++)
+		ASSERT(((m2->data[i] < -1.0 && m1->data[i] == 0.0) ||
+				(m2->data[i] > 1.0 && m1->data[i] == 0.0) ||
+				(m2->data[i] >= -1.0 && m2->data[i] <= 1.0 && m1->data[i] == 1.0)), "hardTanH_derivative test");
 
 
 
