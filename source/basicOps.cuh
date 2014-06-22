@@ -103,6 +103,10 @@ Matrix *doubleRectifiedLinear(Matrix *A);
 void doubleRectifiedLinear(Matrix *A, Matrix *out);
 Matrix *hardTanH(Matrix *A);
 void hardTanH(Matrix *A, Matrix *out);
+Matrix *pairwise_ranking(Matrix *A, Matrix *B);
+void pairwise_ranking(Matrix *A, Matrix *B, Matrix *out);
+Matrix *pairwise_ranking_derivative(Matrix *A, Matrix *B);
+void pairwise_ranking_derivative(Matrix *A, Matrix *B, Matrix *out);
 
 Matrix *softmax(Matrix *A);
 void softmax(Matrix *A, Matrix *out);

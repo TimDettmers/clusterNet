@@ -53,5 +53,6 @@ __global__ void kSparseDot(int m, int n, int k, float *data, int* indptr, int* i
 __global__ void kPrintData(float *A, int size);
 __global__ void kHardTanH(float *A, float *out, int size);
 __global__ void kHardTanH_Derivative(float *A, float *out, int size);
-
+__global__ void kPairwise_ranking(float *A, float *B, float *out, int size);
+__global__ void kPairwise_ranking_derivative(float *A, float *B, float *out, int size);
 #endif

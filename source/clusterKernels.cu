@@ -615,6 +615,32 @@ __global__ void kHardTanH(float *A, float *out, int size)
   }
 }
 
+__global__ void kPairwise_ranking(float *A, float *B, float *out, int size)
+{
+  const unsigned int numThreads = blockDim.x * gridDim.x;
+  const int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
+  float value = 0.0f;
+
+  for (unsigned int i = idx;i < size; i += numThreads)
+  {
+	  value = 1.0f - A[i] + B[i];
+      out[i] = value < 0.0f ? 0.0f : value;
+  }
+}
+
+__global__ void kPairwise_ranking_derivative(float *A, float *B, float *out, int size)
+{
+  const unsigned int numThreads = blockDim.x * gridDim.x;
+  const int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
+  float value = 0.0f;
+
+  for (unsigned int i = idx;i < size; i += numThreads)
+  {
+	  value = 1.0f - A[i] + B[i];
+      out[i] = value > 0.0f ? 1.0f : 0.0f;
+  }
+}
+
 __global__ void kHardTanH_Derivative(float *A, float *out, int size)
 {
 	  const unsigned int numThreads = blockDim.x * gridDim.x;

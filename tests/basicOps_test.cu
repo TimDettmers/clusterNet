@@ -530,15 +530,34 @@ int run_basicOps_test()
 	m1 = to_host(hardTanH(gpu.randn(137,457)));
 	for(int i = 0; i < m1->size; i++)
 		ASSERT(m1->data[i] >= -1.0 && m1->data[i] <= 1.0, "hardTanH test");
+	assert(test_matrix(m1,137,457));
 
 	//hard tanh derivative
 	m3 = gpu.randn(137,400);
 	m2 = to_host(m3);
 	m1 = to_host(hardTanH_derivative(m3));
+
+	assert(test_matrix(m1,137,400));
 	for(int i = 0; i < m3->size; i++)
 		ASSERT(((m2->data[i] < -1.0 && m1->data[i] == 0.0) ||
 				(m2->data[i] > 1.0 && m1->data[i] == 0.0) ||
 				(m2->data[i] >= -1.0 && m2->data[i] <= 1.0 && m1->data[i] == 1.0)), "hardTanH_derivative test");
+
+	//pairwise ranking tests
+	m3 = gpu.randn(137,450);
+	m2 = gpu.randn(137,450);
+	m1 = to_host(pairwise_ranking(m2,m3));
+	m4 = to_host(pairwise_ranking_derivative(m2, m3));
+	m3 = to_host(m3);
+	m2 = to_host(m2);
+	assert(test_matrix(m1,137,450));
+	assert(test_matrix(m4,137,450));
+	for(int i = 0; i < m1->size; i++)
+	{
+		ASSERT(m1->data[i] == (1.0f - m2->data[i] + m3->data[i]) < 0.0f ? 0.0f : (1.0f - m2->data[i] + m3->data[i]), "pairwise ranking test");
+		ASSERT(m4->data[i] == (1.0f - m2->data[i] + m3->data[i]) > 0.0f ? 1.0f : 0.0f, "pairwise ranking test derivative");
+	}
+
 
 
 

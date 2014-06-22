@@ -659,6 +659,34 @@ void hardTanH(Matrix *A, Matrix *out)
   kHardTanH<<<block_size,THREADS_PER_BLOCKS>>>(A->data, out->data, A->size);
 }
 
+Matrix *pairwise_ranking(Matrix *A, Matrix *B)
+{
+  Matrix *out = empty(A->rows,A->cols);
+  pairwise_ranking(A, B, out);
+
+  return out;
+}
+
+void pairwise_ranking(Matrix *A, Matrix *B, Matrix *out)
+{
+  int block_size = (A->size/THREADS_PER_BLOCKS) + 1;
+  kPairwise_ranking<<<block_size,THREADS_PER_BLOCKS>>>(A->data, B->data, out->data, A->size);
+}
+
+Matrix *pairwise_ranking_derivative(Matrix *A, Matrix *B)
+{
+  Matrix *out = empty(A->rows,A->cols);
+  pairwise_ranking_derivative(A, B, out);
+
+  return out;
+}
+
+void pairwise_ranking_derivative(Matrix *A, Matrix *B, Matrix *out)
+{
+  int block_size = (A->size/THREADS_PER_BLOCKS) + 1;
+  kPairwise_ranking_derivative<<<block_size,THREADS_PER_BLOCKS>>>(A->data, B->data, out->data, A->size);
+}
+
 Matrix *square(Matrix *A)
 {
   Matrix *out = empty(A->rows,A->cols);
