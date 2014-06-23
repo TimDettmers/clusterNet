@@ -975,7 +975,7 @@ void hardTanH_derivative(Matrix *A, Matrix *out)
 
 Matrix *maxColumnwise(Matrix *A)
 {
-	Matrix *out = empty(1,A->cols);
+	Matrix *out = empty(A->cols,1);
 	maxColumnwise(A,out);
 	return out;
 }
@@ -987,6 +987,30 @@ void maxColumnwise(Matrix *A, Matrix *out)
 	dim3 gridDim(w1, w2, 1);
 
 	kMaxColumnwise<<<gridDim,32, shared_mem_size>>>(A->data, out->data, A->cols, A->rows);
+	cudaThreadSynchronize();
+}
+
+
+Matrix *maxout(Matrix *A, int maxout_level)
+{
+	assert(A->cols % maxout_level == 0);
+	Matrix *out = empty(A->rows,A->cols/maxout_level);
+	maxout(A, out, maxout_level);
+	return out;
+}
+
+void maxout(Matrix *A, Matrix *out, int maxout_level)
+{
+	int batch_size = A->rows;
+	int grid_row_size = batch_size*out->cols < 65535 ? batch_size : floor(65535.0f/out->cols);
+	if (grid_row_size*out->cols > 65535)
+	{
+		printf("column size to large for a maxout level of %i! Increase maxout level or decrease column width!", maxout_level);
+		assert(false);
+	}
+	int shared_mem_size = maxout_level * sizeof(float);
+	dim3 gridDim(grid_row_size, out->cols, 1);
+	kMaxout<<<gridDim,32, shared_mem_size>>>(A->data, out->data, maxout_level, A->cols, A->rows);
 	cudaThreadSynchronize();
 }
 

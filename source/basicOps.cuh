@@ -122,6 +122,8 @@ Matrix *equal(Matrix *A, Matrix *B);
 void equal(Matrix *A, Matrix *B, Matrix *out);
 Matrix *maxColumnwise(Matrix *A);
 void maxColumnwise(Matrix *A, Matrix *out);
+Matrix *maxout(Matrix *A, int maxout_level);
+void maxout(Matrix *A, Matrix *out, int maxout_level);
 
 Matrix *rectified_linear(Matrix *A);
 void rectified_linear(Matrix *A, Matrix *out);

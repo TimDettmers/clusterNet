@@ -824,9 +824,29 @@ __global__ void kPrintData(float *A, int size)
 	printf("]\n");
 }
 
+__global__ void kMaxout(float *A, float *out, int maxout_level, unsigned int cols, unsigned int rows)
+{
+  extern __shared__ float max_values[];
+  float const min_value = -FLT_MAX;
+
+  for(int row = blockIdx.x; row < rows; row +=blockDim.x)
+  {
+	  int softout_block_idx = row + (blockIdx.y*maxout_level*rows);
+	  if(threadIdx.x < maxout_level)
+		  max_values[threadIdx.x] = A[softout_block_idx+(threadIdx.x*rows)];
+	  else
+		  max_values[threadIdx.x] = min_value;
+
+	  reduceToMax(max_values, threadIdx.x);
+	  __syncthreads();
+	  if(threadIdx.x == 0) out[row + (blockIdx.y*rows)] = max_values[0];
+  }
+}
+
+
 __global__ void kMaxColumnwise(float* mat, float* target, unsigned int width, unsigned int height)
 {
-  extern __shared__ float max_vals[] ;
+  extern __shared__ float max_vals[];
   float cur_max = -FLT_MAX;
   float val = 0;
   const int column = gridDim.x * blockIdx.y + blockIdx.x;

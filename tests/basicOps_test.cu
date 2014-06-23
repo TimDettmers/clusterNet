@@ -559,10 +559,10 @@ int run_basicOps_test()
 	}
 
 	//col max test
-	m1 = gpu.rand(6,4);
+	m1 = gpu.rand(53,57);
 	m2 = maxColumnwise(m1);
 	m1 = to_host(m1);
-	//assert(test_matrix(m2,53,1));
+	assert(test_matrix(m2,57,1));
 	m2 = to_host(m2);
 	float max_value = -2.0f;
 	for(int col = 0; col < m1->cols; col++)
@@ -575,6 +575,35 @@ int run_basicOps_test()
 		assert(test_eq(m2->data[col],max_value,"testing max col value"));
 
 	}
+
+
+	//maxout test
+	m1 = gpu.rand(1377,1736);
+	int maxout_level = 8;
+	m2 = maxout(m1,maxout_level);
+	m1 = to_host(m1);
+	assert(test_matrix(m2,1377,1736/8));
+	m2 = to_host(m2);
+	max_value = -2.0f;
+	for(int row = 0; row < m1->rows; row++)
+	{
+		max_value = -2.0f;
+		for(int col = 0; col < m1->cols; col++)
+		{
+			if(m1->data[(row*m1->cols) + col] > max_value)
+				max_value = m1->data[(m1->cols*row) + col];
+
+			if((col+1) % maxout_level == 0)
+			{
+				assert(test_eq(m2->data[(row*(m1->cols/maxout_level))+(col/maxout_level)],max_value,"testing maxout value"));
+				max_value = -2.0f;
+			}
+		}
+
+
+
+	}
+
 
 
 
