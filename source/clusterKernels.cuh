@@ -56,5 +56,6 @@ __global__ void kHardTanH_Derivative(float *A, float *out, int size);
 __global__ void kPairwise_ranking(float *A, float *B, float *out, int size);
 __global__ void kPairwise_ranking_derivative(float *A, float *B, float *out, int size);
 __global__ void kMaxColumnwise(float* mat, float* target, unsigned int width, unsigned int height);
-__global__ void kMaxout(float* mat, float* target, int maxout_level, unsigned int cols, unsigned int rows);
+__global__ void kMaxout(float *A, float *out, float *outargmax, int maxout_level, unsigned int cols, unsigned int rows);
+__device__ void reduceToMaxAndArgMax(float* sdataMax, float* sdataArgMax, unsigned int tid, int threads);
 #endif

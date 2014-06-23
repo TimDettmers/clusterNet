@@ -991,15 +991,22 @@ void maxColumnwise(Matrix *A, Matrix *out)
 }
 
 
-Matrix *maxout(Matrix *A, int maxout_level)
+Matrix **maxout(Matrix *A, int maxout_level)
 {
 	assert(A->cols % maxout_level == 0);
+	assert(maxout_level <= 64);
 	Matrix *out = empty(A->rows,A->cols/maxout_level);
-	maxout(A, out, maxout_level);
-	return out;
+	Matrix *outargmax = empty(A->rows,A->cols/maxout_level);
+	maxout(A, out, outargmax, maxout_level);
+
+	Matrix **out_array = (Matrix**)malloc(sizeof(Matrix*)*2);
+	out_array[0] = out;
+	out_array[1] = outargmax;
+
+	return out_array;
 }
 
-void maxout(Matrix *A, Matrix *out, int maxout_level)
+void maxout(Matrix *A, Matrix *out, Matrix *outargmax, int maxout_level)
 {
 	int batch_size = A->rows;
 	int grid_row_size = batch_size*out->cols < 65535 ? batch_size : floor(65535.0f/out->cols);
@@ -1008,9 +1015,8 @@ void maxout(Matrix *A, Matrix *out, int maxout_level)
 		printf("column size to large for a maxout level of %i! Increase maxout level or decrease column width!", maxout_level);
 		assert(false);
 	}
-	int shared_mem_size = maxout_level * sizeof(float);
 	dim3 gridDim(grid_row_size, out->cols, 1);
-	kMaxout<<<gridDim,32, shared_mem_size>>>(A->data, out->data, maxout_level, A->cols, A->rows);
+	kMaxout<<<gridDim,32>>>(A->data, out->data, outargmax->data, maxout_level, A->cols, A->rows);
 	cudaThreadSynchronize();
 }
 
