@@ -558,6 +558,24 @@ int run_basicOps_test()
 		ASSERT(m4->data[i] == (1.0f - m2->data[i] + m3->data[i]) > 0.0f ? 1.0f : 0.0f, "pairwise ranking test derivative");
 	}
 
+	//col max test
+	m1 = gpu.rand(6,4);
+	m2 = maxColumnwise(m1);
+	m1 = to_host(m1);
+	//assert(test_matrix(m2,53,1));
+	m2 = to_host(m2);
+	float max_value = -2.0f;
+	for(int col = 0; col < m1->cols; col++)
+	{
+		max_value = -2.0f;
+		for(int row = 0; row < m1->rows; row++)
+			if(m1->data[(row*m1->cols) + col] > max_value)
+				max_value = m1->data[(row*m1->cols) + col];
+
+		assert(test_eq(m2->data[col],max_value,"testing max col value"));
+
+	}
+
 
 
 

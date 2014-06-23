@@ -120,6 +120,8 @@ Matrix *create_t_matrix(Matrix *labels, int max_label);
 void create_t_matrix(Matrix *labels, Matrix *out);
 Matrix *equal(Matrix *A, Matrix *B);
 void equal(Matrix *A, Matrix *B, Matrix *out);
+Matrix *maxColumnwise(Matrix *A);
+void maxColumnwise(Matrix *A, Matrix *out);
 
 Matrix *rectified_linear(Matrix *A);
 void rectified_linear(Matrix *A, Matrix *out);

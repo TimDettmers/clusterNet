@@ -824,6 +824,24 @@ __global__ void kPrintData(float *A, int size)
 	printf("]\n");
 }
 
+__global__ void kMaxColumnwise(float* mat, float* target, unsigned int width, unsigned int height)
+{
+  extern __shared__ float max_vals[] ;
+  float cur_max = -FLT_MAX;
+  float val = 0;
+  const int column = gridDim.x * blockIdx.y + blockIdx.x;
+  if (column < width) {
+    float *cur_data = &mat[column * height] ;
+    for (unsigned int i = threadIdx.x; i < height; i += blockDim.x) {
+      val = cur_data[i];
+      if (val > cur_max) cur_max = val;
+    }
+    max_vals[threadIdx.x] = cur_max;
+    reduceToMax(max_vals, threadIdx.x);
+    __syncthreads();
+    if (threadIdx.x == 0) target[column] = max_vals[0];
+  }
+}
 
 
 

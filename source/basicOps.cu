@@ -255,6 +255,7 @@ Matrix *empty_sparse(int rows, int cols, int nonzeros)
 
 
 
+
 Matrix *empty_pinned_sparse(int rows, int cols, float max_sparsity, float sparsity_buffer)
 { return empty_pinned_sparse(rows, cols, ceil(rows*cols*(max_sparsity + sparsity_buffer)) + 1); }
 Matrix *empty_pinned_sparse(int rows, int cols, int nonzeros)
@@ -972,6 +973,24 @@ void hardTanH_derivative(Matrix *A, Matrix *out)
 	kHardTanH_Derivative<<<blocks,THREADS_PER_BLOCKS>>>(A->data, out->data, out->size);
 }
 
+Matrix *maxColumnwise(Matrix *A)
+{
+	Matrix *out = empty(1,A->cols);
+	maxColumnwise(A,out);
+	return out;
+}
+void maxColumnwise(Matrix *A, Matrix *out)
+{
+	int shared_mem_size = 32 * sizeof(float);
+	int w1 = floor(sqrt(A->cols));
+	int w2 = A->cols / w1 + (A->cols % w1 == 0 ? 0 : 1);
+	dim3 gridDim(w1, w2, 1);
+
+	kMaxColumnwise<<<gridDim,32, shared_mem_size>>>(A->data, out->data, A->cols, A->rows);
+	cudaThreadSynchronize();
+}
+
+
 Matrix *squared_error(Matrix *A, Matrix *targets)
 {
 	Matrix *out = empty(A->rows,A->cols);
@@ -983,6 +1002,8 @@ void squared_error(Matrix *A, Matrix *targets, Matrix *out)
 	int blocks = (out->size/THREADS_PER_BLOCKS) + 1;
 	kSquaredError<<<blocks,THREADS_PER_BLOCKS>>>(A->data, targets->data, out->data, out->size);
 }
+
+
 
 
 void sparse_dot(Matrix *A, Matrix *B, Matrix *out)
