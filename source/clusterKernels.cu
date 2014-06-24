@@ -916,5 +916,21 @@ __global__ void kMaxColumnwise(float* mat, float* target, unsigned int width, un
 }
 
 
+__global__ void kExpandToMaxoutGrad(float* error, float* indexes, float *out, int error_size, int error_rows, int maxout_level)
+{
+	const unsigned int numThreads = blockDim.x * gridDim.x;
+	const int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
+	const int grad_size = maxout_level*error_size;
+
+    for (unsigned int i = idx;i < grad_size; i += numThreads)
+    	out[i] = 0.0f;
+
+	for (unsigned int i = idx;i < error_size; i += numThreads)
+	{
+		int row_idx = idx - ((idx / error_rows)*error_rows);
+		out[row_idx + (((int)indexes[idx])*error_rows)] = error[i];
+	}
+}
+
 
 

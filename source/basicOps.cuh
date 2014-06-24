@@ -136,6 +136,8 @@ void hardTanH_derivative(Matrix *A, Matrix *out);
 Matrix *squared_error(Matrix *A, Matrix *targets);
 void squared_error(Matrix *A, Matrix *targets, Matrix *out);
 
+void expand_to_maxout_grad(Matrix *error, Matrix *idx, Matrix *grad);
+
 int checkMatrixOperation(Matrix *A, Matrix *B, Matrix *C, int blnMatrixProduct);
 int blnFaultySizes(Matrix *A, Matrix *B, Matrix *C);
 int blnFaultyMatrixProductSizes(Matrix *A, Matrix *B, Matrix *C);

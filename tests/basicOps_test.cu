@@ -578,13 +578,13 @@ int run_basicOps_test()
 
 
 	//maxout test
-	m1 = gpu.rand(1753,1736);
+	m1 = gpu.rand(128,1736);
 	int maxout_level = 8;
 	m2 = maxout(m1,maxout_level)[0];
 	m3 = maxout(m1,maxout_level)[1];
 	m1 = to_host(m1);
-	assert(test_matrix(m2,1753,1736/8));
-	assert(test_matrix(m3,1753,1736/8));
+	assert(test_matrix(m2,128,1736/8));
+	assert(test_matrix(m3,128,1736/8));
 	m2 = to_host(m2);
 	m3 = to_host(m3);
 	max_value = -2.0f;
@@ -607,10 +607,36 @@ int run_basicOps_test()
 				max_value = -2.0f;
 			}
 		}
-
-
-
 	}
+
+	//expand maxout grad test
+	Matrix *grad = gpu.rand(2,8);
+	Matrix *error = gpu.rand(2,4);
+	m1 = gpu.rand(2,8);
+	maxout_level = 2;
+	m2 = maxout(m1,maxout_level)[0];
+	m3 = maxout(m1,maxout_level)[1];
+	expand_to_maxout_grad(error,m3,grad);
+	grad = to_host(grad);
+	m3 = to_host(m3);
+	error = to_host(error);
+	int maxout_block = 0;
+	float value = 0.0f;
+	for(int row = 0; row < grad->rows; row++)
+	{
+		for(int col = 0; col < grad->cols; col++)
+		{
+			value = grad->data[(row*grad->cols) + col];
+			if(value != 0.0f)
+			{
+				assert(test_eq((int)m3->data[(row*m3->cols)+maxout_block],col,"test idx grad for expand maxout"));
+				assert(test_eq(error->data[(row*error->cols)+maxout_block],value,"test value grad for expand maxout"));
+				maxout_block++;
+			}
+		}
+		maxout_block = 0;
+	}
+
 
 
 
