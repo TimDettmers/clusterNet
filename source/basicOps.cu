@@ -1037,6 +1037,7 @@ void squared_error(Matrix *A, Matrix *targets, Matrix *out)
 void expand_to_maxout_grad(Matrix *error, Matrix *idx, Matrix *grad)
 {
 	int blocks = (grad->size/THREADS_PER_BLOCKS) + 1;
+	assert(grad->cols % error->cols == 0);
 	int maxout_level = grad->cols/error->cols;
 	kExpandToMaxoutGrad<<<blocks,THREADS_PER_BLOCKS>>>(error->data, idx->data, grad->data, error->size, error->rows, maxout_level);
 }

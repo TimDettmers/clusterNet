@@ -287,38 +287,30 @@ void run_miniMNIST_test(ClusterNet gpus)
 
 	b_dist.finish_batch_allocator();
 
-	/*
+
 	// Maxout test
 
 	// Tests RMSprop with weight updates, logistic grad.
 	// Additionally tests the interplay between different functions.
 
-	char buff[1024] = {0};
-	ssize_t len = ::readlink("/proc/self/exe", buff, sizeof(buff)-1);
-	std::string path = std::string(buff);
-	replace(path,"/build/testSuite.out","/tests/");
+	w1 = gpus.uniformSqrtWeight(784,1024);
+	w2 = gpus.uniformSqrtWeight(128,10);
+	m1 = zeros(784,1024);
+	m2 = zeros(128,10);
+	ms1 = zeros(784,1024);
+	ms2 = zeros(128,10);
+	grad_w1_ms = zeros(784,1024);
+	grad_w2_ms = zeros(128,10);
+	grad_w1 = empty(784,1024);
+	grad_w2 = empty(128,10);
+	cv_error = 0.0f;
+	train_error = 0.0f;
 
-	Matrix *X = read_hdf5((path + "/mnist_mini_X.hdf5").c_str());
-	Matrix *y = read_hdf5((path + "/mnist_mini_y.hdf5").c_str());
-
-	Matrix *w1 = gpus.uniformSqrtWeight(784,1024);
-	Matrix *w2 = gpus.uniformSqrtWeight(128,10);
-	Matrix *m1 = zeros(784,1024);
-	Matrix *m2 = zeros(128,10);
-	Matrix *ms1 = zeros(784,1024);
-	Matrix *ms2 = zeros(128,10);
-	Matrix *grad_w1_ms = zeros(784,1024);
-	Matrix *grad_w2_ms = zeros(128,10);
-	Matrix *grad_w1 = empty(784,1024);
-	Matrix *grad_w2 = empty(128,10);
-	float cv_error = 0.0f;
-	float train_error = 0.0f;
-
-	BatchAllocator b = BatchAllocator();
+	b = BatchAllocator();
 	b.init(X, y, 0.2, 32, 64);
-	int epochs  = 17;
-	float learning_rate = 0.003;
-	float momentum = 0.5;
+	epochs  = 17;
+	learning_rate = 0.003;
+	momentum = 0.5;
 	for(int EPOCH = 1; EPOCH < epochs; EPOCH++)
 	{
 	  momentum += 0.01;
@@ -349,12 +341,12 @@ void run_miniMNIST_test(ClusterNet gpus)
 
 		  //backprop
 		  Matrix *e1 = sub(out, t);
-		  Matrix *e2 = gpus.dotT(e1, w2);
+		  Matrix *e2_partial = gpus.dotT(e1, w2);
+		  Matrix *e2 = empty(b.CURRENT_BATCH->rows,e2_partial->cols*8);
 
 		  gpus.Tdot(a1,e1,grad_w2);
-		  expand_to_maxout_grad(e2, a1_idx,grad_w1);
-
-		  gpus.Tdot(b.CURRENT_BATCH,grad_w1,grad_w1);
+		  expand_to_maxout_grad(e2_partial, a1_idx,e2);
+		  gpus.Tdot(b.CURRENT_BATCH,e2,grad_w1);
 
 		  //weight updates
 		  RMSprop_with_nesterov_weight_update(ms1,grad_w1,w1,m1,0.9f,learning_rate,b.CURRENT_BATCH->rows);
@@ -362,16 +354,21 @@ void run_miniMNIST_test(ClusterNet gpus)
 
 		  cudaFree(e1->data);
 		  cudaFree(e2->data);
+		  cudaFree(e2_partial->data);
 		  cudaFree(z1->data);
+		  cudaFree(a1->data);
+		  cudaFree(a1_idx->data);
 		  cudaFree(a2->data);
 		  cudaFree(out->data);
 		  cudaFree(t->data);
 		  cudaFree(d0->data);
 		  cudaFree(d1->data);
+		  free(a_paired);
 
 		  b.replace_current_batch_with_next();
 
 	  }
+
 
 
 	  train_error = 0;
@@ -380,8 +377,9 @@ void run_miniMNIST_test(ClusterNet gpus)
 
 		  b.broadcast_batch_to_processes();
 
-		  Matrix *a1 = gpus.dot(b.CURRENT_BATCH,w1);
-		  logistic(a1, a1);
+		  Matrix *z1 = gpus.dot(b.CURRENT_BATCH,w1);
+		  Matrix **a1_pair = maxout(z1,8);
+		  Matrix *a1 = a1_pair[0];
 		  Matrix *a2 = gpus.dot(a1,w2);
 		  Matrix *out = softmax(a2);
 		  Matrix *result = argmax(out);
@@ -391,45 +389,57 @@ void run_miniMNIST_test(ClusterNet gpus)
 
 		  train_error += (b.CURRENT_BATCH->rows - sum_value)/ (1.0f * b.CURRENT_BATCH->rows *b.TOTAL_BATCHES) ;
 
+		  cudaFree(z1->data);
 		  cudaFree(a1->data);
+		  cudaFree(a1_pair[1]->data);
 		  cudaFree(a2->data);
 		  cudaFree(out->data);
 		  cudaFree(result->data);
 		  cudaFree(eq->data);
+		  free(a1_pair);
 
 		  b.replace_current_batch_with_next();
 	  }
 
-	  //std::cout << "Train error: " << train_error << std::endl;
+	  //std::cout << "MAXOUT Train error: " << train_error << std::endl;
+
+
 
 	  cv_error = 0;
 	  for(int i = 0; i < b.TOTAL_BATCHES_CV; i++)
 	  {
 		  b.broadcast_batch_cv_to_processes();
-		  Matrix *a1 = gpus.dot(b.CURRENT_BATCH_CV,w1);
-		  logistic(a1, a1);
+		  Matrix *z1 = gpus.dot(b.CURRENT_BATCH_CV,w1);
+		  Matrix **a1_pair = maxout(z1,8);
+		  Matrix *a1 = a1_pair[0];
 		  Matrix *a2 = gpus.dot(a1,w2);
 		  Matrix *out = softmax(a2);
 		  Matrix *result = argmax(out);
 		  Matrix *eq = equal(result,b.CURRENT_BATCH_CV_Y);
-		  b.allocate_next_cv_batch_async();
+		  b.allocate_next_batch_async();
 		  float sum_value = sum(eq);
 
 		  cv_error += (b.CURRENT_BATCH_CV->rows  - sum_value)/ (1.0f * b.CURRENT_BATCH_CV->rows *b.TOTAL_BATCHES_CV) ;
 
+		  cudaFree(z1->data);
 		  cudaFree(a1->data);
+		  cudaFree(a1_pair[1]->data);
 		  cudaFree(a2->data);
 		  cudaFree(out->data);
 		  cudaFree(result->data);
 		  cudaFree(eq->data);
+		  free(a1_pair);
 
 		  b.replace_current_cv_batch_with_next();
 	  }
 
-	  //std::cout << "Cross validation error: " << cv_error << std::endl;
+	  //std::cout << "MAXOUT Cross validation error: " << cv_error << std::endl;
 
 	}
-*/
+
+
+	ASSERT(train_error < 0.01f,"mini-MNIST train error 17 epochs < 0.01.");
+	ASSERT(cv_error < 0.22f, "mini-MNIST train error 17 epochs < 0.22.");
 
 	std::vector<int> layers;
 	layers.push_back(500);
