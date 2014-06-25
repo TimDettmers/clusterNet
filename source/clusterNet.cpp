@@ -36,6 +36,14 @@ ClusterNet::ClusterNet(int argc, char* argv[], int seed)
 	init_MPI(argc, argv);
 	init(seed + (10000*MYRANK+12345));
 }
+ClusterNet::ClusterNet(int argc, char* argv[], int seed, bool useSameSeed)
+{
+	init_MPI(argc, argv);
+	if(useSameSeed)
+		init(seed);
+	else
+		init(seed + (10000*MYRANK+12345));
+}
 ClusterNet::ClusterNet(int argc, char* argv[])
 {
 	init_MPI(argc, argv);
@@ -837,5 +845,12 @@ Matrix *ClusterNet::sparse_to_dense(Matrix *A)
     //to_col_major(out,out);
 
 	return out;
+}
+
+void ClusterNet::construct_vocab_matrix(Matrix *vocab_idx, Matrix *batch_X, Matrix *batch_y, Matrix *vocab)
+{
+	Matrix *rdm_idx = rand_int(batch_X->rows,1, 0,vocab->cols-1);
+	::construct_vocab_matrix(vocab_idx,batch_X,batch_y,vocab,rdm_idx);
+
 }
 

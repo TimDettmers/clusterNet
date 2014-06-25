@@ -19,6 +19,7 @@ public:
 	 ClusterNet(int seed);
 	 ClusterNet(int argc, char* argv[]);
 	 ClusterNet(int argc, char *argv[], int seed);
+	 ClusterNet(int argc, char* argv[], int seed, bool useSameSeed);
 
 	 Matrix *dot(Matrix *A, Matrix *B);
 	 Matrix *Tdot(Matrix *A, Matrix *B);
@@ -65,6 +66,8 @@ public:
 
 	 Matrix *dense_to_sparse(Matrix *A);
 	 Matrix *sparse_to_dense(Matrix *A);
+
+	 void construct_vocab_matrix(Matrix *vocab_idx, Matrix *batch_X, Matrix *batch_y, Matrix *vocab);
 
 	 int MYRANK;
 	 int NODES;

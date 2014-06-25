@@ -614,7 +614,40 @@ int run_clusterNet_test(ClusterNet gpus)
 		assert(test_eq(s3->ptr_rows[i],s4->ptr_rows[i],"dense to sparse and back equality."));
 
 
+	//construct vocab test
+	int vocab_vector_size = 37;
+	int batch_size = 137;
+	int window_size = 17;
+	int middleIdx = window_size/2;
+	int vocab_size = 333;
+	Matrix *vocab_idx = gpu.rand_int(batch_size,window_size,0,vocab_size-1);
+	Matrix *vocab = gpu.uniformSqrtWeight(vocab_vector_size,vocab_size);
+	Matrix *batch_X = gpu.rand(batch_size,vocab_vector_size*window_size);
+	Matrix *batch_Y = gpu.rand(batch_size,vocab_vector_size*window_size);
+	gpu.construct_vocab_matrix(vocab_idx,batch_X,batch_Y,vocab);
 
+	m1 = to_host(vocab_idx);
+	m2 = to_host(vocab);
+	m3 = to_host(batch_X);
+	m4 = to_host(batch_Y);
+
+	int idx = 0;
+	for(int row = 0; row < vocab_idx->rows; row++)
+		for(int col = 0; col < vocab_idx->cols; col++)
+		{
+			idx = (int)m1->data[col + (row*m1->cols)];
+			for(int i = 0; i < vocab_vector_size; i++)
+			{
+				assert(test_eq(m3->data[(col*vocab_vector_size) + (row*batch_X->cols) + i],m2->data[idx + (vocab->cols*i)],"construct vocab matrix test"));
+				if(col != middleIdx)
+					assert(test_eq(m4->data[(col*vocab_vector_size) + (row*batch_X->cols) + i],m2->data[idx + (vocab->cols*i)],"construct vocab matrix test"));
+				else
+					ASSERT(m4->data[(col*vocab_vector_size) + (row*batch_X->cols) + i] != m3->data[(col*vocab_vector_size) + (row*batch_X->cols) + i] &&
+							(m4->data[(col*vocab_vector_size) + (row*batch_X->cols) + i] < 50.0 &&
+							 m4->data[(col*vocab_vector_size) + (row*batch_X->cols) + i] > -50.0),"construct vocab matrix test");//if the number is >50 or < -50 something is wrong
+
+			}
+		}
 
 
 	//This should just pass without error

@@ -10,6 +10,7 @@
 #include <time.h>
 #include <batchAllocator.h>
 #include <DeepNeuralNetwork.h>
+#include <WikiMaxoutNet.h>
 
 using std::cout;
 using std::endl;
@@ -735,6 +736,16 @@ void dotMPI_test(int argc, char *argv[])
 
 int main(int argc, char *argv[])
 {
+
+
+	ClusterNet gpus = ClusterNet(argc,argv, 1245, true);
+	WikiMaxoutNet net = WikiMaxoutNet(gpus);
+	net.run();
+
+	gpus.shutdown_MPI();
+
+
+	/*
 	ClusterNet gpus = ClusterNet(argc,argv, 1245);
 	BatchAllocator b = BatchAllocator();
 	if(gpus.MYGPUID == 0)
@@ -773,6 +784,7 @@ int main(int argc, char *argv[])
 	}
 
 	gpus.shutdown_MPI();
+	*/
 
 	/*
 	ClusterNet gpus = ClusterNet(argc,argv,1245);

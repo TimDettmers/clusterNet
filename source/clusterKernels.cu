@@ -932,5 +932,38 @@ __global__ void kExpandToMaxoutGrad(float* error, float* indexes, float *out, in
 	}
 }
 
+__global__ void kConstructVocabMatrix(float *vocab_idx, float* vocab, float *rdm_idx, float *batch_X, float *batch_Y)
+{
+	int middleIdx = (gridDim.y/2);
+	int myIdx = 0;
+	int myRdmIdx = 0;
 
+	//vocab_vector_size = blockDim.x;
+	//vocab_idx_rows = back_size = gridDim.x
+	//vocab_idx_cols = window_size = gridDim.y
+
+	//middle index is replaced by rdm word for batch_Y, but we still need to write the correct into batch_X!
+	if(blockIdx.y != middleIdx)
+		myIdx = (int)vocab_idx[blockIdx.x+(blockIdx.y*gridDim.x)];//gridDim.x = vocab_idx_vector rows == batch size
+	else
+	{
+		myIdx = (int)vocab_idx[blockIdx.x+(blockIdx.y*gridDim.x)];
+		myRdmIdx = (int)rdm_idx[blockIdx.x];
+	}
+
+	int myVocabIdx = blockDim.x*myIdx;
+	int myVocabRdmIdx = blockDim.x*myRdmIdx;
+
+	if(blockIdx.y != middleIdx)
+	{
+		batch_X[blockIdx.x + (blockIdx.y*blockDim.x*gridDim.x) + (threadIdx.x*gridDim.x)] = vocab[myVocabIdx + threadIdx.x];
+		batch_Y[blockIdx.x + (blockIdx.y*blockDim.x*gridDim.x) + (threadIdx.x*gridDim.x)] = vocab[myVocabIdx + threadIdx.x];
+	}
+	else
+	{
+		batch_X[blockIdx.x + (blockIdx.y*blockDim.x*gridDim.x) + (threadIdx.x*gridDim.x)] = vocab[myVocabIdx + threadIdx.x];
+		batch_Y[blockIdx.x + (blockIdx.y*blockDim.x*gridDim.x) + (threadIdx.x*gridDim.x)] = vocab[myVocabRdmIdx + threadIdx.x];
+	}
+
+}
 

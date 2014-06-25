@@ -1071,6 +1071,12 @@ void sparse_dot(Matrix *A, Matrix *B, Matrix *out)
 
 }
 
+void construct_vocab_matrix(Matrix *vocab_idx, Matrix *batch_X, Matrix *batch_y, Matrix *vocab, Matrix *rdm_idx)
+{
+	assert(vocab->rows <= 1024);
+	dim3 grid(vocab_idx->rows,vocab_idx->cols,1);
+	kConstructVocabMatrix<<<grid,vocab->rows>>>(vocab_idx->data, vocab->data, rdm_idx->data, batch_X->data, batch_y->data);
+}
 
 
 
