@@ -338,6 +338,14 @@ void printmat(Matrix *A)
 
 }
 
+void printhostmat(Matrix *A)
+{
+  if(A->isSparse == 0)
+	  print_matrix(A,A->rows,A->cols);
+  else
+	  print_matrix(A,0,A->size);
+}
+
 void printmat(Matrix *A, int end_rows, int end_cols)
 {
   Matrix * m = to_host(A);

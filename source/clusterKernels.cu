@@ -936,7 +936,7 @@ __global__ void kConstructVocabMatrix(float *vocab_idx, float *vocab_idx_y, floa
 	int myRdmIdx = 0;
 
 	//vocab_vector_size = blockDim.x;
-	//vocab_idx_rows = back_size = gridDim.x
+	//vocab_idx_rows = batch_size = gridDim.x
 	//vocab_idx_cols = window_size = gridDim.y
 
 	//middle index is replaced by rdm word for batch_Y, but we still need to write the correct into batch_X!
@@ -967,6 +967,21 @@ __global__ void kConstructVocabMatrix(float *vocab_idx, float *vocab_idx_y, floa
 	}
 
 
+
+}
+
+__global__ void kUpdateVocabWithGradient(float *grad, float *vocab_idx, float* vocab)
+{
+	//vocab_vector_size = blockDim.x;
+	//vocab_idx_rows = batch_size = gridDim.x
+	//vocab_idx_cols = window_size = gridDim.y
+
+	int myIdx = 0;
+	myIdx = (int)vocab_idx[blockIdx.x+(blockIdx.y*gridDim.x)];
+	int myVocabIdx = blockDim.x*myIdx;
+
+	//atomicAdd(&out[0],A[i] != 0.0f ? 1.0f : 0.0f);
+	atomicAdd(&vocab[myVocabIdx + threadIdx.x],-fdividef(grad[blockIdx.x + (blockIdx.y*blockDim.x*gridDim.x) + (threadIdx.x*gridDim.x)],float(gridDim.x)));
 
 }
 

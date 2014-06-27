@@ -143,9 +143,9 @@ void WikiMaxoutNet::feedforward()
     expand_to_maxout_grad(e2_partial_Y, a1_idx_X,e2_Y);
     _gpu.Tdot(_batchX,e2_Y,_grad1_Y);
 
-    //Matrix *e3 = _gpu.dotT(e2_Y,_W1);
+    Matrix *e3 = _gpu.dotT(e2_Y,_W1);
 
-    //update_vocab_gradient(e3,_Vocab, _currentBatchIdx_X);
+    update_vocab_with_gradient(e3,_currentBatchIdx_Y, _Vocab);
 
 
 	Matrix *e1_X = empty(_nBatchSize,1);

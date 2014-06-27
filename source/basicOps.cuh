@@ -156,4 +156,5 @@ void hStackN(float** arrA, int general_size, Matrix *out, int matrices_count);
 
 void sparse_dot(Matrix *A, Matrix *B, Matrix *out);
 void construct_vocab_matrix(Matrix *vocab_idx, Matrix *vocab_idx_y, Matrix *batch_X, Matrix *batch_y, Matrix *vocab, Matrix *rdm_idx);
+void update_vocab_with_gradient(Matrix *grad, Matrix *vocab_idx, Matrix *vocab);
 #endif

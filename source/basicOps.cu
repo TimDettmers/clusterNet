@@ -1101,7 +1101,11 @@ void construct_vocab_matrix(Matrix *vocab_idx, Matrix *vocab_idx_y, Matrix *batc
 	kConstructVocabMatrix<<<grid,vocab->rows>>>(vocab_idx->data, vocab_idx_y->data, vocab->data, rdm_idx->data, batch_X->data, batch_y->data);
 }
 
-
-
+void update_vocab_with_gradient(Matrix *grad, Matrix *vocab_idx, Matrix *vocab)
+{
+	assert(vocab->rows <= 1024);
+	dim3 grid(vocab_idx->rows,vocab_idx->cols,1);
+	kUpdateVocabWithGradient<<<grid,vocab->rows>>>(grad->data, vocab_idx->data, vocab->data);
+}
 
 
