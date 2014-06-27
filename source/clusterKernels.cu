@@ -970,18 +970,102 @@ __global__ void kConstructVocabMatrix(float *vocab_idx, float *vocab_idx_y, floa
 
 }
 
-__global__ void kUpdateVocabWithGradient(float *grad, float *vocab_idx, float* vocab)
+
+
+ //numerically unstable?
+__global__ void kUpdateVocabWithGradient(float *grad, float *vocab_idx, float* vocab, float learning_rate)
 {
 	//vocab_vector_size = blockDim.x;
 	//vocab_idx_rows = batch_size = gridDim.x
 	//vocab_idx_cols = window_size = gridDim.y
 
 	int myIdx = 0;
+	float multiplier = -fdividef(learning_rate,float(gridDim.x));
 	myIdx = (int)vocab_idx[blockIdx.x+(blockIdx.y*gridDim.x)];
 	int myVocabIdx = blockDim.x*myIdx;
 
-	//atomicAdd(&out[0],A[i] != 0.0f ? 1.0f : 0.0f);
-	atomicAdd(&vocab[myVocabIdx + threadIdx.x],-fdividef(grad[blockIdx.x + (blockIdx.y*blockDim.x*gridDim.x) + (threadIdx.x*gridDim.x)],float(gridDim.x)));
+
+
+	//printf("%f ",grad[blockIdx.x + (blockIdx.y*blockDim.x*gridDim.x) + (threadIdx.x*gridDim.x)]*multiplier);
+	//printf("%f ",vocab[myVocabIdx + threadIdx.x]);
+	//printf("%f ",vocab[myVocabIdx + threadIdx.x]+ (grad[blockIdx.x + (blockIdx.y*blockDim.x*gridDim.x) + (threadIdx.x*gridDim.x)]*multiplier));
+	if(myIdx > 10000)
+		atomicAdd(&vocab[myVocabIdx + threadIdx.x],grad[blockIdx.x + (blockIdx.y*blockDim.x*gridDim.x) + (threadIdx.x*gridDim.x)]*multiplier);
+	//vocab[myVocabIdx + threadIdx.x] +=grad[blockIdx.x + (blockIdx.y*blockDim.x*gridDim.x) + (threadIdx.x*gridDim.x)];
+	//printf("%s ",!isfinite(grad[blockIdx.x + (blockIdx.y*blockDim.x*gridDim.x) + (threadIdx.x*gridDim.x)]*multiplier));
 
 }
+
+
+
+/*
+//numerically unstable?
+__global__ void kUpdateVocabWithGradient(float *grad, float *vocab_idx, float* vocab, float learning_rate, int batch_size, int window_size, int vocab_rows, int vocab_cols)
+{
+	//vocab_vector_size = blockDim.x;
+	//vocab_idx_rows = batch_size = gridDim.x
+	//vocab_idx_cols = window_size = gridDim.y
+
+	int myIdx = 0;
+	float multiplier = -fdividef(learning_rate,float(batch_size));
+	int size = window_size*batch_size;
+	int myVocabIdx = 0;
+	int grad_row = 0;
+	int grad_col = 0;
+	for(int i = threadIdx.x; i < size; i+=blockDim.x)
+	{
+		myIdx = (int)vocab_idx[i];
+		grad_row = i/window_size;
+		grad_col = i - grad_row;
+
+		myVocabIdx = vocab_rows*myIdx;
+		for(int j = 0; j < vocab_rows; j++)
+		{
+			atomicAdd(&vocab[myVocabIdx + j],grad[grad_row + (grad_col*vocab_rows)]*multiplier);
+		}
+	}
+}
+
+
+/*
+__global__ void kUpdateVocabWithGradient(float *gradX, float *gradY, float *vocab_idx_X, float *vocab_idx_Y, float* vocab,
+										 float *vocab_grad, float *vocab_grad_idx, float learning_rate, int grad_size)
+{
+	//vocab_vector_size = blockDim.x;
+	//vocab_idx_rows = batch_size = gridDim.x
+	//vocab_idx_cols = window_size = gridDim.y
+
+
+	float multiplier = fdividef(learning_rate,(float)(gridDim.x*2));
+	int myIdx_X = (int)vocab_idx_X[blockIdx.x+(blockIdx.y*gridDim.x)];
+	int myIdx_Y = (int)vocab_idx_Y[blockIdx.x+(blockIdx.y*gridDim.x)];
+	int grad_cols = grad_size/blockDim.x;
+
+	int myVocabIdx_X = blockDim.x*myIdx_X;
+	int myVocabIdx_Y = blockDim.x*myIdx_Y;
+
+
+	atomicAdd(&vocab_grad[myVocabIdx_X + threadIdx.x],gradX[blockIdx.x + (blockIdx.y*blockDim.x*gridDim.x) + (threadIdx.x*gridDim.x)]);
+	atomicAdd(&vocab_grad[myVocabIdx_Y + threadIdx.x],gradY[blockIdx.x + (blockIdx.y*blockDim.x*gridDim.x) + (threadIdx.x*gridDim.x)]);
+	vocab_grad_idx[myIdx_X] = 1.0f;
+	vocab_grad_idx[myIdx_Y] = 1.0f;
+
+	__syncthreads();
+
+
+
+	int block_idx = (blockIdx.y*gridDim.x) + blockIdx.x;
+	int threads_blocks = gridDim.x*gridDim.y;
+	for(int i = block_idx; i < grad_cols; i+=threads_blocks)
+	{
+		if(vocab_grad_idx[i] == 1.0f)
+		{
+			vocab[(i*blockDim.x) + threadIdx.x] -= vocab_grad[(i*blockDim.x) + threadIdx.x]*multiplier;
+		}
+	}
+
+
+
+}
+*/
 

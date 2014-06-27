@@ -638,16 +638,18 @@ int run_basicOps_test()
 	}
 
 
+
 	//update vocab grad test
 	int vocab_vector_size = 73;
 	int batch_size = 137;
 	int window_size = 17;
 	int vocab_size = 987;
+	float learing_rate = 0.17;
 	grad = ones(batch_size,window_size*vocab_vector_size);
 	Matrix *vocab_idx = gpu.rand_int(batch_size,window_size,0,vocab_size-1);
 	Matrix *vocab = gpu.uniformSqrtWeight(vocab_vector_size,vocab_size);
 	m2 = to_host(vocab);
-	update_vocab_with_gradient(grad,vocab_idx,vocab);
+	update_vocab_with_gradient(grad,vocab_idx,vocab,learing_rate);
 
 	m1 = to_host(vocab_idx);
 	m4 = to_host(vocab);
@@ -659,7 +661,7 @@ int run_basicOps_test()
 		{
 			idx = (int)m1->data[col + (row*m1->cols)];
 			for(int i = 0; i < vocab_vector_size; i++)
-				m2->data[idx + (vocab->cols*i)]-= (m3->data[(col*vocab_vector_size) + (row*grad->cols) + i]/(float)batch_size);
+				m2->data[idx + (vocab->cols*i)]-= learing_rate*(m3->data[(col*vocab_vector_size) + (row*grad->cols) + i]/(float)batch_size);
 
 
 		}
@@ -672,8 +674,6 @@ int run_basicOps_test()
 				assert(test_eq(m2->data[idx + (vocab->cols*i)], m4->data[idx + (vocab->cols*i)],"update vocab with gradient test"));
 
 		}
-
-
 
 
 

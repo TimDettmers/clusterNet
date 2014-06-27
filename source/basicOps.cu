@@ -35,9 +35,11 @@ Matrix *to_gpu(Matrix *A, int is_col_major)
 Matrix *to_host(Matrix *A){ return to_host(A, 0); }
 Matrix *to_host(Matrix *A, int is_row_major)
 {
-  Matrix *row_major = A;
+	Matrix *row_major;
 	 if(is_row_major == 0 && A->isSparse == 0)
 		 row_major = to_row_major(A);
+	 else
+		 row_major = A;
 
   Matrix *out = (Matrix*)malloc(sizeof(Matrix));
   float *cpu_data;
@@ -78,6 +80,9 @@ Matrix *to_host(Matrix *A, int is_row_major)
 	  out->idx_cols = idx_cols;
 	  out->ptr_rows = ptr_rows;
   }
+
+	 if(is_row_major == 0 && A->isSparse == 0)
+		 cudaFree(row_major->data);
 
   return out;
 }
@@ -1101,11 +1106,13 @@ void construct_vocab_matrix(Matrix *vocab_idx, Matrix *vocab_idx_y, Matrix *batc
 	kConstructVocabMatrix<<<grid,vocab->rows>>>(vocab_idx->data, vocab_idx_y->data, vocab->data, rdm_idx->data, batch_X->data, batch_y->data);
 }
 
-void update_vocab_with_gradient(Matrix *grad, Matrix *vocab_idx, Matrix *vocab)
+void update_vocab_with_gradient(Matrix *grad, Matrix *vocab_idx, Matrix *vocab, float learning_rate)
 {
 	assert(vocab->rows <= 1024);
 	dim3 grid(vocab_idx->rows,vocab_idx->cols,1);
-	kUpdateVocabWithGradient<<<grid,vocab->rows>>>(grad->data, vocab_idx->data, vocab->data);
+	kUpdateVocabWithGradient<<<grid,vocab->rows>>>(grad->data, vocab_idx->data, vocab->data, learning_rate);
+
+	cudaThreadSynchronize();
 }
 
 

@@ -39,6 +39,8 @@ private:
 	Matrix *_grad2_Y;
 	Matrix *_grad3_X;
 	Matrix *_grad3_Y;
+	Matrix *_Vocab_grad;
+	Matrix *_Vocab_grad_idx;
 	Matrix *_gradB1;
 	Matrix *_gradB2;
 	Matrix *_batchX;
@@ -59,7 +61,7 @@ private:
 	Matrix *z2_Y;
 
 	cudaStream_t _streamNextBatch;
-	float _fSumError;
+	double _dSumError;
 	int _nTrainErrorPeriodicity;
 	int _nTrainErrorLength;
 
