@@ -34,8 +34,8 @@ DeepNeuralNetwork::DeepNeuralNetwork(std::vector<int> lLayerSizes, Networktype_t
 void DeepNeuralNetwork::init_network_layout(std::vector<int> lLayerSizes)
 {
 	m_lLayers = lLayerSizes;
-	if(m_net_type == Classification){ m_costFunction = Root_Squared_Error;}
-	if(m_net_type == Regression){ m_costFunction = Cross_Entropy; }
+	if(m_net_type == Classification){ m_costFunction = Cross_Entropy;}
+	if(m_net_type == Regression){ m_costFunction = Root_Squared_Error; }
 
 	lDropout.push_back(0.2f);
 	for(int i = 0;i < m_lLayers.size(); i++)

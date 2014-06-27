@@ -746,6 +746,7 @@ int main(int argc, char *argv[])
 
 
 	/*
+
 	ClusterNet gpus = ClusterNet(argc,argv, 1245);
 	BatchAllocator b = BatchAllocator();
 	if(gpus.MYGPUID == 0)
@@ -761,14 +762,44 @@ int main(int argc, char *argv[])
 		//layers.push_back(1000);
 		//layers.push_back(1000);
 		layers.push_back(500);
+		layers.push_back(500);
+
+		BatchAllocator allocator = BatchAllocator();
+		allocator.init(X,y,0.2,128,512,gpus, Single_GPU);
+		DeepNeuralNetwork net = DeepNeuralNetwork(layers,Classification, gpus, allocator, 2);
+
+		net.LEARNING_RATE = 0.0003;
+		net.EPOCHS = 10;
+		net.TRANSITION_EPOCH = 500;
+		net.train();
+
+		Matrix *result = net.predict(test);
+
+		write_csv("/home/tim/data/higgs/result.csv",result,"EventId,RankOrder,Class",ids);
+	}
+
+	gpus.shutdown_MPI();
+
+	*/
+
+	/*
+	ClusterNet gpus = ClusterNet(argc,argv, 1245);
+	BatchAllocator b = BatchAllocator();
+	if(gpus.MYGPUID == 0)
+	{
+		Matrix *X = read_hdf5("/home/tim/data/KDD2014/X_nontext_dense.hdf5");
+		Matrix *y = read_hdf5("/home/tim/data/KDD2014/y_nontext_dense.hdf5");
+		Matrix *test = read_hdf5("/home/tim/data/KDD2014/test_nontext_dense.hdf5");
+		//Matrix *ids = read_hdf5("/home/tim/data/KDD2014/ids.hdf5");
 
 		cout << X->rows << "x" << X->cols << endl;
-		cout << y->rows << "x" << y->cols << endl;
-		cout << test->rows << "x" << test->cols << endl;
-		cout << ids->rows << "x" << ids->cols << endl;
 
+		b.init(X,y,0.2,128,512);
 
-
+		std::vector<int> layers;
+		//layers.push_back(1000);
+		//layers.push_back(1000);
+		layers.push_back(500);
 
 		BatchAllocator allocator = BatchAllocator();
 		allocator.init(X,y,0.2,128,512,gpus, Single_GPU);
@@ -780,11 +811,12 @@ int main(int argc, char *argv[])
 
 		Matrix *result = net.predict(test);
 
-		write_csv("/home/tim/data/higgs/result.csv",result,"EventId,RankOrder,Class",ids);
+		//write_csv("/home/tim/data/KDD2014/result.csv",result,"EventId,RankOrder,Class",ids);
 	}
 
 	gpus.shutdown_MPI();
 	*/
+
 
 	/*
 	ClusterNet gpus = ClusterNet(argc,argv,1245);

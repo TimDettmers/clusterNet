@@ -47,6 +47,7 @@ public:
 	 Matrix *randn(int rows, int cols, float mean, float std);
 	 void randn(int rows, int cols, float mean, float std, Matrix *out);
 	 Matrix *dropout(Matrix *A, float dropout_rate);
+	 void dropout(Matrix *A, Matrix *out, float dropout_rate);
 	 Matrix *rand_int(int rows, int cols, int low, int high);
 
 	 void tick(std::string name);
@@ -67,7 +68,7 @@ public:
 	 Matrix *dense_to_sparse(Matrix *A);
 	 Matrix *sparse_to_dense(Matrix *A);
 
-	 void construct_vocab_matrix(Matrix *vocab_idx, Matrix *batch_X, Matrix *batch_y, Matrix *vocab);
+	 void construct_vocab_matrix(Matrix *vocab_idx, Matrix *vocab_idx_y, Matrix *batch_X, Matrix *batch_y, Matrix *vocab);
 
 	 int MYRANK;
 	 int NODES;

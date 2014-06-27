@@ -192,9 +192,9 @@ int run_basicOps_test()
   assert(blnFaultySizes(ones(1,3),ones(1,3),ones(1,3))==0);
   assert(blnFaultySizes(ones(3,3),ones(3,3),ones(3,3))==0);
   //test blnFaultyMatrixSizes
-  assert(blnFaultyMatrixProductSizes(ones(1,3),ones(1,3),ones(3,3))==1);
-  assert(blnFaultyMatrixProductSizes(ones(3,1),ones(1,3),ones(2,2))==1);
-  assert(blnFaultyMatrixProductSizes(ones(3,1),ones(1,3),ones(3,3))==0);
+  assert(blnFaultyMatrixProductSizes(ones(1,3),ones(1,3),ones(3,3),CUBLAS_OP_N,CUBLAS_OP_N)==1);
+  assert(blnFaultyMatrixProductSizes(ones(3,1),ones(1,3),ones(2,2),CUBLAS_OP_N,CUBLAS_OP_N)==1);
+  assert(blnFaultyMatrixProductSizes(ones(3,1),ones(1,3),ones(3,3),CUBLAS_OP_N,CUBLAS_OP_N)==0);
 
   //transpose test
   //column major order

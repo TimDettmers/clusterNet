@@ -59,5 +59,5 @@ __global__ void kMaxColumnwise(float* mat, float* target, unsigned int width, un
 __global__ void kMaxout(float *A, float *out, float *outargmax, int maxout_level, unsigned int cols, unsigned int rows);
 __device__ void reduceToMaxAndArgMax(float* sdataMax, float* sdataArgMax, unsigned int tid, int threads);
 __global__ void kExpandToMaxoutGrad(float* error, float* indexes, float *out, int error_size, int error_rows, int maxout_level);
-__global__ void kConstructVocabMatrix(float *vocab_idx, float* vocab, float *rdm_idx, float *batch_X, float *batch_Y);
+__global__ void kConstructVocabMatrix(float *vocab_idx, float *vocab_idx_y, float* vocab, float *rdm_idx, float *batch_X, float *batch_Y);
 #endif

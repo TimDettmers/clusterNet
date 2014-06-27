@@ -675,13 +675,10 @@ __global__ void kPairwise_ranking_derivative(float *A, float *B, float *out, int
 {
   const unsigned int numThreads = blockDim.x * gridDim.x;
   const int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
-  float value = 0.0f;
 
   for (unsigned int i = idx;i < size; i += numThreads)
-  {
-	  value = 1.0f - A[i] + B[i];
-      out[i] = value > 0.0f ? 1.0f : 0.0f;
-  }
+      out[i] = (1.0f - A[i] + B[i]) > 0.0f ? 1.0f : 0.0f;
+
 }
 
 __global__ void kHardTanH_Derivative(float *A, float *out, int size)
@@ -932,7 +929,7 @@ __global__ void kExpandToMaxoutGrad(float* error, float* indexes, float *out, in
 	}
 }
 
-__global__ void kConstructVocabMatrix(float *vocab_idx, float* vocab, float *rdm_idx, float *batch_X, float *batch_Y)
+__global__ void kConstructVocabMatrix(float *vocab_idx, float *vocab_idx_y, float* vocab, float *rdm_idx, float *batch_X, float *batch_Y)
 {
 	int middleIdx = (gridDim.y/2);
 	int myIdx = 0;
@@ -944,11 +941,15 @@ __global__ void kConstructVocabMatrix(float *vocab_idx, float* vocab, float *rdm
 
 	//middle index is replaced by rdm word for batch_Y, but we still need to write the correct into batch_X!
 	if(blockIdx.y != middleIdx)
+	{
 		myIdx = (int)vocab_idx[blockIdx.x+(blockIdx.y*gridDim.x)];//gridDim.x = vocab_idx_vector rows == batch size
+		vocab_idx_y[blockIdx.x+(blockIdx.y*gridDim.x)] = (float)myIdx;
+	}
 	else
 	{
 		myIdx = (int)vocab_idx[blockIdx.x+(blockIdx.y*gridDim.x)];
 		myRdmIdx = (int)rdm_idx[blockIdx.x];
+		vocab_idx_y[blockIdx.x+(blockIdx.y*gridDim.x)] = (float)myRdmIdx;
 	}
 
 	int myVocabIdx = blockDim.x*myIdx;
@@ -964,6 +965,8 @@ __global__ void kConstructVocabMatrix(float *vocab_idx, float* vocab, float *rdm
 		batch_X[blockIdx.x + (blockIdx.y*blockDim.x*gridDim.x) + (threadIdx.x*gridDim.x)] = vocab[myVocabIdx + threadIdx.x];
 		batch_Y[blockIdx.x + (blockIdx.y*blockDim.x*gridDim.x) + (threadIdx.x*gridDim.x)] = vocab[myVocabRdmIdx + threadIdx.x];
 	}
+
+
 
 }
 

@@ -334,7 +334,7 @@ void ClusterNet::dot(Matrix *A, Matrix *B, Matrix *out, cublasOperation_t T1, cu
 {
 	if(A->isSparse == 0)
 	{
-		//if(checkMatrixOperation(A, B, out, 1) == 1){ throw "Matrix *size error:\n"; }
+		if(checkMatrixOperation(A, B, out, T1, T2, 1) == 1){ throw "Matrix *size error:\n"; }
 		cublasStatus_t status;
 		if(!m_cublasInitialized)
 		{
@@ -686,6 +686,19 @@ Matrix *ClusterNet::dropout(Matrix *A, float dropout_rate)
 	return out;
 }
 
+void ClusterNet::dropout(Matrix *A, Matrix *out, float dropout_rate)
+{
+
+	if(A->isSparse == 0)
+		curandGenerateUniform(m_generator, out->data, out->rows*out->cols);
+	else
+	{
+		out = empty_sparse(A->rows,A->cols,A->size);
+		curandGenerateUniform(m_generator, out->data, A->size);
+	}
+	::dropout(A, out, dropout_rate);
+}
+
 Matrix *ClusterNet::uniformSqrtWeight(int rows, int cols)
 {
 	Matrix * out = rand(rows, cols);
@@ -847,10 +860,10 @@ Matrix *ClusterNet::sparse_to_dense(Matrix *A)
 	return out;
 }
 
-void ClusterNet::construct_vocab_matrix(Matrix *vocab_idx, Matrix *batch_X, Matrix *batch_y, Matrix *vocab)
+void ClusterNet::construct_vocab_matrix(Matrix *vocab_idx, Matrix *vocab_idx_y, Matrix *batch_X, Matrix *batch_y, Matrix *vocab)
 {
 	Matrix *rdm_idx = rand_int(batch_X->rows,1, 0,vocab->cols-1);
-	::construct_vocab_matrix(vocab_idx,batch_X,batch_y,vocab,rdm_idx);
+	::construct_vocab_matrix(vocab_idx,vocab_idx_y,batch_X,batch_y,vocab,rdm_idx);
 
 }
 

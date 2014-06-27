@@ -401,7 +401,7 @@ Matrix *add(Matrix *A, Matrix *B)
 
 void add(Matrix *A, Matrix *B, Matrix *out)
 {
-  checkMatrixOperation(A, B, out, 0);
+  checkMatrixOperation(A, B, out, CUBLAS_OP_N, CUBLAS_OP_N, 0);
   int block_size = (A->size/THREADS_PER_BLOCKS) + 1;
   kAdd<<<block_size,THREADS_PER_BLOCKS>>>(A->data, B->data, out->data, A->size);
 }
@@ -410,7 +410,6 @@ Matrix *sub(Matrix *A, Matrix *B)
 {
   Matrix *out = empty(A->rows,A->cols);
   sub(A, B, out);
-  checkMatrixOperation(A, B, out, 0);
   return out;
 }
 
@@ -486,7 +485,7 @@ void hStack(Matrix *A, Matrix *B, Matrix *out)
 
 void sub(Matrix *A, Matrix *B, Matrix *out)
 {
-	checkMatrixOperation(A, B, out, 0);
+	checkMatrixOperation(A, B, out, CUBLAS_OP_N, CUBLAS_OP_N, 0);
 	int block_size = (A->size/THREADS_PER_BLOCKS) + 1;
 	if(B->isSparse == 0)
 		kSub<<<block_size,THREADS_PER_BLOCKS>>>(A->data, B->data, out->data, A->size);
@@ -498,14 +497,13 @@ Matrix *mul(Matrix *A, Matrix *B)
 {
   Matrix *out = empty(A->rows,A->cols);
   mul(A, B, out);
-  checkMatrixOperation(A, B, out, 0);
 
   return out;
 }
 
 void mul(Matrix *A, Matrix *B, Matrix *out)
 {
-	checkMatrixOperation(A, B, out, 0);
+	checkMatrixOperation(A, B, out, CUBLAS_OP_N, CUBLAS_OP_N, 0);
 	int block_size = (A->size/THREADS_PER_BLOCKS) + 1;
 	kMul<<<block_size,THREADS_PER_BLOCKS>>>(A->data, B->data, out->data, A->size);
 }
@@ -515,7 +513,6 @@ Matrix *div(Matrix *A, Matrix *B)
   Matrix *out = empty(A->rows,A->cols);
   
   div(A, B, out);
-  checkMatrixOperation(A, B, out, 0);
 
   return out;
 }
@@ -529,7 +526,7 @@ void printData(Matrix *A)
 
 void div(Matrix *A, Matrix *B, Matrix *out)
 {
-	checkMatrixOperation(A, B, out, 0);
+	checkMatrixOperation(A, B, out, CUBLAS_OP_N, CUBLAS_OP_N, 0);
 	int block_size = (A->size/THREADS_PER_BLOCKS) + 1;
 	kDiv<<<block_size,THREADS_PER_BLOCKS>>>(A->data, B->data, out->data, A->size);
 }
@@ -717,11 +714,24 @@ int blnFaultySizes(Matrix *A, Matrix *B, Matrix *C)
   }
 }
 
-int blnFaultyMatrixProductSizes(Matrix *A, Matrix *B, Matrix *C)
+int blnFaultyMatrixProductSizes(Matrix *A, Matrix *B, Matrix *C, cublasOperation_t T1, cublasOperation_t T2)
 {
-   if((A->cols == B->rows) &&
-      (A->rows == C->rows) &&
-      (B->cols == C->cols))
+	int A_rows = A->rows, A_cols = A->cols, B_rows = B->rows, B_cols = B->cols;
+
+	if (T1 == CUBLAS_OP_T)
+	{
+		A_rows = A->cols;
+		A_cols = A->rows;
+	}
+	if (T2 == CUBLAS_OP_T)
+	{
+		B_cols = B->rows;
+		B_rows = B->cols;
+	}
+
+   if((A_cols == B_rows) &&
+      (A_rows == C->rows) &&
+      (B_cols == C->cols))
   {
     return 0;
   }
@@ -748,23 +758,36 @@ void printFaultySizeError(Matrix *A, Matrix *B, Matrix *C)
     assert(0);
   }
 }
-void printFaultyMatrixProductSizeError(Matrix *A, Matrix *B, Matrix *C)
+void printFaultyMatrixProductSizeError(Matrix *A, Matrix *B, Matrix *C, cublasOperation_t T1, cublasOperation_t T2)
 {
+	int A_rows = A->rows, A_cols = A->cols, B_rows = B->rows, B_cols = B->cols;
+
+	if (T1 == CUBLAS_OP_T)
+	{
+		A_rows = A->cols;
+		A_cols = A->rows;
+	}
+	if (T2 == CUBLAS_OP_T)
+	{
+		B_cols = B->rows;
+		B_rows = B->cols;
+	}
+
+
     printf("Error: Faulty dot product matrix operation:\n");
-  if(A->cols != B->rows)
-  {
-    printf("Matrix *A is of size %ix%i while Matrix *B is of size %ix%i.\n",
-           A->rows,A->cols,B->rows,B->cols);
-  }
-  else if((A->cols == B->rows)  &&          
-  	  ((C->rows != A->rows) || (C->cols != B->cols)))
-  {
-    printf("Output Matrix *is of size %ix%i while Matrix *A and B have sizes %ix%i and %ix%i.\n",
-           C->rows,C->cols,A->rows,A->cols, B->rows,B->cols);
-  }
+	if(A_cols != B_rows)
+	{
+		printf("Matrix *A is of size %ix%i while Matrix *B is of size %ix%i.\n",
+				A_rows,A_cols,B_rows,B_cols);
+	}
+	else if((A_cols == B_rows)  && ((C->rows != A_rows) || (C->cols != B_cols)))
+	{
+		printf("Output Matrix *is of size %ix%i while Matrix *A and B have sizes %ix%i and %ix%i.\n",
+		   C->rows,C->cols,A_rows,A_cols, B_rows,B_cols);
+	}
 }
 
-int checkMatrixOperation(Matrix *A, Matrix *B, Matrix *C, int blnMatrixProduct)
+int checkMatrixOperation(Matrix *A, Matrix *B, Matrix *C, cublasOperation_t T1, cublasOperation_t T2, int blnMatrixProduct)
 {
   if(blnMatrixProduct == 0)
   {
@@ -777,9 +800,9 @@ int checkMatrixOperation(Matrix *A, Matrix *B, Matrix *C, int blnMatrixProduct)
   }
   else
   {
-    if(blnFaultyMatrixProductSizes(A, B, C) == 1)
+    if(blnFaultyMatrixProductSizes(A, B, C, T1, T2) == 1)
     {
-      printFaultyMatrixProductSizeError(A, B, C);
+      printFaultyMatrixProductSizeError(A, B, C, T1, T2);
       return 1;
     }
   }
@@ -1071,11 +1094,11 @@ void sparse_dot(Matrix *A, Matrix *B, Matrix *out)
 
 }
 
-void construct_vocab_matrix(Matrix *vocab_idx, Matrix *batch_X, Matrix *batch_y, Matrix *vocab, Matrix *rdm_idx)
+void construct_vocab_matrix(Matrix *vocab_idx, Matrix *vocab_idx_y, Matrix *batch_X, Matrix *batch_y, Matrix *vocab, Matrix *rdm_idx)
 {
 	assert(vocab->rows <= 1024);
 	dim3 grid(vocab_idx->rows,vocab_idx->cols,1);
-	kConstructVocabMatrix<<<grid,vocab->rows>>>(vocab_idx->data, vocab->data, rdm_idx->data, batch_X->data, batch_y->data);
+	kConstructVocabMatrix<<<grid,vocab->rows>>>(vocab_idx->data, vocab_idx_y->data, vocab->data, rdm_idx->data, batch_X->data, batch_y->data);
 }
 
 

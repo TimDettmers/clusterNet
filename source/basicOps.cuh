@@ -139,11 +139,11 @@ void squared_error(Matrix *A, Matrix *targets, Matrix *out);
 
 void expand_to_maxout_grad(Matrix *error, Matrix *idx, Matrix *grad);
 
-int checkMatrixOperation(Matrix *A, Matrix *B, Matrix *C, int blnMatrixProduct);
+int checkMatrixOperation(Matrix *A, Matrix *B, Matrix *C, cublasOperation_t T1, cublasOperation_t T2, int blnMatrixProduct);
 int blnFaultySizes(Matrix *A, Matrix *B, Matrix *C);
-int blnFaultyMatrixProductSizes(Matrix *A, Matrix *B, Matrix *C);
+int blnFaultyMatrixProductSizes(Matrix *A, Matrix *B, Matrix *C, cublasOperation_t T1, cublasOperation_t T2);
 void printFaultySizeError(Matrix *A, Matrix *B, Matrix *C);
-void printFaultyMatrixProductSizeError(Matrix *A, Matrix *B, Matrix *C);
+void printFaultyMatrixProductSizeError(Matrix *A, Matrix *B, Matrix *C, cublasOperation_t T1, cublasOperation_t T2);
 void printData(Matrix *A);
 
 Matrix *slice_rows(Matrix *A, int start, int end);
@@ -155,5 +155,5 @@ Matrix *hStack(Matrix *A, Matrix *B);
 void hStackN(float** arrA, int general_size, Matrix *out, int matrices_count);
 
 void sparse_dot(Matrix *A, Matrix *B, Matrix *out);
-void construct_vocab_matrix(Matrix *vocab_idx, Matrix *batch_X, Matrix *batch_y, Matrix *vocab, Matrix *rdm_idx);
+void construct_vocab_matrix(Matrix *vocab_idx, Matrix *vocab_idx_y, Matrix *batch_X, Matrix *batch_y, Matrix *vocab, Matrix *rdm_idx);
 #endif

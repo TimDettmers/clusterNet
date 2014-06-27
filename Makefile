@@ -30,4 +30,4 @@ test:
 
 run:
 	#scp $(TOP)$(EXECSRC) $(NODES):$(TOP)build/;
-	$(MPI_DIR)/bin/mpirun -x LD_LIBRARY_PATH -np 3 -hostfile $(HOSTFILE) $(TOP)$(EXECSRC)
+	$(MPI_DIR)/bin/mpirun -x LD_LIBRARY_PATH -np 1 -hostfile $(HOSTFILE) $(TOP)$(EXECSRC)
