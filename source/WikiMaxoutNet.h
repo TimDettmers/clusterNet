@@ -29,10 +29,6 @@ private:
 	ClusterNet _gpu;
 	Matrix *_X;
 	Matrix *_Vocab;
-	Matrix *_W1;
-	Matrix *_W2;
-	Matrix *_B1;
-	Matrix *_B2;
 	Matrix *_grad1_X;
 	Matrix *_grad2_X;
 	Matrix *_grad1_Y;
@@ -40,6 +36,8 @@ private:
 	Matrix *_grad0_X;
 	Matrix *_grad0_Y;
 	Matrix *_Vocab_grad;
+	Matrix *_MSVocab_grad;
+	Matrix *_MVocab;
 	Matrix *_Vocab_grad_idx;
 	Matrix *_gradB1_X;
 	Matrix *_gradB1_Y;
@@ -51,6 +49,15 @@ private:
 	int _nNextBatchNumber;
 	int _nBatchSize;
 	int _batches;
+	std::vector<int> _layers;
+	std::vector<Matrix*> W;
+	std::vector<Matrix*> B;
+	std::vector<Matrix*> M;
+	std::vector<Matrix*> BM;
+	std::vector<Matrix*> GRAD;
+	std::vector<Matrix*> MSGRAD;
+	std::vector<Matrix*> BGRAD;
+	std::vector<Matrix*> MSBGRAD;
 
 
 	Matrix *d0;
@@ -68,6 +75,7 @@ private:
 	int _nTrainErrorPeriodicity;
 	int _nTrainErrorLength;
 	int _nMaxoutSize;
+	float MOMENTUM;
 	float _learningRate;
 	int _totalNumberOfBatches;
 

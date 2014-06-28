@@ -1,17 +1,22 @@
 #include <WikiMaxoutNet.h>
 #include <assert.h>
+#include <exception>
 using std::cout;
 using std::endl;
 
 
 WikiMaxoutNet::WikiMaxoutNet(ClusterNet gpu)
 {
+
+
 	int nWordVectorDim = 50;
 	int nWindowSize = 11;
+	_layers.push_back(1024);
 	_nMaxoutSize = 8;
-	_learningRate = 0.01;
+	_learningRate = 0.003;
 	_nTrainErrorPeriodicity = 1000;
 	_nTrainErrorLength = 100;
+	MOMENTUM = 0.5;
 	_gpu = gpu;
 	_nCurrentDataSet = _gpu.MYRANK;
 	_X = gpu.rand(1,1);
@@ -19,26 +24,39 @@ WikiMaxoutNet::WikiMaxoutNet(ClusterNet gpu)
 	_nBatchSize = 128;
 	cudaStreamCreate(&_streamNextBatch);
 
+	W.push_back(gpu.uniformSqrtWeight(nWordVectorDim*nWindowSize,_layers[0]));
+	W.push_back(gpu.uniformSqrtWeight(_layers[0]/_nMaxoutSize, 1));
+	B.push_back(zeros(1,_layers[0]));
+	B.push_back(zeros(1,1));
+	M.push_back(zeros(nWordVectorDim*nWindowSize,_layers[0]));
+	M.push_back(zeros(_layers[0]/_nMaxoutSize, 1));
+	BM.push_back(zeros(1,_layers[0]));
+	BM.push_back(zeros(1,1));
+
+	//scalarMul(_Vocab,20,_Vocab);
+
+
+	for(int i = W.size()-1; i >= 0; i--)
+	{
+		GRAD.push_back(zeros(W[i]->rows, W[i]->cols));
+		GRAD.push_back(zeros(W[i]->rows, W[i]->cols));
+		MSGRAD.push_back(zeros(W[i]->rows, W[i]->cols));
+		MSGRAD.push_back(zeros(W[i]->rows, W[i]->cols));
+		BGRAD.push_back(zeros(B[i]->rows, B[i]->cols));
+		BGRAD.push_back(zeros(B[i]->rows, B[i]->cols));
+		MSBGRAD.push_back(zeros(B[i]->rows, B[i]->cols));
+		MSBGRAD.push_back(zeros(B[i]->rows, B[i]->cols));
+	}
+	GRAD.push_back(zeros(_nBatchSize,nWordVectorDim*nWindowSize));
+	GRAD.push_back(zeros(_nBatchSize,nWordVectorDim*nWindowSize));
+	MSGRAD.push_back(zeros(_nBatchSize,nWordVectorDim*nWindowSize));
+	MSGRAD.push_back(zeros(_nBatchSize,nWordVectorDim*nWindowSize));
+
 	_Vocab = gpu.uniformSqrtWeight(nWordVectorDim,300002);
-	//scalarMul(_Vocab,0.0002,_Vocab);
-	_W1 = gpu.uniformSqrtWeight(nWordVectorDim*nWindowSize,1024);
-	_B1 = zeros(1,1024);
-	_W2 = gpu.uniformSqrtWeight(128,1);
-	_B2 = zeros(1,1);
-
-	_grad1_X = zeros(nWordVectorDim*nWindowSize,1024);
-	_grad1_Y = zeros(nWordVectorDim*nWindowSize,1024);
-	_gradB1_X = zeros(1,1024);
-	_gradB1_Y = zeros(1,1024);
-	_grad2_X = zeros(128,1);
-	_grad2_Y = zeros(128,1);
-	_gradB2_X = zeros(1,1);
-	_gradB2_Y = zeros(1,1);
 	_Vocab_grad = zeros(nWordVectorDim,300002);
+	_MSVocab_grad = zeros(nWordVectorDim,300002);
+	_MVocab = zeros(nWordVectorDim,300002);
 	_Vocab_grad_idx = zeros(1,300002);
-	_grad0_X = zeros(128,nWordVectorDim*nWindowSize);
-	_grad0_Y = zeros(128,nWordVectorDim*nWindowSize);
-
 
 	d0 = zeros(_nBatchSize,nWordVectorDim*nWindowSize);
 	z1 = zeros(_nBatchSize, 1024);
@@ -60,12 +78,15 @@ WikiMaxoutNet::WikiMaxoutNet(ClusterNet gpu)
 	_dSumError = 0.0;
 
 	loadNextDataSet();
-	loadNextDataSet();
 	allocateNextBatch();
 }
 void WikiMaxoutNet::run()
 {
 	allocateNextBatch();
+
+	size_t freemem, total;
+	cudaMemGetInfo(&freemem,&total);
+	cout << freemem << endl;
 
 	int i = 0;
 	while(true)
@@ -113,9 +134,10 @@ void WikiMaxoutNet::allocateNextBatch()
 		_gpu.construct_vocab_matrix(_currentBatchIdx_X, _currentBatchIdx_Y, _batchX, _batchY, _Vocab);
 	}
 
-	cudaMemcpyAsync(_nextBatchIdx->data,&_X->data[_nBatchSize*11*sizeof(float)*_nNextBatchNumber],
+		cudaMemcpyAsync(_nextBatchIdx->data,&_X->data[_nBatchSize*11*_nNextBatchNumber],
 					_nBatchSize*11*sizeof(float),
 					cudaMemcpyHostToDevice,_streamNextBatch);
+
 
 	_nNextBatchNumber+=1;
 
@@ -125,18 +147,40 @@ void WikiMaxoutNet::allocateNextBatch()
 
 void WikiMaxoutNet::feedforward()
 {
-	_gpu.dot(_batchX,_W1,z1);
-	addMatrixVector(z1,_B1,z1);
+
+	//nesterov
+	for(int i = 0;i < M.size(); i++)
+	{
+		scalarMul(M[i],MOMENTUM,M[i]);
+		add(W[i],M[i],W[i]);
+	}
+
+	for(int i = 0;i < B.size(); i++)
+	{
+		scalarMul(BM[i],MOMENTUM,BM[i]);
+		add(B[i],BM[i],B[i]);
+	}
+
+	scalarMul(_MVocab, MOMENTUM, _MVocab);
+	add(_Vocab,_MVocab,_Vocab);
+
+
+	//_gpu.dropout(_batchX,d0,0.2);
+	_gpu.dot(_batchX,W[0],z1);
+	addMatrixVector(z1,B[0],z1);
 
 	maxout(z1, a1_X, a1_idx_X, _nMaxoutSize);
-	_gpu.dot(a1_X,_W2,z2_X);
-	addMatrixVector(z2_X,_B2,z2_X);
+	//_gpu.dropout(a1_X,d1,0.5);
+	_gpu.dot(a1_X,W[1],z2_X);
+	addMatrixVector(z2_X,B[1],z2_X);
 
-	_gpu.dot(_batchY,_W1,z1);
-	addMatrixVector(z1,_B1,z1);
+	//_gpu.dropout(_batchY,d0,0.2);
+	_gpu.dot(_batchY,W[0],z1);
+	addMatrixVector(z1,B[0],z1);
 	maxout(z1, a1_Y, a1_idx_Y, _nMaxoutSize);
-	_gpu.dot(a1_Y,_W2,z2_Y);
-	addMatrixVector(z2_Y,_B2,z2_Y);
+	//_gpu.dropout(a1_Y,d1,0.5);
+	_gpu.dot(a1_Y,W[1],z2_Y);
+	addMatrixVector(z2_Y,B[1],z2_Y);
 
 
 	Matrix *out = pairwise_ranking(z2_X,z2_Y);
@@ -145,52 +189,53 @@ void WikiMaxoutNet::feedforward()
 	Matrix *e1_Y = empty(_nBatchSize,1);
 	mul(out, pairwise_grad, e1_Y);
 	Matrix *aB = ones(1,_nBatchSize);
-	_gpu.dot(aB,e1_Y,_gradB2_Y);
 
-	_gpu.Tdot(a1_Y,e1_Y,_grad2_Y);
-	Matrix *e2_partial_Y = _gpu.dotT(e1_Y, _W2);
+	_gpu.dot(aB,e1_Y,BGRAD[0]);
+	_gpu.Tdot(a1_Y,e1_Y,GRAD[0]);
+
+	Matrix *e2_partial_Y = _gpu.dotT(e1_Y, W[1]);
 	Matrix *e2_Y = empty(_nBatchSize,e2_partial_Y->cols*_nMaxoutSize);
     expand_to_maxout_grad(e2_partial_Y, a1_idx_Y,e2_Y);
-    _gpu.Tdot(_batchY,e2_Y,_grad1_Y);
-    _gpu.dot(aB,e2_Y,_gradB1_Y);
-    _gpu.dotT(e2_Y,_W1,_grad0_Y);
 
+    _gpu.Tdot(_batchY,e2_Y,GRAD[2]);
+    _gpu.dot(aB,e2_Y,BGRAD[2]);
+    _gpu.dotT(e2_Y,W[0],GRAD[4]);
 
 	Matrix *e1_X = empty(_nBatchSize,1);
 	scalarMul(pairwise_grad,-1.0f,pairwise_grad);
 	mul(out, pairwise_grad, e1_X);
 
-	_gpu.dot(aB,e1_X,_gradB2_X);
+	_gpu.dot(aB,e1_X,BGRAD[1]);
+	_gpu.Tdot(a1_X,e1_X,GRAD[1]);
 
-	_gpu.Tdot(a1_X,e1_X,_grad2_X);
-	Matrix *e2_partial_X = _gpu.dotT(e1_X, _W2);
+	Matrix *e2_partial_X = _gpu.dotT(e1_X, W[1]);
 	Matrix *e2_X = empty(_nBatchSize,e2_partial_X->cols*_nMaxoutSize);
     expand_to_maxout_grad(e2_partial_X, a1_idx_X,e2_X);
-    _gpu.Tdot(_batchX,e2_X,_grad1_X);
-	_gpu.dot(aB,e2_X,_gradB1_X);
-    _gpu.dotT(e2_X,_W1,_grad0_X);
 
-	scalarMul(_grad2_Y,_learningRate/(float)_batchY->rows,_grad2_Y);
-	sub(_W2,_grad2_Y,_W2);
-	scalarMul(_gradB2_Y,_learningRate/(float)_batchX->rows,_gradB2_Y);
-	sub(_B2,_gradB2_Y,_B2);
-	scalarMul(_grad1_Y,0.1*_learningRate/(float)_batchY->rows,_grad1_Y);
-	sub(_W1,_grad1_Y,_W1);
-	scalarMul(_gradB1_Y,_learningRate/(float)_batchX->rows,_gradB1_Y);
-	sub(_B1,_gradB1_Y,_B1);
-	update_vocab_with_gradient(_grad0_Y,_currentBatchIdx_Y, _Vocab,_learningRate*0.01f);
+    _gpu.Tdot(_batchX,e2_X,GRAD[3]);
+	_gpu.dot(aB,e2_X,BGRAD[3]);
+    _gpu.dotT(e2_X,W[0],GRAD[5]);
+
+    float multiplier = _learningRate/(float)_nBatchSize;
 
 
-	scalarMul(_grad2_X,_learningRate/(float)_batchX->rows,_grad2_X);
-	sub(_W2,_grad2_X,_W2);
-	scalarMul(_gradB2_X,_learningRate/(float)_batchX->rows,_gradB2_X);
-	sub(_B2,_gradB2_X,_B2);
-	scalarMul(_grad1_X,0.1*_learningRate/(float)_batchX->rows,_grad1_X);
-	sub(_W1,_grad1_X,_W1);
-	scalarMul(_gradB1_X,_learningRate/(float)_batchX->rows,_gradB1_X);
-	sub(_B1,_gradB1_X,_B1);
-	update_vocab_with_gradient(_grad0_X,_currentBatchIdx_X, _Vocab,_learningRate*0.01f);
 
+    RMSprop_with_nesterov_weight_update(MSGRAD[0],GRAD[0],W[1],M[1],0.9f,_learningRate/(float)GRAD[0]->rows,_nBatchSize);
+    RMSprop_with_nesterov_weight_update(MSGRAD[1],GRAD[1],W[1],M[1],0.9f,_learningRate/(float)GRAD[1]->rows,_nBatchSize);
+    RMSprop_with_nesterov_weight_update(MSGRAD[2],GRAD[2],W[0],M[0],0.9f,_learningRate/(float)GRAD[2]->rows,_nBatchSize);
+    RMSprop_with_nesterov_weight_update(MSGRAD[3],GRAD[3],W[0],M[0],0.9f,_learningRate/(float)GRAD[3]->rows,_nBatchSize);
+
+    RMSprop_with_nesterov_weight_update(MSBGRAD[0],BGRAD[0],B[1],BM[1],0.9f,_learningRate,_nBatchSize);
+    RMSprop_with_nesterov_weight_update(MSBGRAD[1],BGRAD[1],B[1],BM[1],0.9f,_learningRate,_nBatchSize);
+    RMSprop_with_nesterov_weight_update(MSBGRAD[2],BGRAD[2],B[0],BM[0],0.9f,_learningRate,_nBatchSize);
+    RMSprop_with_nesterov_weight_update(MSBGRAD[3],BGRAD[3],B[0],BM[0],0.9f,_learningRate,_nBatchSize);
+
+	//update_vocab_with_gradient(GRAD[4],_currentBatchIdx_Y, _Vocab,_learningRate/(float)_nBatchSize);
+	//update_vocab_with_gradient(GRAD[5],_currentBatchIdx_X, _Vocab,_learningRate/(float)_nBatchSize);
+
+	fill_matrix(_Vocab_grad,0.0f);
+	update_vocab_with_gradient(GRAD[5],GRAD[4],_currentBatchIdx_X,_currentBatchIdx_Y,_Vocab,_Vocab_grad,_Vocab_grad_idx,_learningRate/(float)_nBatchSize);
+	RMSprop_with_nesterov_weight_update(_MSVocab_grad,_Vocab_grad,_Vocab,_MVocab,0.9f,_learningRate/(float)_nBatchSize,1);
 
 
 
@@ -204,30 +249,49 @@ void WikiMaxoutNet::feedforward()
 	cudaFree(e2_X->data);
 	cudaFree(aB->data);
 
+	/*
+	free(out);
+	free(pairwise_grad);
+	free(e1_Y);
+	free(e2_partial_Y);
+	free(e2_Y);
+	free(e1_X);
+	free(e2_partial_X);
+	free(e2_X);
+	free(aB);
+	*/
+
 
 
 }
 
 void WikiMaxoutNet::calculateError()
 {
+
 	for(int i = 0; i < _nTrainErrorLength; i++)
 	{
-		_gpu.dot(_batchX,_W1,z1);
-		addMatrixVector(z1,_B1,z1);
-		maxout(z1, a1_X, a1_idx_X, _nMaxoutSize);
-		_gpu.dot(a1_X,_W2,z2_X);
-		addMatrixVector(z2_X,_B2,z2_X);
 
-		_gpu.dot(_batchY,_W1,z1);
-		addMatrixVector(z1,_B1,z1);
+		//scalarMul(_batchX,0.8,d0);
+		_gpu.dot(_batchX,W[0],z1);
+		addMatrixVector(z1,B[0],z1);
+		maxout(z1, a1_X, a1_idx_X, _nMaxoutSize);
+		//scalarMul(a1_X,0.5,d1);
+		_gpu.dot(a1_X,W[1],z2_X);
+		addMatrixVector(z2_X,B[1],z2_X);
+
+		//scalarMul(_batchY,0.8,d0);
+		_gpu.dot(_batchY,W[0],z1);
+		addMatrixVector(z1,B[0],z1);
 		maxout(z1, a1_Y, a1_idx_Y, _nMaxoutSize);
-		_gpu.dot(a1_Y,_W2,z2_Y);
-		addMatrixVector(z2_Y,_B2,z2_Y);
+		//scalarMul(a1_Y,0.5,d1);
+		_gpu.dot(a1_Y,W[1],z2_Y);
+		addMatrixVector(z2_Y,B[1],z2_Y);
 
 		Matrix *out = pairwise_ranking(z2_X,z2_Y);
 		_dSumError += (double)sum(out);
 
 		cudaFree(out->data);
+
 
 		allocateNextBatch();
 	}

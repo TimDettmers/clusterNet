@@ -971,7 +971,7 @@ __global__ void kConstructVocabMatrix(float *vocab_idx, float *vocab_idx_y, floa
 }
 
 
-
+/*
  //numerically unstable?
 __global__ void kUpdateVocabWithGradient(float *grad, float *vocab_idx, float* vocab, float learning_rate)
 {
@@ -995,7 +995,7 @@ __global__ void kUpdateVocabWithGradient(float *grad, float *vocab_idx, float* v
 	//printf("%s ",!isfinite(grad[blockIdx.x + (blockIdx.y*blockDim.x*gridDim.x) + (threadIdx.x*gridDim.x)]*multiplier));
 
 }
-
+*/
 
 
 /*
@@ -1026,8 +1026,8 @@ __global__ void kUpdateVocabWithGradient(float *grad, float *vocab_idx, float* v
 	}
 }
 
+*/
 
-/*
 __global__ void kUpdateVocabWithGradient(float *gradX, float *gradY, float *vocab_idx_X, float *vocab_idx_Y, float* vocab,
 										 float *vocab_grad, float *vocab_grad_idx, float learning_rate, int grad_size)
 {
@@ -1047,10 +1047,12 @@ __global__ void kUpdateVocabWithGradient(float *gradX, float *gradY, float *voca
 
 	atomicAdd(&vocab_grad[myVocabIdx_X + threadIdx.x],gradX[blockIdx.x + (blockIdx.y*blockDim.x*gridDim.x) + (threadIdx.x*gridDim.x)]);
 	atomicAdd(&vocab_grad[myVocabIdx_Y + threadIdx.x],gradY[blockIdx.x + (blockIdx.y*blockDim.x*gridDim.x) + (threadIdx.x*gridDim.x)]);
+	/*
 	vocab_grad_idx[myIdx_X] = 1.0f;
 	vocab_grad_idx[myIdx_Y] = 1.0f;
 
 	__syncthreads();
+
 
 
 
@@ -1064,8 +1066,12 @@ __global__ void kUpdateVocabWithGradient(float *gradX, float *gradY, float *voca
 		}
 	}
 
+	*/
+
 
 
 }
-*/
+
+
+
 

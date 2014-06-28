@@ -1106,6 +1106,7 @@ void construct_vocab_matrix(Matrix *vocab_idx, Matrix *vocab_idx_y, Matrix *batc
 	kConstructVocabMatrix<<<grid,vocab->rows>>>(vocab_idx->data, vocab_idx_y->data, vocab->data, rdm_idx->data, batch_X->data, batch_y->data);
 }
 
+/*
 void update_vocab_with_gradient(Matrix *grad, Matrix *vocab_idx, Matrix *vocab, float learning_rate)
 {
 	assert(vocab->rows <= 1024);
@@ -1114,5 +1115,17 @@ void update_vocab_with_gradient(Matrix *grad, Matrix *vocab_idx, Matrix *vocab, 
 
 	cudaThreadSynchronize();
 }
+*/
+//float *gradX, float *gradY, float *vocab_idx_X, float *vocab_idx_Y, float* vocab,
+	//									 float *vocab_grad, float *vocab_grad_idx, float learning_rate, int grad_size
 
+void update_vocab_with_gradient(Matrix *gradX, Matrix *gradY, Matrix *vocab_idx_X, Matrix *vocab_idx_Y, Matrix *vocab, Matrix *vocab_grad, Matrix *vocab_grad_idx, float learning_rate)
+{
+	assert(vocab->rows <= 1024);
+	dim3 grid(vocab_idx_X->rows,vocab_idx_X->cols,1);
+	kUpdateVocabWithGradient<<<grid,vocab->rows>>>(gradX->data, gradY->data, vocab_idx_X->data, vocab_idx_Y->data,
+													vocab->data, vocab_grad->data,vocab_grad_idx->data, learning_rate, vocab_grad->size);
+
+	cudaThreadSynchronize();
+}
 

@@ -639,6 +639,7 @@ int run_basicOps_test()
 
 
 
+	/*
 	//update vocab grad test
 	int vocab_vector_size = 73;
 	int batch_size = 137;
@@ -675,6 +676,7 @@ int run_basicOps_test()
 
 		}
 
+*/
 
 
 
