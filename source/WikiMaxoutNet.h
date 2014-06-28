@@ -37,17 +37,20 @@ private:
 	Matrix *_grad2_X;
 	Matrix *_grad1_Y;
 	Matrix *_grad2_Y;
-	Matrix *_grad3_X;
-	Matrix *_grad3_Y;
+	Matrix *_grad0_X;
+	Matrix *_grad0_Y;
 	Matrix *_Vocab_grad;
 	Matrix *_Vocab_grad_idx;
-	Matrix *_gradB1;
-	Matrix *_gradB2;
+	Matrix *_gradB1_X;
+	Matrix *_gradB1_Y;
+	Matrix *_gradB2_X;
+	Matrix *_gradB2_Y;
 	Matrix *_batchX;
 	Matrix *_batchY;
 	int _nCurrentDataSet;
 	int _nNextBatchNumber;
 	int _nBatchSize;
+	int _batches;
 
 
 	Matrix *d0;
@@ -64,6 +67,9 @@ private:
 	double _dSumError;
 	int _nTrainErrorPeriodicity;
 	int _nTrainErrorLength;
+	int _nMaxoutSize;
+	float _learningRate;
+	int _totalNumberOfBatches;
 
 
 	void loadNextDataSet();
