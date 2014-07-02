@@ -227,7 +227,7 @@ int run_basicOps_test()
 
   //to_gpu for col major data test
   //col major data
-  float m2_data[6] = {0,0,2,0.83,3,59.1387};
+  float m2_data[6] = {0,0,2.0f,0.83,3,59.1387};
   size_t m2_bytes = 2*3*sizeof(float);
   Matrix *m2_cpu = (Matrix*)malloc(sizeof(Matrix));
   m2_cpu->rows = 2;

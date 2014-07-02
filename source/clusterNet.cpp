@@ -868,30 +868,34 @@ void ClusterNet::construct_vocab_matrix(Matrix *vocab_idx, Matrix *vocab_idx_y, 
 
 }
 
-void ClusterNet::queue_matricies(Matrix **gpuArray, MPI_Request **send_request, MPI_Request **receive_request)
+void ClusterNet::queue_matricies(Matrix **gpuArray, std::vector<MPI_Request> send_request, std::vector<MPI_Request> receive_request)
 {
 	int send_matrix_idx = (MYRANK + 1) == MPI_SIZE ? 0 : (MYRANK + 1);
+	//int receive_matrix_idx = (MYRANK - 1) < 0 ? MPI_SIZE - 1 : (MYRANK - 1);
+	for (int i = 0; i < MPI_SIZE-1; i++)
+	{
+		MPI_Isend(gpuArray[MYRANK]->data, gpuArray[MYRANK]->size, MPI_FLOAT, send_matrix_idx, MYRANK, MPI_COMM_WORLD, &send_request[i]);
+		//MPI_Irecv(gpuArray[receive_matrix_idx]->data, gpuArray[receive_matrix_idx]->size, MPI_FLOAT, receive_matrix_idx, receive_matrix_idx, MPI_COMM_WORLD,&receive_request[i]);
+
+		send_matrix_idx = (send_matrix_idx + 1) == MPI_SIZE ? 0 : (send_matrix_idx + 1);
+		//receive_matrix_idx = (receive_matrix_idx - 1) < 0 ? MPI_SIZE - 1 : (receive_matrix_idx - 1);
+	}
+}
+
+void ClusterNet::gather_queued_matricies(Matrix **gpuArray,  std::vector<MPI_Request> send_request, std::vector<MPI_Request> receive_request, Matrix *out)
+{
+
 	int receive_matrix_idx = (MYRANK - 1) < 0 ? MPI_SIZE - 1 : (MYRANK - 1);
 	for (int i = 0; i < MPI_SIZE-1; i++)
 	{
-		MPI_Isend(gpuArray[MYRANK]->data, gpuArray[MYRANK]->size, MPI_FLOAT, send_matrix_idx, MYRANK, MPI_COMM_WORLD, send_request[i]);
-		MPI_Irecv(gpuArray[receive_matrix_idx]->data, gpuArray[receive_matrix_idx]->size, MPI_FLOAT, receive_matrix_idx, receive_matrix_idx, MPI_COMM_WORLD,receive_request[i]);
-
-		send_matrix_idx = (send_matrix_idx + 1) == MPI_SIZE ? 0 : (send_matrix_idx + 1);
+		MPI_Recv(gpuArray[receive_matrix_idx]->data, gpuArray[receive_matrix_idx]->size, MPI_FLOAT, receive_matrix_idx, receive_matrix_idx, MPI_COMM_WORLD, &m_status);
 		receive_matrix_idx = (receive_matrix_idx - 1) < 0 ? MPI_SIZE - 1 : (receive_matrix_idx - 1);
 	}
 
-}
-
-void ClusterNet::gather_queued_matricies(Matrix **gpuArray,  MPI_Request **send_request, MPI_Request **receive_request, Matrix *out)
-{
-	for(int i = 0; i < MPI_SIZE-1;i++ )
-		MPI_Wait(send_request[i],&m_status);
 
 	for(int i = 0; i < MPI_SIZE-1;i++ )
-		MPI_Wait(receive_request[i],&m_status);
+		MPI_Wait(&send_request[i],&m_status);
 
-	MPI_Barrier(MPI_COMM_WORLD);
 	vStackN(gpuArray, out, MPI_SIZE);
 
 }

@@ -61,10 +61,12 @@ private:
 	std::vector<Matrix*> W;
 	std::vector<Matrix*> B;
 	std::vector<Matrix*> M;
-	std::vector<Matrix*> BM;
+	std::vector<Matrix*> M_B;
 	std::vector<Matrix*> GRAD;
+	std::vector<Matrix**> arrGRAD;
 	std::vector<Matrix*> MSGRAD;
-	std::vector<Matrix*> BGRAD;
+	std::vector<Matrix*> GRAD_B;
+	std::vector<Matrix**> arrGRAD_B;
 	std::vector<Matrix*> MSBGRAD;
 	clock_t start,stop;
 

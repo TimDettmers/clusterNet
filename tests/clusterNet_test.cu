@@ -662,29 +662,24 @@ int run_clusterNet_test(ClusterNet gpus)
 
 
 	Matrix **gpuArray = (Matrix**)malloc(sizeof(Matrix*)*gpus.MPI_SIZE);
-	MPI_Request **send = (MPI_Request**)malloc(sizeof(MPI_Request*)*gpus.MPI_SIZE);
-	MPI_Request **receive = (MPI_Request**)malloc(sizeof(MPI_Request*)*gpus.MPI_SIZE);
+	std::vector<MPI_Request> send;
+	std::vector<MPI_Request> receive;
 	for(int i = 0; i < gpus.MPI_SIZE; i++)
 	{
-		gpuArray[i] = zeros(4,3);
-		MPI_Request a;
-		MPI_Request b;
-		a= MPI_REQUEST_NULL;
-		b = MPI_REQUEST_NULL;
-		send[i] = &a;
-		receive[i] = &b;
+		gpuArray[i] = zeros(783,8379);
+		MPI_Request a = MPI_REQUEST_NULL;
+		MPI_Request b = MPI_REQUEST_NULL;
+		send.push_back(a);
+		receive.push_back(b);
 	}
 
-	gpuArray[gpus.MYRANK] = ones(4,3);
+	gpuArray[gpus.MYRANK] = ones(783,8379);
 
-
-	out = zeros(4*gpus.MPI_SIZE,3);
+	out = zeros(783*gpus.MPI_SIZE,8379);
 	gpus.queue_matricies(gpuArray,send,receive);
 	gpus.gather_queued_matricies(gpuArray,send,receive,out);
-	printmat(out);
-	assert(test_eq(sum(out),4*3*gpus.MPI_SIZE*1.0f,"queue and gather matricies test"));
 
-	//without this barrier the scope is left and the variables are being deallocated so
+	assert(test_eq(sum(out),783*8379*gpus.MPI_SIZE*1.0f,"queue and gather matricies test"));
 
 	//This should just pass without error
 	ticktock_test.tock("ClusterNet test ran in");

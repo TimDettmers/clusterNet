@@ -41,8 +41,8 @@ WikiMaxoutNet::WikiMaxoutNet(ClusterNet gpu)
 	B.push_back(zeros(1,1));
 	M.push_back(zeros(nWordVectorDim*nWindowSize,_layers[0]));
 	M.push_back(zeros(_layers[0]/_nMaxoutSize, 1));
-	BM.push_back(zeros(1,_layers[0]));
-	BM.push_back(zeros(1,1));
+	M_B.push_back(zeros(1,_layers[0]));
+	M_B.push_back(zeros(1,1));
 
 
 
@@ -52,8 +52,8 @@ WikiMaxoutNet::WikiMaxoutNet(ClusterNet gpu)
 		GRAD.push_back(zeros(W[i]->rows, W[i]->cols));
 		MSGRAD.push_back(zeros(W[i]->rows, W[i]->cols));
 		MSGRAD.push_back(zeros(W[i]->rows, W[i]->cols));
-		BGRAD.push_back(zeros(B[i]->rows, B[i]->cols));
-		BGRAD.push_back(zeros(B[i]->rows, B[i]->cols));
+		GRAD_B.push_back(zeros(B[i]->rows, B[i]->cols));
+		GRAD_B.push_back(zeros(B[i]->rows, B[i]->cols));
 		MSBGRAD.push_back(zeros(B[i]->rows, B[i]->cols));
 		MSBGRAD.push_back(zeros(B[i]->rows, B[i]->cols));
 	}
@@ -239,8 +239,8 @@ void WikiMaxoutNet::nesterov()
 
 	for(int i = 0;i < B.size(); i++)
 	{
-		scalarMul(BM[i],MOMENTUM,BM[i]);
-		add(B[i],BM[i],B[i]);
+		scalarMul(M_B[i],MOMENTUM,M_B[i]);
+		add(B[i],M_B[i],B[i]);
 	}
 
 	scalarMul(_MVocab, MOMENTUM, _MVocab);
@@ -291,19 +291,19 @@ void WikiMaxoutNet::weightUpdates()
 		scalarMul(GRAD[1],multiplier/(float)GRAD[1]->rows,GRAD[1]);
 		scalarMul(GRAD[2],multiplier/(float)GRAD[1]->rows,GRAD[2]);
 		scalarMul(GRAD[3],multiplier/(float)GRAD[1]->rows,GRAD[3]);
-		scalarMul(BGRAD[0],multiplier,BGRAD[0]);
-		scalarMul(BGRAD[1],multiplier,BGRAD[1]);
-		scalarMul(BGRAD[2],multiplier,BGRAD[2]);
-		scalarMul(BGRAD[3],multiplier,BGRAD[3]);
+		scalarMul(GRAD_B[0],multiplier,GRAD_B[0]);
+		scalarMul(GRAD_B[1],multiplier,GRAD_B[1]);
+		scalarMul(GRAD_B[2],multiplier,GRAD_B[2]);
+		scalarMul(GRAD_B[3],multiplier,GRAD_B[3]);
 
 		sub(W[1],GRAD[0],W[1]);
 		sub(W[1],GRAD[1],W[1]);
 		sub(W[0],GRAD[2],W[0]);
 		sub(W[0],GRAD[3],W[0]);
-		sub(B[1],BGRAD[0],B[1]);
-		sub(B[1],BGRAD[1],B[1]);
-		sub(B[0],BGRAD[2],B[0]);
-		sub(B[0],BGRAD[3],B[0]);
+		sub(B[1],GRAD_B[0],B[1]);
+		sub(B[1],GRAD_B[1],B[1]);
+		sub(B[0],GRAD_B[2],B[0]);
+		sub(B[0],GRAD_B[3],B[0]);
 
 		update_vocab_with_gradient(GRAD[4],_currentBatchIdx_Y,_Vocab,multiplier);
 		update_vocab_with_gradient(GRAD[5],_currentBatchIdx_Y,_Vocab,multiplier);
@@ -316,10 +316,10 @@ void WikiMaxoutNet::weightUpdates()
 		RMSprop_with_nesterov_weight_update(MSGRAD[3],GRAD[3],W[0],M[0],0.9f,_learningRate/(float)GRAD[3]->rows,_nBatchSize);
 
 
-		RMSprop_with_nesterov_weight_update(MSBGRAD[0],BGRAD[0],B[1],BM[1],0.9f,_learningRate,_nBatchSize);
-		RMSprop_with_nesterov_weight_update(MSBGRAD[1],BGRAD[1],B[1],BM[1],0.9f,_learningRate,_nBatchSize);
-		RMSprop_with_nesterov_weight_update(MSBGRAD[2],BGRAD[2],B[0],BM[0],0.9f,_learningRate,_nBatchSize);
-		RMSprop_with_nesterov_weight_update(MSBGRAD[3],BGRAD[3],B[0],BM[0],0.9f,_learningRate,_nBatchSize);
+		RMSprop_with_nesterov_weight_update(MSBGRAD[0],GRAD_B[0],B[1],M_B[1],0.9f,_learningRate,_nBatchSize);
+		RMSprop_with_nesterov_weight_update(MSBGRAD[1],GRAD_B[1],B[1],M_B[1],0.9f,_learningRate,_nBatchSize);
+		RMSprop_with_nesterov_weight_update(MSBGRAD[2],GRAD_B[2],B[0],M_B[0],0.9f,_learningRate,_nBatchSize);
+		RMSprop_with_nesterov_weight_update(MSBGRAD[3],GRAD_B[3],B[0],M_B[0],0.9f,_learningRate,_nBatchSize);
 
 
 		//update_vocab_with_gradient(GRAD[4],_currentBatchIdx_Y,_Vocab,0.01/(float)_nBatchSize);
@@ -353,7 +353,7 @@ void WikiMaxoutNet::backprop()
 	mul(out, pairwise_grad, e1);
 	_gpu.dotT(e1, W[1],e2_partial);
 
-	_gpu.dot(aB,e1,BGRAD[0]);
+	_gpu.dot(aB,e1,GRAD_B[0]);
 	_gpu.Tdot(a1_Y,e1,GRAD[0]);
 
     if(!useMaxout)
@@ -366,14 +366,14 @@ void WikiMaxoutNet::backprop()
         expand_to_maxout_grad(e2_partial, a1_idx_Y,e2);
     }
     _gpu.Tdot(_batchY,e2,GRAD[2]);
-    _gpu.dot(aB,e2,BGRAD[2]);
+    _gpu.dot(aB,e2,GRAD_B[2]);
     _gpu.dotT(e2,W[0],GRAD[4]);
 
 
 	scalarMul(pairwise_grad,-1.0f,pairwise_grad);
 	mul(out, pairwise_grad, e1);
 
-	_gpu.dot(aB,e1,BGRAD[1]);
+	_gpu.dot(aB,e1,GRAD_B[1]);
 	_gpu.Tdot(a1_X,e1,GRAD[1]);
 	_gpu.dotT(e1, W[1],e2_partial);
 
@@ -388,7 +388,7 @@ void WikiMaxoutNet::backprop()
         expand_to_maxout_grad(e2_partial, a1_idx_X,e2);
     }
     _gpu.Tdot(_batchX,e2,GRAD[3]);
-	_gpu.dot(aB,e2,BGRAD[3]);
+	_gpu.dot(aB,e2,GRAD_B[3]);
     _gpu.dotT(e2,W[0],GRAD[5]);
 
 }
