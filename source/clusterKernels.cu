@@ -9,9 +9,25 @@ __global__ void kGetNonZeroElements(float *A, float *out, int size)
 {
 	const unsigned int numThreads = blockDim.x * gridDim.x;
 	const int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
-	out[0] = 0.0f;
 	for (unsigned int i = idx;i < size; i += numThreads)
 		 atomicAdd(&out[0],A[i] != 0.0f ? 1.0f : 0.0f);
+}
+
+__global__ void kGetNonZeroColumns(float *A, float *out, int rows, int cols)
+{
+	const int myCol = (blockIdx.x * blockDim.x) + threadIdx.x;
+	float result = 0.0f;
+
+	if(myCol < cols)
+	{
+		for (unsigned int i = 0;i < rows; i++)
+		{
+			if(A[(myCol*rows) + i] != 0.0f)
+				result = 1.0f;
+		}
+
+		atomicAdd(&out[0],result);
+	}
 }
 
 
@@ -144,6 +160,31 @@ __global__ void hStackN(float **arrA, int general_size, float *out, int size_out
 	  current_matrix = i / general_size;
 	  current_matrix = current_matrix == matrices_count ? current_matrix - 1 : current_matrix;
 	  out[i] = arrA[current_matrix][i - (current_matrix*general_size)];
+  }
+
+}
+
+__global__ void vStackN(float **arrA, float *out, int rows, int cols)
+{
+  int size = rows*cols;
+  int offset = rows*cols*blockIdx.x;
+
+  for(unsigned int i = threadIdx.x; i < size; i+=blockDim.x)
+	  out[offset + i] = arrA[blockIdx.x][i];
+
+}
+
+__global__ void hStackN(Matrix **arrA, int general_size, float *out, int size_out, int matrices_count)
+{
+  const unsigned int numThreads = blockDim.x * gridDim.x;
+  const int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
+  int current_matrix = 0;
+
+  for(unsigned int i = idx; i < size_out; i+=numThreads)
+  {
+	  current_matrix = i / general_size;
+	  current_matrix = current_matrix == matrices_count ? current_matrix - 1 : current_matrix;
+	  out[i] = arrA[current_matrix]->data[i - (current_matrix*general_size)];
   }
 
 }
@@ -762,7 +803,6 @@ __global__ void kRMSprop_with_nesterov_weight_update(float *RMS, float *grad, fl
 	  float grad_value = 0.0f;
 	  float RMS_value = 0.0f;
 	  float rms_reciprocal = 1.0f - RMS_multiplier;
-	  float weight_value = 0.0f;
 	  float momentum_matrix_value = 0.0f;
 
 	  for (unsigned int i = idx;i < size; i += numThreads)
@@ -771,12 +811,10 @@ __global__ void kRMSprop_with_nesterov_weight_update(float *RMS, float *grad, fl
 		  RMS_value = (RMS_multiplier*RMS[i]) + (powf(grad_value,2.0f)*rms_reciprocal);
 		  grad_value = learning_rate*fdividef(grad_value,(sqrtf(RMS_value)+1.0e-08f));
 		  momentum_matrix_value = m[i];
-		  weight_value = w[i]-momentum_matrix_value;
 		  momentum_matrix_value -= grad_value;
 
 		  RMS[i] = RMS_value;
 		  m[i] = momentum_matrix_value;
-		  w[i] = weight_value + momentum_matrix_value;
 	  }
 }
 
@@ -998,37 +1036,26 @@ __global__ void kUpdateVocabWithGradient(float *grad, float *vocab_idx, float* v
 */
 
 
-/*
+
 //numerically unstable?
-__global__ void kUpdateVocabWithGradient(float *grad, float *vocab_idx, float* vocab, float learning_rate, int batch_size, int window_size, int vocab_rows, int vocab_cols)
+__global__ void kUpdateVocabWithGradient(float *grad, float *vocab_idx, float* vocab, float learning_rate)
 {
 	//vocab_vector_size = blockDim.x;
 	//vocab_idx_rows = batch_size = gridDim.x
 	//vocab_idx_cols = window_size = gridDim.y
 
-	int myIdx = 0;
-	float multiplier = -fdividef(learning_rate,float(batch_size));
-	int size = window_size*batch_size;
-	int myVocabIdx = 0;
-	int grad_row = 0;
-	int grad_col = 0;
-	for(int i = threadIdx.x; i < size; i+=blockDim.x)
-	{
-		myIdx = (int)vocab_idx[i];
-		grad_row = i/window_size;
-		grad_col = i - grad_row;
-
-		myVocabIdx = vocab_rows*myIdx;
-		for(int j = 0; j < vocab_rows; j++)
-		{
-			atomicAdd(&vocab[myVocabIdx + j],grad[grad_row + (grad_col*vocab_rows)]*multiplier);
-		}
-	}
+	int myIdx = (int)vocab_idx[blockIdx.x+(blockIdx.y*gridDim.x)];
+	int myVocabIdx = blockDim.x*myIdx;
+	atomicAdd(&vocab[myVocabIdx + threadIdx.x],grad[blockIdx.x + (blockIdx.y*blockDim.x*gridDim.x) + (threadIdx.x*gridDim.x)]*learning_rate);
 }
 
-*/
 
-__global__ void kUpdateVocabWithGradient(float *gradX, float *gradY, float *vocab_idx_X, float *vocab_idx_Y, float* vocab,
+
+
+
+
+
+__global__ void kExpandDoubleVocabGradient(float *gradX, float *gradY, float *vocab_idx_X, float *vocab_idx_Y, float* vocab,
 										 float *vocab_grad, float *vocab_grad_idx, float learning_rate, int grad_size)
 {
 	//vocab_vector_size = blockDim.x;
@@ -1036,10 +1063,10 @@ __global__ void kUpdateVocabWithGradient(float *gradX, float *gradY, float *voca
 	//vocab_idx_cols = window_size = gridDim.y
 
 
-	float multiplier = fdividef(learning_rate,(float)(gridDim.x*2));
+	//float multiplier = fdividef(learning_rate,(float)(gridDim.x*2));
 	int myIdx_X = (int)vocab_idx_X[blockIdx.x+(blockIdx.y*gridDim.x)];
 	int myIdx_Y = (int)vocab_idx_Y[blockIdx.x+(blockIdx.y*gridDim.x)];
-	int grad_cols = grad_size/blockDim.x;
+	//int grad_cols = grad_size/blockDim.x;
 
 	int myVocabIdx_X = blockDim.x*myIdx_X;
 	int myVocabIdx_Y = blockDim.x*myIdx_Y;
@@ -1069,6 +1096,18 @@ __global__ void kUpdateVocabWithGradient(float *gradX, float *gradY, float *voca
 	*/
 
 
+}
+
+
+__global__ void kExpandVocabGradient(float *grad, float *vocab_idx, float *vocab_grad)
+{
+	//vocab_vector_size = blockDim.x;
+	//vocab_idx_rows = batch_size = gridDim.x
+	//vocab_idx_cols = window_size = gridDim.y
+
+	int myIdx = (int)vocab_idx[blockIdx.x+(blockIdx.y*gridDim.x)];
+	int myVocabIdx = blockDim.x*myIdx;
+	atomicAdd(&vocab_grad[myVocabIdx + threadIdx.x],grad[blockIdx.x + (blockIdx.y*blockDim.x*gridDim.x) + (threadIdx.x*gridDim.x)]);
 
 }
 

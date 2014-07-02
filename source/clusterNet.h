@@ -69,6 +69,8 @@ public:
 	 Matrix *sparse_to_dense(Matrix *A);
 
 	 void construct_vocab_matrix(Matrix *vocab_idx, Matrix *vocab_idx_y, Matrix *batch_X, Matrix *batch_y, Matrix *vocab);
+	 void queue_matricies(Matrix **gpuArray, MPI_Request **send_request, MPI_Request **receive_request);
+	 void gather_queued_matricies(Matrix **gpuArray, MPI_Request **send_request, MPI_Request **receive_request, Matrix *out);
 
 	 int MYRANK;
 	 int NODES;

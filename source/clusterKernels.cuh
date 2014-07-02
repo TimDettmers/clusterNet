@@ -3,6 +3,7 @@
 
 #include "curand.h"
 #include "curand_kernel.h"
+__global__ void kGetNonZeroColumns(float *A, float *out, int rows, int cols);
 __global__ void kGetNonZeroElements(float *A, float *out, int size);
 __global__ void kFill_with(float *m, float fill_value, int size);
 __global__ void kFill_with(int *m, int fill_value, int size);
@@ -26,6 +27,8 @@ __global__ void slice_cols(float *A, float *out, int start, int rows, int size_o
 __global__ void vStack(float *A, float *B, float *out, int size_out, int rows_a, int rows, int cols);
 __global__ void hStack(float *A, float *B, float *out, int size_out, int size_a);
 __global__ void hStackN(float **arrA, int general_size, float *out, int size_out, int matrices_count);
+__global__ void hStackN(Matrix **arrA, int general_size, float *out, int size_out, int matrices_count);
+__global__ void vStackN(float **arrA, float *out, int rows, int cols);
 __global__ void kSoftMax(float* A, float* out, unsigned int rows, unsigned int cols);
 __device__ void reduceToMax(float* sdata, unsigned int tid);
 __device__ void reduceToSumLocal(float* sdata, unsigned int tid);
@@ -60,6 +63,8 @@ __global__ void kMaxout(float *A, float *out, float *outargmax, int maxout_level
 __device__ void reduceToMaxAndArgMax(float* sdataMax, float* sdataArgMax, unsigned int tid, int threads);
 __global__ void kExpandToMaxoutGrad(float* error, float* indexes, float *out, int error_size, int error_rows, int maxout_level);
 __global__ void kConstructVocabMatrix(float *vocab_idx, float *vocab_idx_y, float* vocab, float *rdm_idx, float *batch_X, float *batch_Y);
-__global__ void kUpdateVocabWithGradient(float *gradX, float *gradY, float *vocab_idx_X, float *vocab_idx_Y, float* vocab,
+__global__ void kExpandDoubleVocabGradient(float *gradX, float *gradY, float *vocab_idx_X, float *vocab_idx_Y, float* vocab,
 										 float *vocab_grad, float *vocab_grad_idx, float learning_rate, int grad_size);
+__global__ void kExpandVocabGradient(float *grad, float *vocab_idx, float *vocab_grad);
+__global__ void kUpdateVocabWithGradient(float *grad, float *vocab_idx, float* vocab, float learning_rate);
 #endif

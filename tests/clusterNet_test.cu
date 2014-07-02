@@ -179,7 +179,7 @@ int run_clusterNet_test(ClusterNet gpus)
 	m_host = to_host(r1);
 	int upper = 0;
 	int lower = 0;
-	int zeros = 0;
+	int zero = 0;
 	for(int i = 0; i < r1->size; i++)
 	{
 	assert(m_host->data[i] >= 0.0f);
@@ -190,7 +190,7 @@ int run_clusterNet_test(ClusterNet gpus)
 	   lower++;
 
 	if(m_host->data[i] == 0)
-	   zeros++;
+	   zero++;
 	}
 	//there should be more than 47% which is > 0.5
 	assert(upper > (r1->size)*0.47f);
@@ -229,7 +229,7 @@ int run_clusterNet_test(ClusterNet gpus)
 	upper = 0;
 	lower = 0;
 	int middle = 0;
-	zeros = 0;
+	zero = 0;
 	for(int i = 0; i < r1->size; i++)
 	{
 	if(m_host->data[i] > 1.96f)
@@ -239,7 +239,7 @@ int run_clusterNet_test(ClusterNet gpus)
 	   lower++;
 
 	if(m_host->data[i] == 0)
-	   zeros++;
+	   zero++;
 
 	if((m_host->data[i] < 1) && (m_host->data[i] > -1))
 	   middle++;
@@ -251,7 +251,7 @@ int run_clusterNet_test(ClusterNet gpus)
 	//the 68% of the data should be within one standard deviation
 	assert((middle > r1->size*0.65) && (middle < r1->size*0.70));
 	//if there are more than 1% zeros then there is something fishy
-	assert(zeros < r1->size*0.01);
+	assert(zero < r1->size*0.01);
 	assert(test_matrix(m_host,100,479));
 
 	//dotMPI test
@@ -660,6 +660,31 @@ int run_clusterNet_test(ClusterNet gpus)
 			}
 		}
 
+
+	Matrix **gpuArray = (Matrix**)malloc(sizeof(Matrix*)*gpus.MPI_SIZE);
+	MPI_Request **send = (MPI_Request**)malloc(sizeof(MPI_Request*)*gpus.MPI_SIZE);
+	MPI_Request **receive = (MPI_Request**)malloc(sizeof(MPI_Request*)*gpus.MPI_SIZE);
+	for(int i = 0; i < gpus.MPI_SIZE; i++)
+	{
+		gpuArray[i] = zeros(4,3);
+		MPI_Request a;
+		MPI_Request b;
+		a= MPI_REQUEST_NULL;
+		b = MPI_REQUEST_NULL;
+		send[i] = &a;
+		receive[i] = &b;
+	}
+
+	gpuArray[gpus.MYRANK] = ones(4,3);
+
+
+	out = zeros(4*gpus.MPI_SIZE,3);
+	gpus.queue_matricies(gpuArray,send,receive);
+	gpus.gather_queued_matricies(gpuArray,send,receive,out);
+	printmat(out);
+	assert(test_eq(sum(out),4*3*gpus.MPI_SIZE*1.0f,"queue and gather matricies test"));
+
+	//without this barrier the scope is left and the variables are being deallocated so
 
 	//This should just pass without error
 	ticktock_test.tock("ClusterNet test ran in");

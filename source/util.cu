@@ -79,6 +79,24 @@ void write_csv(const char* filename, Matrix *X, const char* header, Matrix *ids)
 	myfile.close();
 }
 
+void write_csv(const char* filename, Matrix *X)
+{
+	std::ofstream myfile;
+	myfile.open(filename,std::ios::trunc);
+	for(int row = 0; row< X->rows; row++)
+	  {
+		  for(int col = 0; col < X->cols; col++)
+		  {
+			  if(col > 0)
+				  myfile << ",";
+
+			  myfile << std::fixed << X->data[(row*X->cols)+col];
+		  }
+		  myfile << "\r\n";
+	  }
+	myfile.close();
+}
+
 Matrix *read_hdf5(const char *filepath){ return read_hdf5(filepath,"/Default"); }
 Matrix *read_hdf5(const char *filepath, const char *tag)
 {

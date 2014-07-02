@@ -476,6 +476,24 @@ void hStackN(float** arrA, int general_size, Matrix *out, int matrices_count)
 	hStackN<<<blocks,THREADS_PER_BLOCKS>>>(arrA, general_size, out->data,  out->size, matrices_count);
 }
 
+void vStackN(Matrix** arrA, Matrix *out, int matrices_count)
+{
+	float **h_arrA = (float**)malloc(sizeof(float*) * matrices_count);
+	for (int i = 0; i < matrices_count; i++)
+		h_arrA[i] = arrA[i]->data;
+
+	float **d_arrA;
+	cudaMalloc((void**) &d_arrA, sizeof(float*) * matrices_count);
+	cudaMemcpy(d_arrA, h_arrA, sizeof(float*) * matrices_count,cudaMemcpyDefault);
+
+
+	dim3 griddim(matrices_count,1,1) ;
+	vStackN<<<griddim,THREADS_PER_BLOCKS>>>(d_arrA, out->data, out->rows/matrices_count,out->cols);
+
+	free(h_arrA);
+	cudaFree(d_arrA);
+}
+
 void hStack(Matrix *A, Matrix *B, Matrix *out)
 {
   if(A->rows != B->rows)
@@ -921,9 +939,23 @@ float sum(Matrix *A)
 
 int getNonZeroElements(Matrix *A)
 {
-	Matrix *out = empty(1,1);
+	Matrix *out = zeros(1,1);
 	int blocks = (A->size/THREADS_PER_BLOCKS) + 1;
 	kGetNonZeroElements<<<blocks,THREADS_PER_BLOCKS>>>(A->data, out->data, A->size);
+	Matrix *host = to_host(out);
+	float out_value = host->data[0];
+	cudaFree(out);
+	free(host->data);
+	free(host);
+
+	return (int)out_value;
+}
+
+int getNonZeroColumns(Matrix *A)
+{
+	Matrix *out = zeros(1,1);
+	int blocks = (A->cols/THREADS_PER_BLOCKS) + 1;
+	kGetNonZeroColumns<<<blocks,THREADS_PER_BLOCKS>>>(A->data, out->data, A->rows, A->cols);
 	Matrix *host = to_host(out);
 	float out_value = host->data[0];
 	cudaFree(out);
@@ -1106,26 +1138,31 @@ void construct_vocab_matrix(Matrix *vocab_idx, Matrix *vocab_idx_y, Matrix *batc
 	kConstructVocabMatrix<<<grid,vocab->rows>>>(vocab_idx->data, vocab_idx_y->data, vocab->data, rdm_idx->data, batch_X->data, batch_y->data);
 }
 
-/*
+
 void update_vocab_with_gradient(Matrix *grad, Matrix *vocab_idx, Matrix *vocab, float learning_rate)
 {
 	assert(vocab->rows <= 1024);
 	dim3 grid(vocab_idx->rows,vocab_idx->cols,1);
 	kUpdateVocabWithGradient<<<grid,vocab->rows>>>(grad->data, vocab_idx->data, vocab->data, learning_rate);
-
-	cudaThreadSynchronize();
 }
-*/
+
 //float *gradX, float *gradY, float *vocab_idx_X, float *vocab_idx_Y, float* vocab,
 	//									 float *vocab_grad, float *vocab_grad_idx, float learning_rate, int grad_size
 
-void update_vocab_with_gradient(Matrix *gradX, Matrix *gradY, Matrix *vocab_idx_X, Matrix *vocab_idx_Y, Matrix *vocab, Matrix *vocab_grad, Matrix *vocab_grad_idx, float learning_rate)
+void expand_double_vocab_gradient(Matrix *gradX, Matrix *gradY, Matrix *vocab_idx_X, Matrix *vocab_idx_Y, Matrix *vocab, Matrix *vocab_grad, Matrix *vocab_grad_idx, float learning_rate)
 {
 	assert(vocab->rows <= 1024);
 	dim3 grid(vocab_idx_X->rows,vocab_idx_X->cols,1);
-	kUpdateVocabWithGradient<<<grid,vocab->rows>>>(gradX->data, gradY->data, vocab_idx_X->data, vocab_idx_Y->data,
+	kExpandDoubleVocabGradient<<<grid,vocab->rows>>>(gradX->data, gradY->data, vocab_idx_X->data, vocab_idx_Y->data,
 													vocab->data, vocab_grad->data,vocab_grad_idx->data, learning_rate, vocab_grad->size);
 
-	cudaThreadSynchronize();
+}
+
+
+void expand_vocab_gradient(Matrix *grad, Matrix *vocab_idx, Matrix *vocab_grad)
+{
+	assert(vocab_grad->rows <= 1024);
+	dim3 grid(vocab_idx->rows,vocab_idx->cols,1);
+	kExpandVocabGradient<<<grid,vocab_grad->rows>>>(grad->data, vocab_idx->data, vocab_grad->data);
 }
 

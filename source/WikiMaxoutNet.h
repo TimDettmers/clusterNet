@@ -15,6 +15,9 @@
 #include <batchAllocator.h>
 #include <clusterNet.h>
 #include <util.cuh>
+#include <assert.h>
+#include <exception>
+#include <ctime>
 
 class WikiMaxoutNet
 {
@@ -28,25 +31,30 @@ private:
 	Matrix *_nextBatchIdx;
 	ClusterNet _gpu;
 	Matrix *_X;
+	Matrix *_CV_X;
 	Matrix *_Vocab;
-	Matrix *_grad1_X;
-	Matrix *_grad2_X;
-	Matrix *_grad1_Y;
-	Matrix *_grad2_Y;
-	Matrix *_grad0_X;
-	Matrix *_grad0_Y;
 	Matrix *_Vocab_grad;
 	Matrix *_MSVocab_grad;
+	Matrix *_MSVocab_grad_Y;
 	Matrix *_MVocab;
+	Matrix *_MVocab_Y;
 	Matrix *_Vocab_grad_idx;
-	Matrix *_gradB1_X;
-	Matrix *_gradB1_Y;
-	Matrix *_gradB2_X;
-	Matrix *_gradB2_Y;
 	Matrix *_batchX;
 	Matrix *_batchY;
+
+	Matrix *out;
+	Matrix *pairwise_grad;
+	Matrix *e1;
+	Matrix *aB;
+	Matrix *e2_partial;
+	Matrix *e2;
+
+
+
 	int _nCurrentDataSet;
 	int _nNextBatchNumber;
+	int _nNextBatchNumber_CV;
+	float _RMS_multiplier;
 	int _nBatchSize;
 	int _batches;
 	std::vector<int> _layers;
@@ -58,6 +66,7 @@ private:
 	std::vector<Matrix*> MSGRAD;
 	std::vector<Matrix*> BGRAD;
 	std::vector<Matrix*> MSBGRAD;
+	clock_t start,stop;
 
 
 	Matrix *d0;
@@ -72,18 +81,24 @@ private:
 
 	cudaStream_t _streamNextBatch;
 	double _dSumError;
-	int _nTrainErrorPeriodicity;
-	int _nTrainErrorLength;
+	int _nCVErrorPeriodicity;
+	int _nCVErrorLength;
 	int _nMaxoutSize;
 	float MOMENTUM;
 	float _learningRate;
 	int _totalNumberOfBatches;
 
+	bool useRMSProp;
+	bool useMaxout;
+
 
 	void loadNextDataSet();
-	void allocateNextBatch();
+	void allocateNextBatch(bool isCV);
 	void feedforward();
-	void calculateError();
+	void nesterov();
+	double calculateError();
+	void backprop();
+	void weightUpdates();
 };
 
 

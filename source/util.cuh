@@ -15,6 +15,7 @@
 
 Matrix *read_csv(const char* filename);
 void write_csv(const char* filename, Matrix *X, const char* header, Matrix *ids);
+void write_csv(const char* filename, Matrix *X);
 Matrix *read_hdf5(const char * filepath);
 Matrix *read_sparse_hdf5(const char * filepath);
 Matrix *read_hdf5(const char *filepath, const char *tag);

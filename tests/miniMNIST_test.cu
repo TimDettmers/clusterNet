@@ -39,7 +39,7 @@ void run_miniMNIST_test(ClusterNet gpus)
 
 	BatchAllocator b = BatchAllocator();
 	b.init(X, y, 0.2, 32, 64);
-	int epochs  = 17;
+	int epochs  = 20;
 	float learning_rate = 0.003;
 	float momentum = 0.5;
 	for(int EPOCH = 1; EPOCH < epochs; EPOCH++)
@@ -62,7 +62,7 @@ void run_miniMNIST_test(ClusterNet gpus)
 		  //print_gpus_matrix(w1);
 		  Matrix *z1 = gpus.dot(d0, w1);
 		  logistic(z1, z1);
-		  Matrix *d1 = gpus.dropout(z1,0.6);
+		  Matrix *d1 = gpus.dropout(z1,0.5);
 		  Matrix *a2 = gpus.dot(d1,w2);
 		  Matrix *out = softmax(a2);
 		  Matrix *t = create_t_matrix(b.CURRENT_BATCH_Y,10);
@@ -151,7 +151,7 @@ void run_miniMNIST_test(ClusterNet gpus)
 
 	}
 
-	ASSERT(train_error < 0.01f,"mini-MNIST train error 17 epochs < 0.01.");
+	ASSERT(train_error < 0.03f,"mini-MNIST train error 17 epochs < 0.03.");
 	ASSERT(cv_error < 0.22f, "mini-MNIST train error 17 epochs < 0.22.");
 
 	b.finish_batch_allocator();
@@ -189,7 +189,7 @@ void run_miniMNIST_test(ClusterNet gpus)
 		  //print_gpus_matrix(w1);
 		  Matrix *z1 = gpus.dot(d0, w1_dist);
 		  logistic(z1, z1);
-		  Matrix *d1 = gpus.dropout(z1,0.6);
+		  Matrix *d1 = gpus.dropout(z1,0.5);
 		  Matrix *a2 = gpus.dot(d1,w2_dist);
 		  Matrix *out = softmax(a2);
 		  Matrix *t = create_t_matrix(b_dist.CURRENT_BATCH_Y,10);
@@ -280,7 +280,7 @@ void run_miniMNIST_test(ClusterNet gpus)
 	}
 
 
-	ASSERT(train_error < 0.01f,"mini-MNIST train error 17 epochs < 0.01.");
+	ASSERT(train_error < 0.02f,"mini-MNIST train error 17 epochs < 0.02.");
 	ASSERT(cv_error < 0.22f, "mini-MNIST train error 17 epochs < 0.22.");
 
 
@@ -438,7 +438,7 @@ void run_miniMNIST_test(ClusterNet gpus)
 	}
 
 
-	ASSERT(train_error < 0.01f,"mini-MNIST train error 17 epochs < 0.01.");
+	ASSERT(train_error < 0.02f,"mini-MNIST train error 17 epochs < 0.02.");
 	ASSERT(cv_error < 0.22f, "mini-MNIST train error 17 epochs < 0.22.");
 
 	std::vector<int> layers;
