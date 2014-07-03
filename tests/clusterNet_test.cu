@@ -677,7 +677,7 @@ int run_clusterNet_test(ClusterNet gpus)
 
 	out = zeros(783*gpus.MPI_SIZE,8379);
 	gpus.queue_matricies(gpuArray,send,receive);
-	gpus.gather_queued_matricies(gpuArray,send,receive,out);
+	gpus.vStack_queued_matricies(gpuArray,send,receive,out);
 
 	assert(test_eq(sum(out),783*8379*gpus.MPI_SIZE*1.0f,"queue and gather matricies test"));
 

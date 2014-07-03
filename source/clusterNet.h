@@ -70,7 +70,8 @@ public:
 
 	 void construct_vocab_matrix(Matrix *vocab_idx, Matrix *vocab_idx_y, Matrix *batch_X, Matrix *batch_y, Matrix *vocab);
 	 void queue_matricies(Matrix **gpuArray, std::vector<MPI_Request> send_request, std::vector<MPI_Request> receive_request);
-	 void gather_queued_matricies(Matrix **gpuArray, std::vector<MPI_Request> send_request, std::vector<MPI_Request> receive_request, Matrix *out);
+	 void vStack_queued_matricies(Matrix **gpuArray, std::vector<MPI_Request> send_request, std::vector<MPI_Request> receive_request, Matrix *out);
+	 void gather_queued_matricies(Matrix **gpuArray, std::vector<MPI_Request> send_request, std::vector<MPI_Request> receive_request);
 
 	 int MYRANK;
 	 int NODES;

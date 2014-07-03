@@ -22,25 +22,29 @@
 class WikiMaxoutNet
 {
 public:
-	WikiMaxoutNet(ClusterNet gpu);
+	WikiMaxoutNet(ClusterNet gpus);
 	void run();
 
 private:
 	Matrix *_currentBatchIdx_X;
 	Matrix *_currentBatchIdx_Y;
 	Matrix *_nextBatchIdx;
-	ClusterNet _gpu;
+	ClusterNet gpu;
 	Matrix *_X;
 	Matrix *_CV_X;
 	Matrix *_Vocab;
 	Matrix *_Vocab_grad;
 	Matrix *_MSVocab_grad;
 	Matrix *_MSVocab_grad_Y;
-	Matrix *_MVocab;
-	Matrix *_MVocab_Y;
+	Matrix *M_VocabX;
+	Matrix *M_VocabY;
 	Matrix *_Vocab_grad_idx;
 	Matrix *_batchX;
 	Matrix *_batchY;
+	Matrix *stackedVocabGrad_X;
+	Matrix *stackedVocabGrad_Y;
+	Matrix *stackedBatchIdx_X;
+	Matrix *stackedBatchIdx_Y;
 
 	Matrix *out;
 	Matrix *pairwise_grad;
@@ -62,14 +66,11 @@ private:
 	std::vector<Matrix*> B;
 	std::vector<Matrix*> M;
 	std::vector<Matrix*> M_B;
-	std::vector<Matrix*> GRAD;
 	std::vector<Matrix**> arrGRAD;
 	std::vector<Matrix*> MSGRAD;
-	std::vector<Matrix*> GRAD_B;
 	std::vector<Matrix**> arrGRAD_B;
 	std::vector<Matrix*> MSBGRAD;
 	clock_t start,stop;
-
 
 	Matrix *d0;
 	Matrix *z1;

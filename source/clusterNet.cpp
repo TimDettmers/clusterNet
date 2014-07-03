@@ -882,7 +882,7 @@ void ClusterNet::queue_matricies(Matrix **gpuArray, std::vector<MPI_Request> sen
 	}
 }
 
-void ClusterNet::gather_queued_matricies(Matrix **gpuArray,  std::vector<MPI_Request> send_request, std::vector<MPI_Request> receive_request, Matrix *out)
+void ClusterNet::vStack_queued_matricies(Matrix **gpuArray,  std::vector<MPI_Request> send_request, std::vector<MPI_Request> receive_request, Matrix *out)
 {
 
 	int receive_matrix_idx = (MYRANK - 1) < 0 ? MPI_SIZE - 1 : (MYRANK - 1);
@@ -897,6 +897,22 @@ void ClusterNet::gather_queued_matricies(Matrix **gpuArray,  std::vector<MPI_Req
 		MPI_Wait(&send_request[i],&m_status);
 
 	vStackN(gpuArray, out, MPI_SIZE);
+
+}
+
+void ClusterNet::gather_queued_matricies(Matrix **gpuArray,  std::vector<MPI_Request> send_request, std::vector<MPI_Request> receive_request)
+{
+
+	int receive_matrix_idx = (MYRANK - 1) < 0 ? MPI_SIZE - 1 : (MYRANK - 1);
+	for (int i = 0; i < MPI_SIZE-1; i++)
+	{
+		MPI_Recv(gpuArray[receive_matrix_idx]->data, gpuArray[receive_matrix_idx]->size, MPI_FLOAT, receive_matrix_idx, receive_matrix_idx, MPI_COMM_WORLD, &m_status);
+		receive_matrix_idx = (receive_matrix_idx - 1) < 0 ? MPI_SIZE - 1 : (receive_matrix_idx - 1);
+	}
+
+
+	for(int i = 0; i < MPI_SIZE-1;i++ )
+		MPI_Wait(&send_request[i],&m_status);
 
 }
 
