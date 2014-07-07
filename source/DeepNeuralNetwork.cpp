@@ -257,8 +257,8 @@ void DeepNeuralNetwork::weight_updates()
 	  {
 		  if(m_update_type == RMSProp)
 		  {
-			  RMSprop_with_nesterov_weight_update(MS[i],GRAD[i],W[i],M[i],0.9f,LEARNING_RATE,m_BA.CURRENT_BATCH->rows);
-			  RMSprop_with_nesterov_weight_update(B_MS[i],B_GRAD[i],B[i],B_M[i],0.9f,LEARNING_RATE,m_BA.CURRENT_BATCH->rows);
+			  RMSprop_with_nesterov_weight_update(MS[i],GRAD[i],W[i],M[i],0.9f,LEARNING_RATE,m_BA.CURRENT_BATCH->rows, MOMENTUM);
+			  RMSprop_with_nesterov_weight_update(B_MS[i],B_GRAD[i],B[i],B_M[i],0.9f,LEARNING_RATE,m_BA.CURRENT_BATCH->rows, MOMENTUM);
 		  }
 		  else if(m_update_type == NoMomentum)
 		  {

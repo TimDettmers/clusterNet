@@ -87,7 +87,7 @@ Matrix *scalarAdd(Matrix *A, float a);
 void scalarAdd(Matrix *A, float a, Matrix *out);
 void dropout(Matrix *A, Matrix *out, float dropout_rate);
 void RMSprop(Matrix *RMS, Matrix *grad, float RMS_multiplier, float learning_rate, int batch_size);
-void RMSprop_with_nesterov_weight_update(Matrix *RMS, Matrix *grad, Matrix *w, Matrix *m, float RMS_multiplier, float learning_rate, int batch_size);
+void RMSprop_with_nesterov_weight_update(Matrix *RMS, Matrix *grad, Matrix *w, Matrix *m, float RMS_multiplier, float learning_rate, int batch_size, float momentum);
 
 Matrix *square(Matrix *A);
 void square(Matrix *A, Matrix *out);

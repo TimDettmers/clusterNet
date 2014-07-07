@@ -978,11 +978,11 @@ void RMSprop(Matrix *RMS, Matrix *grad, float RMS_multiplier, float learning_rat
 	kRMSprop<<<blocks,THREADS_PER_BLOCKS>>>(RMS->data, grad->data, RMS_multiplier, learning_rate, batch_size, RMS->size);
 }
 
-void RMSprop_with_nesterov_weight_update(Matrix *RMS, Matrix *grad, Matrix *w, Matrix *m, float RMS_multiplier, float learning_rate, int batch_size)
+void RMSprop_with_nesterov_weight_update(Matrix *RMS, Matrix *grad, Matrix *w, Matrix *m, float RMS_multiplier, float learning_rate, int batch_size, float momentum)
 {
 
 	int blocks = (RMS->size/THREADS_PER_BLOCKS) + 1;
-	kRMSprop_with_nesterov_weight_update<<<blocks,THREADS_PER_BLOCKS>>>(RMS->data, grad->data, w->data, m->data, RMS_multiplier, learning_rate, batch_size, RMS->size);
+	kRMSprop_with_nesterov_weight_update<<<blocks,THREADS_PER_BLOCKS>>>(RMS->data, grad->data, w->data, m->data, RMS_multiplier, learning_rate, batch_size, RMS->size, momentum);
 }
 
 Matrix *rectified_linear(Matrix *A)

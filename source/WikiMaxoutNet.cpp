@@ -35,7 +35,7 @@ WikiMaxoutNet::WikiMaxoutNet(ClusterNet gpus)
 		{
 			if(col > next_level)
 			{
-				learning_rate = learning_rate * 10.0f;
+				learning_rate = learning_rate * 10.00f;
 				next_level = next_level == 50000 ? vocabSize : next_level;
 				next_level = next_level == 25000 ? 50000 : next_level;
 				next_level = next_level == 10000 ? 25000 : next_level;
@@ -238,7 +238,7 @@ void WikiMaxoutNet::run()
 void WikiMaxoutNet::loadNextDataSet()
 {
 
-	cout << "Loading next data set..." << endl;
+
 	std::string path = "/home/tim/data/wiki/extracted2/AA/data100000/wiki_";
 	//std::string path = "/home/tim/data/wiki/extracted2/AA/data/wiki_";
 	std::string number = "";
@@ -250,19 +250,13 @@ void WikiMaxoutNet::loadNextDataSet()
 
 	number+= NumberToString(_nCurrentDataSet);
 
-
+	cout << "Loading next data set: " << (path + number + ending) << endl;
 	if(_X != 0)
 		cudaFreeHost(_X->data);
 	_X = read_hdf5((path + number + ending).c_str());
 	_nCurrentDataSet += gpu.MPI_SIZE;
 	_batches = _X->rows/ _nBatchSize;
 	_nNextBatchNumber = 0;
-
-
-	size_t free, total;
-	cudaMemGetInfo(&free, &total);
-	cout << free << endl;
-	cout << "Free system memory: " << sysconf(_SC_PAGE_SIZE)*sysconf(_SC_PHYS_PAGES) << endl;
 }
 
 void WikiMaxoutNet::allocateNextBatch(bool isCV)
@@ -395,23 +389,23 @@ void WikiMaxoutNet::weightUpdates()
 	}
 	else
 	{
-		RMSprop_with_nesterov_weight_update(MSGRAD[0],arrGRAD[0][gpu.MYRANK],W[1],M[1],0.9f,_learningRate/(float)arrGRAD[0][gpu.MYRANK]->rows,_nBatchSize);
-		RMSprop_with_nesterov_weight_update(MSGRAD[1],arrGRAD[1][gpu.MYRANK],W[1],M[1],0.9f,_learningRate/(float)arrGRAD[1][gpu.MYRANK]->rows,_nBatchSize);
-		RMSprop_with_nesterov_weight_update(MSGRAD[2],arrGRAD[2][gpu.MYRANK],W[0],M[0],0.9f,_learningRate/(float)arrGRAD[2][gpu.MYRANK]->rows,_nBatchSize);
-		RMSprop_with_nesterov_weight_update(MSGRAD[3],arrGRAD[3][gpu.MYRANK],W[0],M[0],0.9f,_learningRate/(float)arrGRAD[3][gpu.MYRANK]->rows,_nBatchSize);
+		RMSprop_with_nesterov_weight_update(MSGRAD[0],arrGRAD[0][gpu.MYRANK],W[1],M[1],0.9f,_learningRate/(float)arrGRAD[0][gpu.MYRANK]->rows,_nBatchSize, MOMENTUM);
+		RMSprop_with_nesterov_weight_update(MSGRAD[1],arrGRAD[1][gpu.MYRANK],W[1],M[1],0.9f,_learningRate/(float)arrGRAD[1][gpu.MYRANK]->rows,_nBatchSize, MOMENTUM);
+		RMSprop_with_nesterov_weight_update(MSGRAD[2],arrGRAD[2][gpu.MYRANK],W[0],M[0],0.9f,_learningRate/(float)arrGRAD[2][gpu.MYRANK]->rows,_nBatchSize, MOMENTUM);
+		RMSprop_with_nesterov_weight_update(MSGRAD[3],arrGRAD[3][gpu.MYRANK],W[0],M[0],0.9f,_learningRate/(float)arrGRAD[3][gpu.MYRANK]->rows,_nBatchSize, MOMENTUM);
 
 
-		RMSprop_with_nesterov_weight_update(MSBGRAD[0],arrGRAD_B[0][gpu.MYRANK],B[1],M_B[1],0.9f,_learningRate,_nBatchSize);
-		RMSprop_with_nesterov_weight_update(MSBGRAD[1],arrGRAD_B[1][gpu.MYRANK],B[1],M_B[1],0.9f,_learningRate,_nBatchSize);
-		RMSprop_with_nesterov_weight_update(MSBGRAD[2],arrGRAD_B[2][gpu.MYRANK],B[0],M_B[0],0.9f,_learningRate,_nBatchSize);
-		RMSprop_with_nesterov_weight_update(MSBGRAD[3],arrGRAD_B[3][gpu.MYRANK],B[0],M_B[0],0.9f,_learningRate,_nBatchSize);
+		RMSprop_with_nesterov_weight_update(MSBGRAD[0],arrGRAD_B[0][gpu.MYRANK],B[1],M_B[1],0.9f,_learningRate,_nBatchSize, MOMENTUM);
+		RMSprop_with_nesterov_weight_update(MSBGRAD[1],arrGRAD_B[1][gpu.MYRANK],B[1],M_B[1],0.9f,_learningRate,_nBatchSize, MOMENTUM);
+		RMSprop_with_nesterov_weight_update(MSBGRAD[2],arrGRAD_B[2][gpu.MYRANK],B[0],M_B[0],0.9f,_learningRate,_nBatchSize, MOMENTUM);
+		RMSprop_with_nesterov_weight_update(MSBGRAD[3],arrGRAD_B[3][gpu.MYRANK],B[0],M_B[0],0.9f,_learningRate,_nBatchSize, MOMENTUM);
 
 
-		update_vocab_with_gradient(arrGRAD[4][gpu.MYRANK],_currentBatchIdx_Y,_Vocab,_learningRate/(float)_nBatchSize);
-		update_vocab_with_gradient(arrGRAD[5][gpu.MYRANK],_currentBatchIdx_X,_Vocab,_learningRate/(float)_nBatchSize);
+		//update_vocab_with_gradient(arrGRAD[4][gpu.MYRANK],_currentBatchIdx_Y,_Vocab,_learningRate/(float)_nBatchSize);
+		//update_vocab_with_gradient(arrGRAD[5][gpu.MYRANK],_currentBatchIdx_X,_Vocab,_learningRate/(float)_nBatchSize);
 
-		//update_vocab_with_gradient(arrGRAD[4][gpu.MYRANK],_currentBatchIdx_Y,_Vocab,learning_rate_matrix);
-		//update_vocab_with_gradient(arrGRAD[5][gpu.MYRANK],_currentBatchIdx_X,_Vocab,learning_rate_matrix);
+		update_vocab_with_gradient(arrGRAD[4][gpu.MYRANK],_currentBatchIdx_Y,_Vocab,learning_rate_matrix);
+		update_vocab_with_gradient(arrGRAD[5][gpu.MYRANK],_currentBatchIdx_X,_Vocab,learning_rate_matrix);
 
 
 		//fill_matrix(_Vocab_grad,0.0f);
@@ -497,10 +491,10 @@ double WikiMaxoutNet::calculateError()
 		allocateNextBatch(true);
 	}
 	//scalarMul(W[0],1.1,W[0]);
-	size_t free, total;
-	cudaMemGetInfo(&free, &total);
-	cout << free << endl;
-	cout << "Free system memory: " << sysconf(_SC_PAGE_SIZE)*sysconf(_SC_PHYS_PAGES) << endl;
+	//size_t free, total;
+	//cudaMemGetInfo(&free, &total);
+	//cout << free << endl;
+	//cout << "Free system memory: " << sysconf(_SC_PAGE_SIZE)*sysconf(_SC_PHYS_PAGES) << endl;
 
 
 	double error = _dSumError/(double)(_nBatchSize*_nCVErrorLength);
