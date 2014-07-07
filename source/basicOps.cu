@@ -1146,8 +1146,13 @@ void update_vocab_with_gradient(Matrix *grad, Matrix *vocab_idx, Matrix *vocab, 
 	kUpdateVocabWithGradient<<<grid,vocab->rows>>>(grad->data, vocab_idx->data, vocab->data, learning_rate);
 }
 
-//float *gradX, float *gradY, float *vocab_idx_X, float *vocab_idx_Y, float* vocab,
-	//									 float *vocab_grad, float *vocab_grad_idx, float learning_rate, int grad_size
+void update_vocab_with_gradient(Matrix *grad, Matrix *vocab_idx, Matrix *vocab, Matrix *learning_rate)
+{
+	assert(vocab->rows <= 1024);
+	dim3 grid(vocab_idx->rows,vocab_idx->cols,1);
+	kUpdateVocabWithGradient_LearningRateMatrix<<<grid,vocab->rows>>>(grad->data, vocab_idx->data, vocab->data, learning_rate->data);
+}
+
 
 void expand_double_vocab_gradient(Matrix *gradX, Matrix *gradY, Matrix *vocab_idx_X, Matrix *vocab_idx_Y, Matrix *vocab, Matrix *vocab_grad, Matrix *vocab_grad_idx, float learning_rate)
 {

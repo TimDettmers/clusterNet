@@ -52,6 +52,9 @@ private:
 	Matrix *aB;
 	Matrix *e2_partial;
 	Matrix *e2;
+	Matrix *CV_container;
+
+	Matrix *learning_rate_matrix;
 
 
 

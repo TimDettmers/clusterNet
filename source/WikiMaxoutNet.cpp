@@ -11,20 +11,51 @@ WikiMaxoutNet::WikiMaxoutNet(ClusterNet gpus)
 	int nWindowSize = 11;
 	_layers.push_back(512);
 	_nMaxoutSize = 32;
-	_learningRate = 0.003;
+	_learningRate = 0.001;
 	_nCVErrorPeriodicity = 5000;
-	_nCVErrorLength = 2000;
+	_nCVErrorLength = 5000;
 	MOMENTUM = 0.5;
 	gpu = gpus;
 	_nCurrentDataSet = gpu.MYRANK;
-	_X = gpu.rand(1,1);
-	int cv_set_number = 64-gpu.MYRANK;
+	_X = 0;
+	int cv_set_number = 63-gpu.MYRANK;
 	_CV_X = read_hdf5(("/home/tim/data/wiki/extracted2/AA/data100000/wiki_" + NumberToString(cv_set_number) + ".p").c_str());
 	_nNextBatchNumber = 0;
 	_nNextBatchNumber_CV = 0;
 	_nBatchSize = 128;
 	_RMS_multiplier = 0.9f;
 	cudaStreamCreate(&_streamNextBatch);
+
+	Matrix *learning_rate_matrix_cpu = empty_cpu(nWordVectorDim,vocabSize);
+
+	float learning_rate = 0.0000001;
+	int next_level = 2000;
+	for(int col = 0; col < vocabSize; col++)
+		for(int row = 0; row < nWordVectorDim; row++)
+		{
+			if(col > next_level)
+			{
+				learning_rate = learning_rate * 10.0f;
+				next_level = next_level == 50000 ? vocabSize : next_level;
+				next_level = next_level == 25000 ? 50000 : next_level;
+				next_level = next_level == 10000 ? 25000 : next_level;
+				next_level = next_level == 2000 ? 10000 : next_level;
+			}
+
+			if((col == vocabSize-2) || (col == vocabSize-1))
+			{
+				learning_rate_matrix_cpu->data[col + (row*vocabSize)] = 0.0000001;
+			}
+			else
+			{
+				learning_rate_matrix_cpu->data[col + (row*vocabSize)] = learning_rate;
+			}
+		}
+
+
+	learning_rate_matrix = to_gpu(learning_rate_matrix_cpu);
+	free(learning_rate_matrix_cpu->data);
+
 
 	useRMSProp = true;
 	useMaxout = true;
@@ -44,6 +75,14 @@ WikiMaxoutNet::WikiMaxoutNet(ClusterNet gpus)
 	M.push_back(zeros(_layers[0]/_nMaxoutSize, 1));
 	M_B.push_back(zeros(1,_layers[0]));
 	M_B.push_back(zeros(1,1));
+
+	CV_container = empty_cpu(10000,1);
+	for(int i = 0; i < CV_container->size; i++)
+		CV_container->data[i] = 0.0f;
+
+
+	if(gpu.MPI_SIZE == 0)
+		gpu.MPI_SIZE = 1;
 
 
 	cout << gpu.MPI_SIZE << " MPI SIZE" << endl;
@@ -159,10 +198,13 @@ void WikiMaxoutNet::run()
 				write_hdf5("/home/tim/data/wiki/vocab.hdf5",host);
 				free(host->data);
 				free(host);
+				write_hdf5("/home/tim/data/wiki/CV_values.hdf5",CV_container);
 			}
 
+			double error = calculateError();
+			CV_container->data[i/_nCVErrorPeriodicity] = (float)error;
 			cout << "BatchNo: " << i << endl;
-			cout << "Cross validation error: " <<  calculateError() << endl;
+			cout << "Cross validation error: " <<  error << endl;
 			i++;
 
 			//MOMENTUM+= 0.01;
@@ -176,7 +218,8 @@ void WikiMaxoutNet::run()
 			stop = clock();
 
 			double time_interval_seconds = (double((stop - start)) / CLOCKS_PER_SEC) ;
-			cout << "Approximate time left in hours: " << (1.0f/(((i*_nBatchSize)/(float)_X->rows)/63.0))*time_interval_seconds/(float)3600.0 << endl;
+			cout << "Approximate time left in hours: " << ((1.0f/(((i*_nBatchSize)/(float)_X->rows)/63.0))*time_interval_seconds/(float)3600.0)  -
+					(time_interval_seconds/(float)3600.0)<< endl;
 
 		}
 		else
@@ -207,11 +250,19 @@ void WikiMaxoutNet::loadNextDataSet()
 
 	number+= NumberToString(_nCurrentDataSet);
 
-	cudaFree(_X);
+
+	if(_X != 0)
+		cudaFreeHost(_X->data);
 	_X = read_hdf5((path + number + ending).c_str());
 	_nCurrentDataSet += gpu.MPI_SIZE;
 	_batches = _X->rows/ _nBatchSize;
 	_nNextBatchNumber = 0;
+
+
+	size_t free, total;
+	cudaMemGetInfo(&free, &total);
+	cout << free << endl;
+	cout << "Free system memory: " << sysconf(_SC_PAGE_SIZE)*sysconf(_SC_PHYS_PAGES) << endl;
 }
 
 void WikiMaxoutNet::allocateNextBatch(bool isCV)
@@ -275,8 +326,8 @@ void WikiMaxoutNet::nesterov()
 		add(B[i],M_B[i],B[i]);
 	}
 
-	scalarMul(M_VocabX, MOMENTUM, M_VocabX);
-	add(_Vocab,M_VocabX,_Vocab);
+	//scalarMul(M_VocabX, MOMENTUM, M_VocabX);
+	//add(_Vocab,M_VocabX,_Vocab);
 }
 
 void WikiMaxoutNet::feedforward()
@@ -284,12 +335,14 @@ void WikiMaxoutNet::feedforward()
 
 	if(useMaxout)
 	{
+		//gpu.dropout(_batchX,d0,0.1);
 		gpu.dot(_batchX,W[0],z1);
 		addMatrixVector(z1,B[0],z1);
 		maxout(z1, a1_X, a1_idx_X, _nMaxoutSize);
 		gpu.dot(a1_X,W[1],z2_X);
 		addMatrixVector(z2_X,B[1],z2_X);
 
+		//gpu.dropout(_batchY,d0,0.1);
 		gpu.dot(_batchY,W[0],z1);
 		addMatrixVector(z1,B[0],z1);
 		maxout(z1, a1_Y, a1_idx_Y, _nMaxoutSize);
@@ -338,7 +391,7 @@ void WikiMaxoutNet::weightUpdates()
 		sub(B[0],arrGRAD_B[3][gpu.MYRANK],B[0]);
 
 		update_vocab_with_gradient(arrGRAD[4][gpu.MYRANK],_currentBatchIdx_Y,_Vocab,multiplier);
-		update_vocab_with_gradient(arrGRAD[5][gpu.MYRANK],_currentBatchIdx_Y,_Vocab,multiplier);
+		update_vocab_with_gradient(arrGRAD[5][gpu.MYRANK],_currentBatchIdx_X,_Vocab,multiplier);
 	}
 	else
 	{
@@ -354,8 +407,11 @@ void WikiMaxoutNet::weightUpdates()
 		RMSprop_with_nesterov_weight_update(MSBGRAD[3],arrGRAD_B[3][gpu.MYRANK],B[0],M_B[0],0.9f,_learningRate,_nBatchSize);
 
 
-		//update_vocab_with_gradient(GRAD[4],_currentBatchIdx_Y,_Vocab,0.01/(float)_nBatchSize);
-		//update_vocab_with_gradient(GRAD[5],_currentBatchIdx_Y,_Vocab,0.01/(float)_nBatchSize);
+		update_vocab_with_gradient(arrGRAD[4][gpu.MYRANK],_currentBatchIdx_Y,_Vocab,_learningRate/(float)_nBatchSize);
+		update_vocab_with_gradient(arrGRAD[5][gpu.MYRANK],_currentBatchIdx_X,_Vocab,_learningRate/(float)_nBatchSize);
+
+		//update_vocab_with_gradient(arrGRAD[4][gpu.MYRANK],_currentBatchIdx_Y,_Vocab,learning_rate_matrix);
+		//update_vocab_with_gradient(arrGRAD[5][gpu.MYRANK],_currentBatchIdx_X,_Vocab,learning_rate_matrix);
 
 
 		//fill_matrix(_Vocab_grad,0.0f);
@@ -363,7 +419,7 @@ void WikiMaxoutNet::weightUpdates()
 		//RMSprop_with_nesterov_weight_update(_MSVocab_grad,_Vocab_grad,_Vocab,_MVocab,_RMS_multiplier,_learningRate/(float)_nBatchSize,1);
 
 
-
+		/*
 		fill_matrix(_Vocab_grad,0.0f);
 		expand_vocab_gradient(arrGRAD[5][gpu.MYRANK],_currentBatchIdx_X,_Vocab_grad);
 		RMSprop_with_nesterov_weight_update(_MSVocab_grad,_Vocab_grad,_Vocab,M_VocabX,_RMS_multiplier,_learningRate/(float)_nBatchSize,1);
@@ -371,6 +427,7 @@ void WikiMaxoutNet::weightUpdates()
 		fill_matrix(_Vocab_grad,0.0f);
 		expand_vocab_gradient(arrGRAD[4][gpu.MYRANK],_currentBatchIdx_Y,_Vocab_grad);
 		RMSprop_with_nesterov_weight_update(_MSVocab_grad_Y,_Vocab_grad,_Vocab,M_VocabY,_RMS_multiplier,_learningRate/(float)_nBatchSize,1);
+		*/
 
 
 	}
@@ -427,7 +484,7 @@ void WikiMaxoutNet::backprop()
 
 double WikiMaxoutNet::calculateError()
 {
-
+	//scalarMul(W[0],0.9,W[0]);
 	allocateNextBatch(true);
 	for(int i = 0; i < _nCVErrorLength; i++)
 	{
@@ -439,12 +496,17 @@ double WikiMaxoutNet::calculateError()
 
 		allocateNextBatch(true);
 	}
-	//size_t free, total;
-	//cudaMemGetInfo(&free, &total);
-	//cout << free << endl;
+	//scalarMul(W[0],1.1,W[0]);
+	size_t free, total;
+	cudaMemGetInfo(&free, &total);
+	cout << free << endl;
+	cout << "Free system memory: " << sysconf(_SC_PAGE_SIZE)*sysconf(_SC_PHYS_PAGES) << endl;
+
 
 	double error = _dSumError/(double)(_nBatchSize*_nCVErrorLength);
 	_dSumError = 0.0;
+
+
 
 	_nNextBatchNumber_CV = 0;
 

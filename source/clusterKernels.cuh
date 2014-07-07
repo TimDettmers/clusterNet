@@ -67,4 +67,5 @@ __global__ void kExpandDoubleVocabGradient(float *gradX, float *gradY, float *vo
 										 float *vocab_grad, float *vocab_grad_idx, float learning_rate, int grad_size);
 __global__ void kExpandVocabGradient(float *grad, float *vocab_idx, float *vocab_grad);
 __global__ void kUpdateVocabWithGradient(float *grad, float *vocab_idx, float* vocab, float learning_rate);
+__global__ void kUpdateVocabWithGradient_LearningRateMatrix(float *grad, float *vocab_idx, float* vocab, float *learning_rate);
 #endif

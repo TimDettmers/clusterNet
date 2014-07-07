@@ -82,7 +82,9 @@ void write_csv(const char* filename, Matrix *X, const char* header, Matrix *ids)
 void write_csv(const char* filename, Matrix *X)
 {
 	std::ofstream myfile;
+	cout << "pre open file" << endl;
 	myfile.open(filename,std::ios::trunc);
+	cout << "post open file" << endl;
 	for(int row = 0; row< X->rows; row++)
 	  {
 		  for(int col = 0; col < X->cols; col++)
@@ -210,12 +212,7 @@ void write_hdf5(const char * filepath, Matrix *A)
 	   dataspace_id = H5Screate_simple(2, dims, NULL);
 	   dataset_id = H5Dcreate2(file_id, "/Default", H5T_NATIVE_FLOAT, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
 
-	   float data[A->rows][A->cols];
-	   for(int row = 0; row < A->rows; row++)
-		   for(int col = 0; col < A->cols; col++)
-			   data[row][col] = A->data[(row*A->cols) + col];
-
-	   H5Dwrite(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, data);
+	   H5Dwrite(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, A->data);
 	   H5Dclose(dataset_id);
 	   H5Fclose(file_id);
 }
