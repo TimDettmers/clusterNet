@@ -93,9 +93,11 @@ private:
 	float MOMENTUM;
 	float _learningRate;
 	int _totalNumberOfBatches;
+	int TRANSITION;
 
 	bool useRMSProp;
 	bool useMaxout;
+	bool useMomentum;
 
 
 	void loadNextDataSet();

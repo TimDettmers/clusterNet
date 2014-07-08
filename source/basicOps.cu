@@ -978,11 +978,24 @@ void RMSprop(Matrix *RMS, Matrix *grad, float RMS_multiplier, float learning_rat
 	kRMSprop<<<blocks,THREADS_PER_BLOCKS>>>(RMS->data, grad->data, RMS_multiplier, learning_rate, batch_size, RMS->size);
 }
 
+void RMSprop_with_momentum_weight_update(Matrix *RMS, Matrix *grad, Matrix *w, Matrix *m, float RMS_multiplier, float learning_rate, int batch_size, float momentum)
+{
+
+	int blocks = (RMS->size/THREADS_PER_BLOCKS) + 1;
+	kRMSprop_with_momentum_weight_update<<<blocks,THREADS_PER_BLOCKS>>>(RMS->data, grad->data, w->data, m->data, RMS_multiplier, learning_rate, batch_size, RMS->size, momentum);
+}
+
 void RMSprop_with_nesterov_weight_update(Matrix *RMS, Matrix *grad, Matrix *w, Matrix *m, float RMS_multiplier, float learning_rate, int batch_size, float momentum)
 {
 
 	int blocks = (RMS->size/THREADS_PER_BLOCKS) + 1;
 	kRMSprop_with_nesterov_weight_update<<<blocks,THREADS_PER_BLOCKS>>>(RMS->data, grad->data, w->data, m->data, RMS_multiplier, learning_rate, batch_size, RMS->size, momentum);
+}
+
+void RMSprop_with_weight_update(Matrix *RMS, Matrix *grad, Matrix *w, float RMS_multiplier, float learning_rate, int batch_size)
+{
+	int blocks = (RMS->size/THREADS_PER_BLOCKS) + 1;
+	kRMSprop_with_weight_update<<<blocks,THREADS_PER_BLOCKS>>>(RMS->data, grad->data, w->data, RMS_multiplier, learning_rate, batch_size, RMS->size);
 }
 
 Matrix *rectified_linear(Matrix *A)
@@ -1171,3 +1184,22 @@ void expand_vocab_gradient(Matrix *grad, Matrix *vocab_idx, Matrix *vocab_grad)
 	kExpandVocabGradient<<<grid,vocab_grad->rows>>>(grad->data, vocab_idx->data, vocab_grad->data);
 }
 
+
+
+void NesterovVocabUpdate(Matrix *M, Matrix *vocab_idx, Matrix *vocab, Matrix *vocabIdxPlaceholder, float momentum)
+{
+	assert(vocab->rows <= 1024);
+	dim3 grid(vocab_idx->rows,vocab_idx->cols,1);
+	kNesterovVocabUpdate<<<grid,vocab->rows>>>(M->data, vocab_idx->data, vocab->data, vocabIdxPlaceholder->data, momentum, vocab->cols);
+
+}
+
+void RMSpropVocab_with_nesterov_weight_update(Matrix *RMS, Matrix *grad, Matrix *vocab, Matrix *M, Matrix *vocab_idx, Matrix *vocabIdxPlaceholder,
+										 float RMS_multiplier, float learning_rate, int batch_size, float momentum)
+{
+	assert(vocab->rows <= 1024);
+	dim3 grid(vocab_idx->rows,vocab_idx->cols,1);
+	kRMSpropVocab_with_nesterov_weight_update<<<grid,vocab->rows>>>(RMS->data, grad->data, M->data, vocab_idx->data,
+													vocab->data, vocabIdxPlaceholder->data,RMS_multiplier,learning_rate,batch_size, vocab->cols, momentum);
+
+}

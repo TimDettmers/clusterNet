@@ -87,7 +87,9 @@ Matrix *scalarAdd(Matrix *A, float a);
 void scalarAdd(Matrix *A, float a, Matrix *out);
 void dropout(Matrix *A, Matrix *out, float dropout_rate);
 void RMSprop(Matrix *RMS, Matrix *grad, float RMS_multiplier, float learning_rate, int batch_size);
+void RMSprop_with_momentum_weight_update(Matrix *RMS, Matrix *grad, Matrix *w, Matrix *m, float RMS_multiplier, float learning_rate, int batch_size, float momentum);
 void RMSprop_with_nesterov_weight_update(Matrix *RMS, Matrix *grad, Matrix *w, Matrix *m, float RMS_multiplier, float learning_rate, int batch_size, float momentum);
+void RMSprop_with_weight_update(Matrix *RMS, Matrix *grad, Matrix *w, float RMS_multiplier, float learning_rate, int batch_size);
 
 Matrix *square(Matrix *A);
 void square(Matrix *A, Matrix *out);
@@ -164,4 +166,7 @@ void expand_double_vocab_gradient(Matrix *gradX, Matrix *gradY, Matrix *vocab_id
 void expand_vocab_gradient(Matrix *grad, Matrix *vocab_idx, Matrix *vocab_grad);
 void update_vocab_with_gradient(Matrix *grad, Matrix *vocab_idx, Matrix *vocab, float learning_rate);
 void update_vocab_with_gradient(Matrix *grad, Matrix *vocab_idx, Matrix *vocab, Matrix *learning_rate);
+void NesterovVocabUpdate(Matrix *M, Matrix *vocab_idx, Matrix *vocab, Matrix *vocabIdxPlaceholder, float momentum);
+void RMSpropVocab_with_nesterov_weight_update(Matrix *RMS, Matrix *grad, Matrix *vocab, Matrix *M, Matrix *vocab_idx, Matrix *vocabIdxPlaceholder,
+										 float RMS_multiplier, float learning_rate, int batch_size, float momentum);
 #endif

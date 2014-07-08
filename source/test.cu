@@ -82,8 +82,8 @@ void run_neural_network()
 		  mul(e2,z1,e2);
 		  gpu.Tdot(b.CURRENT_BATCH,e2,grad_w1);
 
-		  RMSprop_with_nesterov_weight_update(ms1,grad_w1,w1,m1,0.9f,learning_rate,b.CURRENT_BATCH->rows,momentum);
-		  RMSprop_with_nesterov_weight_update(ms2,grad_w2,w2,m2,0.9f,learning_rate,b.CURRENT_BATCH->rows,momentum);
+		  RMSprop_with_momentum_weight_update(ms1,grad_w1,w1,m1,0.9f,learning_rate,b.CURRENT_BATCH->rows,momentum);
+		  RMSprop_with_momentum_weight_update(ms2,grad_w2,w2,m2,0.9f,learning_rate,b.CURRENT_BATCH->rows,momentum);
 
 		  cudaFree(e1->data);
 		  cudaFree(e2->data);
@@ -740,7 +740,7 @@ int main(int argc, char *argv[])
 
 
 
-	//cudaSetDevice(2);
+	cudaSetDevice(2);
 	ClusterNet gpus = ClusterNet(1245);
 	WikiMaxoutNet net = WikiMaxoutNet(gpus);
 	net.run();

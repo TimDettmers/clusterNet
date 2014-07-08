@@ -52,10 +52,10 @@ void run_miniMNIST_test(ClusterNet gpus)
 
 
 		  //nesterov updates
-		  scalarMul(m1,momentum,m1);
-		  scalarMul(m2,momentum,m2);
-		  add(w1,m1,w1);
-		  add(w2,m2,w2);
+		  //scalarMul(m1,momentum,m1);
+		  //scalarMul(m2,momentum,m2);
+		  //add(w1,m1,w1);
+		  //add(w2,m2,w2);
 
 		  //feedforward
 		  Matrix *d0 = gpus.dropout(b.CURRENT_BATCH,0.2);
@@ -78,8 +78,8 @@ void run_miniMNIST_test(ClusterNet gpus)
 		  gpus.Tdot(b.CURRENT_BATCH,e2,grad_w1);
 
 		  //weight updates
-		  RMSprop_with_nesterov_weight_update(ms1,grad_w1,w1,m1,0.9f,learning_rate,b.CURRENT_BATCH->rows,momentum);
-		  RMSprop_with_nesterov_weight_update(ms2,grad_w2,w2,m2,0.9f,learning_rate,b.CURRENT_BATCH->rows,momentum);
+		  RMSprop_with_momentum_weight_update(ms1,grad_w1,w1,m1,0.9f,learning_rate,b.CURRENT_BATCH->rows,momentum);
+		  RMSprop_with_momentum_weight_update(ms2,grad_w2,w2,m2,0.9f,learning_rate,b.CURRENT_BATCH->rows,momentum);
 
 		  cudaFree(e1->data);
 		  cudaFree(e2->data);
@@ -180,10 +180,10 @@ void run_miniMNIST_test(ClusterNet gpus)
 		  b_dist.broadcast_batch_to_processes();
 
 		  //nesterov updates
-		  scalarMul(m1_dist,momentum,m1_dist);
-		  scalarMul(m2_dist,momentum,m2_dist);
-		  add(w1_dist,m1_dist,w1_dist);
-		  add(w2_dist,m2_dist,w2_dist);
+		  //scalarMul(m1_dist,momentum,m1_dist);
+		  //scalarMul(m2_dist,momentum,m2_dist);
+		  //add(w1_dist,m1_dist,w1_dist);
+		  //add(w2_dist,m2_dist,w2_dist);
 
 		  Matrix *d0 = gpus.dropout(b_dist.CURRENT_BATCH,0.2);
 		  //print_gpus_matrix(w1);
@@ -204,8 +204,8 @@ void run_miniMNIST_test(ClusterNet gpus)
 		  mul(e2,z1,e2);
 		  gpus.Tdot(b_dist.CURRENT_BATCH,e2,grad_w1_dist);
 
-		  RMSprop_with_nesterov_weight_update(ms1_dist,grad_w1_dist,w1_dist,m1_dist,0.9f,learning_rate,b_dist.CURRENT_BATCH->rows,momentum);
-		  RMSprop_with_nesterov_weight_update(ms2_dist,grad_w2_dist,w2_dist,m2_dist,0.9f,learning_rate,b_dist.CURRENT_BATCH->rows,momentum);
+		  RMSprop_with_momentum_weight_update(ms1_dist,grad_w1_dist,w1_dist,m1_dist,0.9f,learning_rate,b_dist.CURRENT_BATCH->rows,momentum);
+		  RMSprop_with_momentum_weight_update(ms2_dist,grad_w2_dist,w2_dist,m2_dist,0.9f,learning_rate,b_dist.CURRENT_BATCH->rows,momentum);
 
 		  cudaFree(e1->data);
 		  cudaFree(e2->data);
@@ -320,10 +320,10 @@ void run_miniMNIST_test(ClusterNet gpus)
 		  b.broadcast_batch_to_processes();
 
 		  //nesterov updates
-		  scalarMul(m1,momentum,m1);
-		  scalarMul(m2,momentum,m2);
-		  add(w1,m1,w1);
-		  add(w2,m2,w2);
+		  //scalarMul(m1,momentum,m1);
+		  //scalarMul(m2,momentum,m2);
+		  //add(w1,m1,w1);
+		  //add(w2,m2,w2);
 
 		  //feedforward
 		  Matrix *d0 = gpus.dropout(b.CURRENT_BATCH,0.2);
@@ -349,8 +349,8 @@ void run_miniMNIST_test(ClusterNet gpus)
 		  gpus.Tdot(b.CURRENT_BATCH,e2,grad_w1);
 
 		  //weight updates
-		  RMSprop_with_nesterov_weight_update(ms1,grad_w1,w1,m1,0.9f,learning_rate,b.CURRENT_BATCH->rows,momentum);
-		  RMSprop_with_nesterov_weight_update(ms2,grad_w2,w2,m2,0.9f,learning_rate,b.CURRENT_BATCH->rows,momentum);
+		  RMSprop_with_momentum_weight_update(ms1,grad_w1,w1,m1,0.9f,learning_rate,b.CURRENT_BATCH->rows,momentum);
+		  RMSprop_with_momentum_weight_update(ms2,grad_w2,w2,m2,0.9f,learning_rate,b.CURRENT_BATCH->rows,momentum);
 
 		  cudaFree(e1->data);
 		  cudaFree(e2->data);

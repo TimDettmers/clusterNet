@@ -14,7 +14,9 @@ WikiMaxoutNet::WikiMaxoutNet(ClusterNet gpus)
 	_learningRate = 0.001;
 	_nCVErrorPeriodicity = 5000;
 	_nCVErrorLength = 5000;
-	MOMENTUM = 0.5;
+	TRANSITION = 10000000;
+	MOMENTUM = 1.0;
+	_dSumError = 0.0;
 	gpu = gpus;
 	_nCurrentDataSet = gpu.MYRANK;
 	_X = 0;
@@ -35,7 +37,7 @@ WikiMaxoutNet::WikiMaxoutNet(ClusterNet gpus)
 		{
 			if(col > next_level)
 			{
-				learning_rate = learning_rate * 10.00f;
+				learning_rate = learning_rate * 3.33f;
 				next_level = next_level == 50000 ? vocabSize : next_level;
 				next_level = next_level == 25000 ? 50000 : next_level;
 				next_level = next_level == 10000 ? 25000 : next_level;
@@ -59,6 +61,7 @@ WikiMaxoutNet::WikiMaxoutNet(ClusterNet gpus)
 
 	useRMSProp = true;
 	useMaxout = true;
+	useMomentum = true;
 
 	cout << "_nMaxoutSize: " << _nMaxoutSize << endl;
 	cout << "_layers: " << _layers[0] << endl;
@@ -189,6 +192,9 @@ void WikiMaxoutNet::run()
 	int i = 0;
 	while(true)
 	{
+		if(i > TRANSITION)
+			useMomentum = false;
+
 		if(i > 0 && i % _nCVErrorPeriodicity == 0)
 		{
 			if( i > 0 && i % 100000 == 0)
@@ -218,12 +224,13 @@ void WikiMaxoutNet::run()
 			stop = clock();
 
 			double time_interval_seconds = (double((stop - start)) / CLOCKS_PER_SEC) ;
-			cout << "Approximate time left in hours: " << ((1.0f/(((i*_nBatchSize)/(float)_X->rows)/63.0))*time_interval_seconds/(float)3600.0)  -
+			cout << "Approximate time left in hours: " << ((1.0f/(((i*_nBatchSize)/(float)_X->rows)/62.0))*time_interval_seconds/(float)3600.0)  -
 					(time_interval_seconds/(float)3600.0)<< endl;
 
 		}
 		else
 		{
+
 			nesterov();
 			feedforward();
 			backprop();
@@ -320,8 +327,14 @@ void WikiMaxoutNet::nesterov()
 		add(B[i],M_B[i],B[i]);
 	}
 
-	//scalarMul(M_VocabX, MOMENTUM, M_VocabX);
-	//add(_Vocab,M_VocabX,_Vocab);
+	scalarMul(M_VocabX, MOMENTUM, M_VocabX);
+	add(_Vocab,M_VocabX,_Vocab);
+
+	//scalarMul(M_VocabY, MOMENTUM, M_VocabY);
+	//add(_Vocab,M_VocabY,_Vocab);
+
+	//NesterovVocabUpdate(M_VocabX,_currentBatchIdx_X,_Vocab,_Vocab_grad_idx,MOMENTUM);
+	//NesterovVocabUpdate(M_VocabY,_currentBatchIdx_Y,_Vocab,_Vocab_grad_idx,MOMENTUM);
 }
 
 void WikiMaxoutNet::feedforward()
@@ -389,39 +402,101 @@ void WikiMaxoutNet::weightUpdates()
 	}
 	else
 	{
-		RMSprop_with_nesterov_weight_update(MSGRAD[0],arrGRAD[0][gpu.MYRANK],W[1],M[1],0.9f,_learningRate/(float)arrGRAD[0][gpu.MYRANK]->rows,_nBatchSize, MOMENTUM);
-		RMSprop_with_nesterov_weight_update(MSGRAD[1],arrGRAD[1][gpu.MYRANK],W[1],M[1],0.9f,_learningRate/(float)arrGRAD[1][gpu.MYRANK]->rows,_nBatchSize, MOMENTUM);
-		RMSprop_with_nesterov_weight_update(MSGRAD[2],arrGRAD[2][gpu.MYRANK],W[0],M[0],0.9f,_learningRate/(float)arrGRAD[2][gpu.MYRANK]->rows,_nBatchSize, MOMENTUM);
-		RMSprop_with_nesterov_weight_update(MSGRAD[3],arrGRAD[3][gpu.MYRANK],W[0],M[0],0.9f,_learningRate/(float)arrGRAD[3][gpu.MYRANK]->rows,_nBatchSize, MOMENTUM);
+		if(useMomentum)
+		{
+			RMSprop_with_momentum_weight_update(MSGRAD[0],arrGRAD[0][gpu.MYRANK],W[1],M[1],0.9f,_learningRate/(float)arrGRAD[0][gpu.MYRANK]->rows,_nBatchSize, MOMENTUM);
+			RMSprop_with_momentum_weight_update(MSGRAD[1],arrGRAD[1][gpu.MYRANK],W[1],M[1],0.9f,_learningRate/(float)arrGRAD[1][gpu.MYRANK]->rows,_nBatchSize, MOMENTUM);
+			RMSprop_with_momentum_weight_update(MSGRAD[2],arrGRAD[2][gpu.MYRANK],W[0],M[0],0.9f,_learningRate/(float)arrGRAD[2][gpu.MYRANK]->rows,_nBatchSize, MOMENTUM);
+			RMSprop_with_momentum_weight_update(MSGRAD[3],arrGRAD[3][gpu.MYRANK],W[0],M[0],0.9f,_learningRate/(float)arrGRAD[3][gpu.MYRANK]->rows,_nBatchSize, MOMENTUM);
 
 
-		RMSprop_with_nesterov_weight_update(MSBGRAD[0],arrGRAD_B[0][gpu.MYRANK],B[1],M_B[1],0.9f,_learningRate,_nBatchSize, MOMENTUM);
-		RMSprop_with_nesterov_weight_update(MSBGRAD[1],arrGRAD_B[1][gpu.MYRANK],B[1],M_B[1],0.9f,_learningRate,_nBatchSize, MOMENTUM);
-		RMSprop_with_nesterov_weight_update(MSBGRAD[2],arrGRAD_B[2][gpu.MYRANK],B[0],M_B[0],0.9f,_learningRate,_nBatchSize, MOMENTUM);
-		RMSprop_with_nesterov_weight_update(MSBGRAD[3],arrGRAD_B[3][gpu.MYRANK],B[0],M_B[0],0.9f,_learningRate,_nBatchSize, MOMENTUM);
+			RMSprop_with_momentum_weight_update(MSBGRAD[0],arrGRAD_B[0][gpu.MYRANK],B[1],M_B[1],0.9f,_learningRate,_nBatchSize, MOMENTUM);
+			RMSprop_with_momentum_weight_update(MSBGRAD[1],arrGRAD_B[1][gpu.MYRANK],B[1],M_B[1],0.9f,_learningRate,_nBatchSize, MOMENTUM);
+			RMSprop_with_momentum_weight_update(MSBGRAD[2],arrGRAD_B[2][gpu.MYRANK],B[0],M_B[0],0.9f,_learningRate,_nBatchSize, MOMENTUM);
+			RMSprop_with_momentum_weight_update(MSBGRAD[3],arrGRAD_B[3][gpu.MYRANK],B[0],M_B[0],0.9f,_learningRate,_nBatchSize, MOMENTUM);
 
 
-		//update_vocab_with_gradient(arrGRAD[4][gpu.MYRANK],_currentBatchIdx_Y,_Vocab,_learningRate/(float)_nBatchSize);
-		//update_vocab_with_gradient(arrGRAD[5][gpu.MYRANK],_currentBatchIdx_X,_Vocab,_learningRate/(float)_nBatchSize);
+			//update_vocab_with_gradient(arrGRAD[4][gpu.MYRANK],_currentBatchIdx_Y,_Vocab,_learningRate/(float)_nBatchSize);
+			//update_vocab_with_gradient(arrGRAD[5][gpu.MYRANK],_currentBatchIdx_X,_Vocab,_learningRate/(float)_nBatchSize);
 
-		update_vocab_with_gradient(arrGRAD[4][gpu.MYRANK],_currentBatchIdx_Y,_Vocab,learning_rate_matrix);
-		update_vocab_with_gradient(arrGRAD[5][gpu.MYRANK],_currentBatchIdx_X,_Vocab,learning_rate_matrix);
-
-
-		//fill_matrix(_Vocab_grad,0.0f);
-		//expand_double_vocab_gradient(GRAD[5],GRAD[4],_currentBatchIdx_X,_currentBatchIdx_Y,_Vocab,_Vocab_grad,_Vocab_grad_idx,_learningRate/(float)_nBatchSize);
-		//RMSprop_with_nesterov_weight_update(_MSVocab_grad,_Vocab_grad,_Vocab,_MVocab,_RMS_multiplier,_learningRate/(float)_nBatchSize,1);
+			//update_vocab_with_gradient(arrGRAD[4][gpu.MYRANK],_currentBatchIdx_Y,_Vocab,learning_rate_matrix);
+			//update_vocab_with_gradient(arrGRAD[5][gpu.MYRANK],_currentBatchIdx_X,_Vocab,learning_rate_matrix);
 
 
-		/*
-		fill_matrix(_Vocab_grad,0.0f);
-		expand_vocab_gradient(arrGRAD[5][gpu.MYRANK],_currentBatchIdx_X,_Vocab_grad);
-		RMSprop_with_nesterov_weight_update(_MSVocab_grad,_Vocab_grad,_Vocab,M_VocabX,_RMS_multiplier,_learningRate/(float)_nBatchSize,1);
+			/*
+			fill_matrix(_Vocab_grad,0.0f);
+			expand_vocab_gradient(arrGRAD[5][gpu.MYRANK],_currentBatchIdx_X,_Vocab_grad);
+			RMSpropVocab_with_momentum_weight_update(_MSVocab_grad,_Vocab_grad,_Vocab,M_VocabX,_currentBatchIdx_X,_Vocab_grad_idx, _RMS_multiplier,_learningRate/(float)_nBatchSize,1,MOMENTUM);
 
-		fill_matrix(_Vocab_grad,0.0f);
-		expand_vocab_gradient(arrGRAD[4][gpu.MYRANK],_currentBatchIdx_Y,_Vocab_grad);
-		RMSprop_with_nesterov_weight_update(_MSVocab_grad_Y,_Vocab_grad,_Vocab,M_VocabY,_RMS_multiplier,_learningRate/(float)_nBatchSize,1);
-		*/
+			//update_vocab_with_gradient(arrGRAD[4][gpu.MYRANK],_currentBatchIdx_Y,_Vocab,_learningRate/(float)_nBatchSize);
+
+			fill_matrix(_Vocab_grad,0.0f);
+			expand_vocab_gradient(arrGRAD[4][gpu.MYRANK],_currentBatchIdx_Y,_Vocab_grad);
+			RMSpropVocab_with_momentum_weight_update(_MSVocab_grad_Y,_Vocab_grad,_Vocab,M_VocabY,_currentBatchIdx_Y,_Vocab_grad_idx, _RMS_multiplier,_learningRate/(float)_nBatchSize,1,MOMENTUM);
+			 */
+
+			//fill_matrix(_Vocab_grad,0.0f);
+			//expand_double_vocab_gradient(GRAD[5],GRAD[4],_currentBatchIdx_X,_currentBatchIdx_Y,_Vocab,_Vocab_grad,_Vocab_grad_idx,_learningRate/(float)_nBatchSize);
+			//RMSprop_with_momentum_weight_update(_MSVocab_grad,_Vocab_grad,_Vocab,_MVocab,_RMS_multiplier,_learningRate/(float)_nBatchSize,1);
+
+			fill_matrix(_Vocab_grad,0.0f);
+			expand_vocab_gradient(arrGRAD[5][gpu.MYRANK],_currentBatchIdx_X,_Vocab_grad);
+			RMSprop_with_momentum_weight_update(_MSVocab_grad,_Vocab_grad,_Vocab,M_VocabX,_RMS_multiplier,_learningRate/(float)_nBatchSize,1,MOMENTUM);
+
+			fill_matrix(_Vocab_grad,0.0f);
+			expand_vocab_gradient(arrGRAD[4][gpu.MYRANK],_currentBatchIdx_Y,_Vocab_grad);
+			RMSprop_with_momentum_weight_update(_MSVocab_grad_Y,_Vocab_grad,_Vocab,M_VocabY,_RMS_multiplier,_learningRate/(float)_nBatchSize,1,MOMENTUM);
+
+		}
+		else
+		{
+			RMSprop_with_weight_update(MSGRAD[0],arrGRAD[0][gpu.MYRANK],W[1],0.9f,_learningRate/(float)arrGRAD[0][gpu.MYRANK]->rows,_nBatchSize);
+			RMSprop_with_weight_update(MSGRAD[1],arrGRAD[1][gpu.MYRANK],W[1],0.9f,_learningRate/(float)arrGRAD[1][gpu.MYRANK]->rows,_nBatchSize);
+			RMSprop_with_weight_update(MSGRAD[2],arrGRAD[2][gpu.MYRANK],W[0],0.9f,_learningRate/(float)arrGRAD[2][gpu.MYRANK]->rows,_nBatchSize);
+			RMSprop_with_weight_update(MSGRAD[3],arrGRAD[3][gpu.MYRANK],W[0],0.9f,_learningRate/(float)arrGRAD[3][gpu.MYRANK]->rows,_nBatchSize);
+
+
+			RMSprop_with_weight_update(MSBGRAD[0],arrGRAD_B[0][gpu.MYRANK],B[1],0.9f,_learningRate,_nBatchSize);
+			RMSprop_with_weight_update(MSBGRAD[1],arrGRAD_B[1][gpu.MYRANK],B[1],0.9f,_learningRate,_nBatchSize);
+			RMSprop_with_weight_update(MSBGRAD[2],arrGRAD_B[2][gpu.MYRANK],B[0],0.9f,_learningRate,_nBatchSize);
+			RMSprop_with_weight_update(MSBGRAD[3],arrGRAD_B[3][gpu.MYRANK],B[0],0.9f,_learningRate,_nBatchSize);
+
+
+			//update_vocab_with_gradient(arrGRAD[4][gpu.MYRANK],_currentBatchIdx_Y,_Vocab,_learningRate/(float)_nBatchSize);
+			//update_vocab_with_gradient(arrGRAD[5][gpu.MYRANK],_currentBatchIdx_X,_Vocab,_learningRate/(float)_nBatchSize);
+
+			//update_vocab_with_gradient(arrGRAD[4][gpu.MYRANK],_currentBatchIdx_Y,_Vocab,learning_rate_matrix);
+			//update_vocab_with_gradient(arrGRAD[5][gpu.MYRANK],_currentBatchIdx_X,_Vocab,learning_rate_matrix);
+
+
+			/*
+			fill_matrix(_Vocab_grad,0.0f);
+			expand_vocab_gradient(arrGRAD[5][gpu.MYRANK],_currentBatchIdx_X,_Vocab_grad);
+			RMSpropVocab_with_weight_update(_MSVocab_grad,_Vocab_grad,_Vocab,M_VocabX,_currentBatchIdx_X,_Vocab_grad_idx, _RMS_multiplier,_learningRate/(float)_nBatchSize,1,MOMENTUM);
+
+			//update_vocab_with_gradient(arrGRAD[4][gpu.MYRANK],_currentBatchIdx_Y,_Vocab,_learningRate/(float)_nBatchSize);
+
+			fill_matrix(_Vocab_grad,0.0f);
+			expand_vocab_gradient(arrGRAD[4][gpu.MYRANK],_currentBatchIdx_Y,_Vocab_grad);
+			RMSpropVocab_with_weight_update(_MSVocab_grad_Y,_Vocab_grad,_Vocab,M_VocabY,_currentBatchIdx_Y,_Vocab_grad_idx, _RMS_multiplier,_learningRate/(float)_nBatchSize,1,MOMENTUM);
+			 */
+
+			//fill_matrix(_Vocab_grad,0.0f);
+			//expand_double_vocab_gradient(GRAD[5],GRAD[4],_currentBatchIdx_X,_currentBatchIdx_Y,_Vocab,_Vocab_grad,_Vocab_grad_idx,_learningRate/(float)_nBatchSize);
+			//RMSprop_with_weight_update(_MSVocab_grad,_Vocab_grad,_Vocab,_MVocab,_RMS_multiplier,_learningRate/(float)_nBatchSize,1);
+
+
+			fill_matrix(_Vocab_grad,0.0f);
+			expand_vocab_gradient(arrGRAD[4][gpu.MYRANK],_currentBatchIdx_Y,_Vocab_grad);
+			RMSprop_with_weight_update(_MSVocab_grad_Y,_Vocab_grad,_Vocab,_RMS_multiplier,_learningRate/(float)_nBatchSize,1);
+
+			fill_matrix(_Vocab_grad,0.0f);
+			expand_vocab_gradient(arrGRAD[5][gpu.MYRANK],_currentBatchIdx_X,_Vocab_grad);
+			RMSprop_with_weight_update(_MSVocab_grad,_Vocab_grad,_Vocab,_RMS_multiplier,_learningRate/(float)_nBatchSize,1);
+
+		}
+
+
 
 
 	}
