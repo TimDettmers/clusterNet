@@ -683,17 +683,11 @@ int run_clusterNet_test(ClusterNet gpus)
 
 	gpuArray[gpus.MYRANK] = ones(783,8379);
 
-
-	for(int i = 0; i < gpus.MPI_SIZE-1; i++)
+	gpus.add_to_queue(gpuArray);
+	while(!gpus.QUEUE_EMPTY)
 	{
-		gpus.queue_matricies2(gpuArray,r,i);
-		while(uden[0] != 1)
-		{
-			MPI_Testall(2,r,uden,MPI_STATUSES_IGNORE);
-		}
-		uden[0] = 0;
+		gpus.pop_queue();
 	}
-
 
 	out = zeros(783*gpus.MPI_SIZE,8379);
 	//gpus.vStack_queued_matricies(gpuArray,send,receive,out);

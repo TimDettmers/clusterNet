@@ -69,11 +69,10 @@ public:
 	 Matrix *sparse_to_dense(Matrix *A);
 
 	 void construct_vocab_matrix(Matrix *vocab_idx, Matrix *vocab_idx_y, Matrix *batch_X, Matrix *batch_y, Matrix *vocab);
-	 void queue_matricies(Matrix **gpuArray, std::vector<MPI_Request> send_request, std::vector<MPI_Request> receive_request);
-	 void vStack_queued_matricies(Matrix **gpuArray, std::vector<MPI_Request> send_request, std::vector<MPI_Request> receive_request, Matrix *out);
-	 void gather_queued_matricies(Matrix **gpuArray, std::vector<MPI_Request> send_request, std::vector<MPI_Request> receive_request);
+	 void add_to_queue(Matrix **gpuArray);
+	 bool pop_queue();
 
-	 void queue_matricies2(Matrix **gpuArray, MPI_Request *request, int offset);
+	 bool QUEUE_EMPTY;
 
 	 int MYRANK;
 	 int NODES;
@@ -99,8 +98,15 @@ private:
 	 bool m_hasMPI;
 	 bool m_cublasInitialized;
 	 bool m_cusparseInitialized;
+	 bool waitingForTransfer;
 	 MPI_Status m_status;
 	 MPI_Comm m_MPIWorld;
+	 MPI_Request *m_request_queue;
+	 int *m_flag_queue;
+	 std::vector<Matrix*> m_send_queue;
+	 std::vector<Matrix*> m_receive_queue;
+	 std::vector<int> m_sendid_queue;
+	 std::vector<int> m_receiveid_queue;
 
 	 int m_destination;
 	 int m_source;

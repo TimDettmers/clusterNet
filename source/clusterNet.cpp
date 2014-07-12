@@ -75,6 +75,16 @@ void ClusterNet::init(int seed)
 		PCIe_RANKS.push_back(0);
 		MYRANK = 0;
 	}
+
+
+
+	m_request_queue = (MPI_Request*)malloc(sizeof(MPI_Request)*2);
+	m_flag_queue = (int*)malloc(sizeof(int));
+	m_flag_queue[0] = 0;
+	m_request_queue[0] = MPI_REQUEST_NULL;
+	m_request_queue[1] = MPI_REQUEST_NULL;
+	QUEUE_EMPTY = true;
+	waitingForTransfer = false;
 }
 
 void ClusterNet::init_MPI(int argc, char * argv[])
@@ -880,68 +890,56 @@ void ClusterNet::construct_vocab_matrix(Matrix *vocab_idx, Matrix *vocab_idx_y, 
 
 }
 
-void ClusterNet::queue_matricies(Matrix **gpuArray, std::vector<MPI_Request> send_request, std::vector<MPI_Request> receive_request)
+void ClusterNet::add_to_queue(Matrix **gpuArray)
 {
 	int send_matrix_idx = (MYRANK + 1) == MPI_SIZE ? 0 : (MYRANK + 1);
-	//int receive_matrix_idx = (MYRANK - 1) < 0 ? MPI_SIZE - 1 : (MYRANK - 1);
-	for (int i = 0; i < MPI_SIZE-1; i++)
-	{
-		MPI_Isend(gpuArray[MYRANK]->data, gpuArray[MYRANK]->size, MPI_FLOAT, send_matrix_idx, MYRANK, MPI_COMM_WORLD, &send_request[i]);
-		//MPI_Irecv(gpuArray[receive_matrix_idx]->data, gpuArray[receive_matrix_idx]->size, MPI_FLOAT, receive_matrix_idx, receive_matrix_idx, MPI_COMM_WORLD,&receive_request[i]);
-
-		send_matrix_idx = (send_matrix_idx + 1) == MPI_SIZE ? 0 : (send_matrix_idx + 1);
-		//receive_matrix_idx = (receive_matrix_idx - 1) < 0 ? MPI_SIZE - 1 : (receive_matrix_idx - 1);
-	}
-}
-
-void ClusterNet::vStack_queued_matricies(Matrix **gpuArray,  std::vector<MPI_Request> send_request, std::vector<MPI_Request> receive_request, Matrix *out)
-{
-
 	int receive_matrix_idx = (MYRANK - 1) < 0 ? MPI_SIZE - 1 : (MYRANK - 1);
-	for (int i = 0; i < MPI_SIZE-1; i++)
+	for(int i = 0; i < MPI_SIZE - 1; i++)
 	{
-		MPI_Recv(gpuArray[receive_matrix_idx]->data, gpuArray[receive_matrix_idx]->size, MPI_FLOAT, receive_matrix_idx, receive_matrix_idx, MPI_COMM_WORLD, &m_status);
-		receive_matrix_idx = (receive_matrix_idx - 1) < 0 ? MPI_SIZE - 1 : (receive_matrix_idx - 1);
-	}
+		m_receive_queue.push_back(gpuArray[receive_matrix_idx]);
+		m_receiveid_queue.push_back(receive_matrix_idx);
+		m_send_queue.push_back(gpuArray[MYRANK]);
+		m_sendid_queue.push_back(send_matrix_idx);
 
-
-	for(int i = 0; i < MPI_SIZE-1;i++ )
-		MPI_Wait(&send_request[i],&m_status);
-
-	vStackN(gpuArray, out, MPI_SIZE);
-
-}
-
-void ClusterNet::queue_matricies2(Matrix **gpuArray, MPI_Request *request, int offset)
-{
-
-	int send_matrix_idx = (MYRANK + 1) == MPI_SIZE ? 0 : (MYRANK + 1);
-	int receive_matrix_idx = (MYRANK - 1) < 0 ? MPI_SIZE - 1 : (MYRANK - 1);
-	for(int i = 0; i < offset; i++)
-	{
 		send_matrix_idx = (send_matrix_idx + 1) == MPI_SIZE ? 0 : (send_matrix_idx + 1);
 		receive_matrix_idx = (receive_matrix_idx - 1) < 0 ? MPI_SIZE - 1 : (receive_matrix_idx - 1);
 	}
 
-	MPI_Irecv(gpuArray[receive_matrix_idx]->data, gpuArray[receive_matrix_idx]->size, MPI_FLOAT, receive_matrix_idx, receive_matrix_idx, MPI_COMM_WORLD, &request[0]);
-	MPI_Isend(gpuArray[MYRANK]->data, gpuArray[MYRANK]->size, MPI_FLOAT, send_matrix_idx, MYRANK, MPI_COMM_WORLD, &request[1]);
-
-
+	QUEUE_EMPTY = false;
 }
 
-void ClusterNet::gather_queued_matricies(Matrix **gpuArray,  std::vector<MPI_Request> send_request, std::vector<MPI_Request> receive_request)
+bool ClusterNet::pop_queue()
 {
+	if(QUEUE_EMPTY){ return true;}
 
-	int receive_matrix_idx = (MYRANK - 1) < 0 ? MPI_SIZE - 1 : (MYRANK - 1);
-	for (int i = 0; i < MPI_SIZE-1; i++)
+
+	if(!waitingForTransfer)
 	{
-		MPI_Recv(gpuArray[receive_matrix_idx]->data, gpuArray[receive_matrix_idx]->size, MPI_FLOAT, receive_matrix_idx, receive_matrix_idx, MPI_COMM_WORLD, &m_status);
-		receive_matrix_idx = (receive_matrix_idx - 1) < 0 ? MPI_SIZE - 1 : (receive_matrix_idx - 1);
+		MPI_Irecv(m_receive_queue[0]->data, m_receive_queue[0]->size, MPI_FLOAT, m_receiveid_queue[0], m_receiveid_queue[0], MPI_COMM_WORLD, &m_request_queue[0]);
+		MPI_Isend(m_send_queue[0]->data, m_send_queue[0]->size, MPI_FLOAT, m_sendid_queue[0], MYRANK, MPI_COMM_WORLD, &m_request_queue[1]);
+		waitingForTransfer = true;
+	}
+	else
+	{
+		MPI_Testall(2,m_request_queue,m_flag_queue,MPI_STATUSES_IGNORE);
+
+		if(m_flag_queue[0] == 1)
+		{
+			waitingForTransfer = false;
+			m_flag_queue[0] = 0;
+			m_receive_queue.erase(m_receive_queue.begin() + 0);
+			m_send_queue.erase(m_send_queue.begin() + 0);
+			m_receiveid_queue.erase(m_receiveid_queue.begin() + 0);
+			m_sendid_queue.erase(m_sendid_queue.begin() + 0);
+			if(m_receive_queue.size() > 0)
+				pop_queue();
+			else
+				QUEUE_EMPTY = true;
+		}
+
 	}
 
-
-	for(int i = 0; i < MPI_SIZE-1;i++ )
-		MPI_Wait(&send_request[i],&m_status);
-
+	return QUEUE_EMPTY;
 }
+
 
