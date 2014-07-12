@@ -1302,7 +1302,9 @@ int main(int argc, char *argv[])
 
 
 	//cudaSetDevice(1);
-	ClusterNet gpus = ClusterNet(1245);
+	//pthread_t t;
+
+	ClusterNet gpus = ClusterNet(argc, argv, 1245, true);
 	WikiMaxoutNet net = WikiMaxoutNet(gpus);
 	net.run();
 

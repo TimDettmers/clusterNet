@@ -1,26 +1,12 @@
-#include <cublas_v2.h>
-#include <cusparse_v2.h>
 #include <clusterNet.h>
-#include <basicOps.cuh>
-#include <util.cuh>
-#include <cstdlib>
-#include <time.h>
-#include <stdlib.h>
-#include <iostream>
-#include <assert.h>
-#include <algorithm>
-#include <vector>
-#include <pthread.h>
-#include <sstream>
-#include <thrust/device_ptr.h>
-#include <thrust/device_vector.h>
-#include <thrust/fill.h>
+
 
 #define SSTR( x ) dynamic_cast< std::ostringstream & >( \
         ( std::ostringstream() << std::dec << x ) ).str()
 
 using std::cout;
 using std::endl;
+
 
 ClusterNet::ClusterNet()
 {
@@ -48,6 +34,9 @@ ClusterNet::ClusterNet(int argc, char* argv[])
 	init_MPI(argc, argv);
 	init((int) (time(0) % (10000*MYRANK+12345)));
 }
+
+int ClusterNet::get_queue_length(){ return m_send_queue.size(); }
+
 void ClusterNet::init(int seed)
 {
 	/*
@@ -85,6 +74,7 @@ void ClusterNet::init(int seed)
 	m_request_queue[1] = MPI_REQUEST_NULL;
 	QUEUE_EMPTY = true;
 	waitingForTransfer = false;
+
 }
 
 void ClusterNet::init_MPI(int argc, char * argv[])
@@ -119,6 +109,8 @@ void ClusterNet::init_MPI(int argc, char * argv[])
 	m_hasMPI = true;
 	compute_GPUID_and_Nodes();
 	compute_PCIe_ranks();
+
+
 
 }
 
@@ -892,21 +884,26 @@ void ClusterNet::construct_vocab_matrix(Matrix *vocab_idx, Matrix *vocab_idx_y, 
 
 void ClusterNet::add_to_queue(Matrix **gpuArray)
 {
-	int send_matrix_idx = (MYRANK + 1) == MPI_SIZE ? 0 : (MYRANK + 1);
-	int receive_matrix_idx = (MYRANK - 1) < 0 ? MPI_SIZE - 1 : (MYRANK - 1);
-	for(int i = 0; i < MPI_SIZE - 1; i++)
+	if(MPI_SIZE > 1)
 	{
-		m_receive_queue.push_back(gpuArray[receive_matrix_idx]);
-		m_receiveid_queue.push_back(receive_matrix_idx);
-		m_send_queue.push_back(gpuArray[MYRANK]);
-		m_sendid_queue.push_back(send_matrix_idx);
+		int send_matrix_idx = (MYRANK + 1) == MPI_SIZE ? 0 : (MYRANK + 1);
+		int receive_matrix_idx = (MYRANK - 1) < 0 ? MPI_SIZE - 1 : (MYRANK - 1);
+		for(int i = 0; i < MPI_SIZE - 1; i++)
+		{
+			m_receive_queue.push_back(gpuArray[receive_matrix_idx]);
+			m_receiveid_queue.push_back(receive_matrix_idx);
+			m_send_queue.push_back(gpuArray[MYRANK]);
+			m_sendid_queue.push_back(send_matrix_idx);
 
-		send_matrix_idx = (send_matrix_idx + 1) == MPI_SIZE ? 0 : (send_matrix_idx + 1);
-		receive_matrix_idx = (receive_matrix_idx - 1) < 0 ? MPI_SIZE - 1 : (receive_matrix_idx - 1);
+			send_matrix_idx = (send_matrix_idx + 1) == MPI_SIZE ? 0 : (send_matrix_idx + 1);
+			receive_matrix_idx = (receive_matrix_idx - 1) < 0 ? MPI_SIZE - 1 : (receive_matrix_idx - 1);
+		}
+
+		QUEUE_EMPTY = false;
 	}
-
-	QUEUE_EMPTY = false;
 }
+
+
 
 bool ClusterNet::pop_queue()
 {

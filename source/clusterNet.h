@@ -8,6 +8,21 @@
 #include <list>
 #include <vector>
 #include <cusparse_v2.h>
+#include <pthread.h>
+#include <cstdlib>
+#include <iostream>
+#include <cusparse_v2.h>
+#include <util.cuh>
+#include <time.h>
+#include <stdlib.h>
+#include <assert.h>
+#include <algorithm>
+#include <vector>
+#include <pthread.h>
+#include <sstream>
+#include <thrust/device_ptr.h>
+#include <thrust/device_vector.h>
+#include <thrust/fill.h>
 
 
 class ClusterNet
@@ -71,6 +86,7 @@ public:
 	 void construct_vocab_matrix(Matrix *vocab_idx, Matrix *vocab_idx_y, Matrix *batch_X, Matrix *batch_y, Matrix *vocab);
 	 void add_to_queue(Matrix **gpuArray);
 	 bool pop_queue();
+	 int get_queue_length();
 
 	 bool QUEUE_EMPTY;
 
@@ -119,6 +135,8 @@ private:
 
 	 void compute_PCIe_ranks();
 	 void compute_GPUID_and_Nodes();
+
+
 };
 #endif
 
