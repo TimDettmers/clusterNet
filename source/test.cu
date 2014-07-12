@@ -15,6 +15,10 @@
 using std::cout;
 using std::endl;
 
+
+
+
+
 void run_neural_network()
 {
   Matrix *X = read_hdf5("/home/tim/mnist_full_X.hdf5");
@@ -22,18 +26,24 @@ void run_neural_network()
 
   ClusterNet gpu = ClusterNet(12345);
 
-  Matrix *w1 = gpu.sparseInitWeight(784,1000);
-  Matrix *w2 = gpu.sparseInitWeight(1000,10);
-  Matrix *m1 = zeros(784,1000);
-  Matrix *m2 = zeros(1000,10);
-  Matrix *ms1 = zeros(784,1000);
-  Matrix *ms2 = zeros(1000,10);
-  Matrix *grad_w1_ms = zeros(784,1000);
-  Matrix *grad_w2_ms = zeros(1000,10);
-  Matrix *grad_w2 = empty(1000,10);
-  Matrix *grad_w1 = empty(784,1000);
-  float error = 0;
+  cout << X->rows << endl;
+
+  int hidden_size = 1024;
+
+
+  Matrix *w1 = gpu.sparseInitWeight(784,hidden_size);
+  Matrix *w2 = gpu.sparseInitWeight(hidden_size,10);
+  Matrix *m1 = zeros(784,hidden_size);
+  Matrix *m2 = zeros(hidden_size,10);
+  Matrix *ms1 = zeros(784,hidden_size);
+  Matrix *ms2 = zeros(hidden_size,10);
+  Matrix *grad_w1_ms = zeros(784,hidden_size);
+  Matrix *grad_w2_ms = zeros(hidden_size,10);
+  Matrix *grad_w2 = empty(hidden_size,10);
+  Matrix *grad_w1 = empty(784,hidden_size);
+  float cv_error = 0;
   float cv_size = 0.1428571f;
+  float train_error = 0.0f;
 
   BatchAllocator b = BatchAllocator();
   b.init(X, y,  cv_size, 128, 512);
@@ -63,13 +73,12 @@ void run_neural_network()
 		  scalarMul(m1,momentum,m1);
 		  scalarMul(m2,momentum,m2);
 		  add(w1,m1,w1);
-		  add(w2,m1,w2);
+		  add(w2,m2,w2);
 
 		  Matrix *d0 = gpu.dropout(b.CURRENT_BATCH,0.2);
-		  //print_gpu_matrix(w1);
 		  Matrix *z1 = gpu.dot(d0, w1);
 		  logistic(z1, z1);
-		  Matrix *d1 = gpu.dropout(z1,0.6);
+		  Matrix *d1 = gpu.dropout(z1,0.5);
 		  Matrix *a2 = gpu.dot(d1,w2);
 		  Matrix *out = softmax(a2);
 		  Matrix *t = create_t_matrix(b.CURRENT_BATCH_Y,10);
@@ -82,8 +91,10 @@ void run_neural_network()
 		  mul(e2,z1,e2);
 		  gpu.Tdot(b.CURRENT_BATCH,e2,grad_w1);
 
-		  RMSprop_with_momentum_weight_update(ms1,grad_w1,w1,m1,0.9f,learning_rate,b.CURRENT_BATCH->rows,momentum);
-		  RMSprop_with_momentum_weight_update(ms2,grad_w2,w2,m2,0.9f,learning_rate,b.CURRENT_BATCH->rows,momentum);
+		  b.allocate_next_batch_async();
+
+		  RMSprop_with_momentum_weight_update(ms1,grad_w1,w1,m1,0.9f,learning_rate,b.CURRENT_BATCH->rows, momentum);
+		  RMSprop_with_momentum_weight_update(ms2,grad_w2,w2,m2,0.9f,learning_rate,b.CURRENT_BATCH->rows, momentum);
 
 		  cudaFree(e1->data);
 		  cudaFree(e2->data);
@@ -102,71 +113,69 @@ void run_neural_network()
 	  //Matrix *sum_value = sum(w1);
 	  //std::cout << "weight 1 Sum: " << to_host(sum_value)->data[0] << std::endl;
 
-	  error = 0;
+	  train_error = 0;
 	  for(int i = 0; i < b.TOTAL_BATCHES; i++)
 	  {
-		  b.allocate_next_batch_async();
 
+		  b.broadcast_batch_to_processes();
+
+		  //Matrix *d0 = scalarMul(b.CURRENT_BATCH,0.8);
 		  Matrix *a1 = gpu.dot(b.CURRENT_BATCH,w1);
-
 		  logistic(a1, a1);
+		  //Matrix *d1 = scalarMul(a1,0.5);
 		  Matrix *a2 = gpu.dot(a1,w2);
-
 		  Matrix *out = softmax(a2);
-
-
 		  Matrix *result = argmax(out);
-
 		  Matrix *eq = equal(result,b.CURRENT_BATCH_Y);
+		  b.allocate_next_batch_async();
 		  float sum_value = sum(eq);
 
-		  //std::cout << "Error count: " << 128.0f - sum_value << std::endl;
-		  error += (b.CURRENT_BATCH->rows - sum_value);
-
+		  train_error += (b.CURRENT_BATCH->rows - sum_value)/ (1.0f * b.CURRENT_BATCH->rows *b.TOTAL_BATCHES) ;
 
 		  cudaFree(a1->data);
 		  cudaFree(a2->data);
 		  cudaFree(out->data);
 		  cudaFree(result->data);
 		  cudaFree(eq->data);
+		  //cudaFree(d0->data);
+		  //cudaFree(d1->data);
 
 		  b.replace_current_batch_with_next();
 	  }
 
 
-	  std::cout << "Train error: " << error/((1.0f - cv_size)*70000.0f)<< std::endl;
+	  std::cout << "Train error: " << train_error << std::endl;
 
 
-	  error = 0;
+	  cv_error = 0;
 	  for(int i = 0; i < b.TOTAL_BATCHES_CV; i++)
 	  {
-		  b.allocate_next_cv_batch_async();
-		  Matrix *a1 = gpu.dot(b.CURRENT_BATCH_CV,w1);
-
+		  b.broadcast_batch_cv_to_processes();
+		  Matrix *d0 = scalarMul(b.CURRENT_BATCH_CV,0.8);
+		  Matrix *a1 = gpu.dot(d0,w1);
 		  logistic(a1, a1);
-		  Matrix *a2 = gpu.dot(a1,w2);
-
+		  Matrix *d1 = scalarMul(a1,0.5);
+		  Matrix *a2 = gpu.dot(d1,w2);
 		  Matrix *out = softmax(a2);
-
 		  Matrix *result = argmax(out);
-
 		  Matrix *eq = equal(result,b.CURRENT_BATCH_CV_Y);
+		  b.allocate_next_cv_batch_async();
 		  float sum_value = sum(eq);
 
-		  //std::cout << "Error count: " << gpu.m_total_batches_cv - sum_value << std::endl;
-		  error += (b.CURRENT_BATCH_CV->rows  - sum_value);
-
+		  cv_error += (b.CURRENT_BATCH_CV->rows  - sum_value)/ (1.0f * b.CURRENT_BATCH_CV->rows *b.TOTAL_BATCHES_CV) ;
 
 		  cudaFree(a1->data);
 		  cudaFree(a2->data);
 		  cudaFree(out->data);
 		  cudaFree(result->data);
 		  cudaFree(eq->data);
+		  cudaFree(d0->data);
+		  cudaFree(d1->data);
 
 		  b.replace_current_cv_batch_with_next();
 	  }
 
-	  std::cout << "Cross validation error: " << error/(cv_size*70000) << std::endl;
+	  std::cout << "Cross validation error: " << cv_error << std::endl;
 
 
   }
@@ -186,6 +195,499 @@ void run_neural_network()
 
 
   printf("Finished!\n");
+}
+
+
+void run_maxout_network()
+{
+
+	cudaSetDevice(0);
+    Matrix *X = read_hdf5("/home/tim/mnist_full_X.hdf5");
+    Matrix *y = read_hdf5("/home/tim/mnist_full_y.hdf5");
+
+  	ClusterNet gpus = ClusterNet(12345);
+
+  	int hiddenunits = 512;
+  	int maxout_Size = 8;
+  	int batch_size = 128;
+
+	Matrix *w1 = gpus.uniformSqrtWeight(784,hiddenunits);
+	Matrix *w2 = gpus.uniformSqrtWeight(hiddenunits/maxout_Size,10);
+	Matrix *b1 = zeros(1,hiddenunits);
+	Matrix *b2 = zeros(1,10);
+	Matrix *m1 = zeros(784,hiddenunits);
+	Matrix *m2 = zeros(hiddenunits/maxout_Size,10);
+	Matrix *mb1 = zeros(1,hiddenunits);
+	Matrix *mb2 = zeros(1,10);
+	Matrix *ms1 = zeros(784,hiddenunits);
+	Matrix *ms2 = zeros(hiddenunits/maxout_Size,10);
+	Matrix *msb1 = zeros(1,hiddenunits);
+	Matrix *msb2 = zeros(1,10);
+	Matrix *grad_w1 = zeros(784,hiddenunits);
+	Matrix *grad_w2 = zeros(hiddenunits/maxout_Size,10);
+	Matrix *grad_b1 = zeros(1,hiddenunits);
+	Matrix *grad_b2 = zeros(1,10);
+
+
+	float cv_error = 0.0f;
+	float train_error = 0.0f;
+
+	BatchAllocator b = BatchAllocator();
+	b.init(X, y, 0.2, batch_size, 512);
+	int epochs  = 1000;
+	float learning_rate = 0.001;
+	float momentum = 0.5;
+	for(int EPOCH = 1; EPOCH < epochs; EPOCH++)
+	{
+	  cout << "EPOCH: " << EPOCH << endl;
+	  //momentum += 0.01;
+	  //if(momentum > 0.95) momentum = 0.95;
+	  for(int i = 0; i < b.TOTAL_BATCHES; i++)
+	  {
+		  b.broadcast_batch_to_processes();
+
+		  //nesterov updates
+		  scalarMul(m1,momentum,m1);
+		  scalarMul(m2,momentum,m2);
+		  scalarMul(mb1,momentum,mb1);
+		  scalarMul(mb2,momentum,mb2);
+		  add(w1,m1,w1);
+		  add(w2,m2,w2);
+		  add(b1,mb1,b1);
+		  add(b2,mb2,b2);
+
+
+		  //feedforward
+		  Matrix *d0 = gpus.dropout(b.CURRENT_BATCH,0.2);
+		  Matrix *z1 = gpus.dot(d0, w1);
+		  addMatrixVector(z1,b1,z1);
+		  Matrix **a_paired = maxout(z1,maxout_Size);
+		  Matrix *a1 = a_paired[0];
+		  Matrix *a1_idx = a_paired[1];
+		  Matrix *d1 = gpus.dropout(a1,0.5);
+		  Matrix *a2 = gpus.dot(d1,w2);
+		  addMatrixVector(a2,b2,a2);
+		  Matrix *out = softmax(a2);
+		  Matrix *t = create_t_matrix(b.CURRENT_BATCH_Y,10);
+
+		  b.allocate_next_batch_async();
+
+		  //backprop
+		  Matrix *e1 = sub(out, t);
+		  Matrix *e2_partial = gpus.dotT(e1, w2);
+		  Matrix *e2 = empty(b.CURRENT_BATCH->rows,e2_partial->cols*maxout_Size);
+		  Matrix *aB = ones(1,b.CURRENT_BATCH->rows);
+
+
+		  gpus.Tdot(a1,e1,grad_w2);
+		  gpus.dot(aB,e1,grad_b2);
+		  expand_to_maxout_grad(e2_partial, a1_idx,e2);
+		  gpus.Tdot(b.CURRENT_BATCH,e2,grad_w1);
+		  gpus.dot(aB,e2,grad_b1);
+
+		  //weight updates
+		  //RMSProp
+
+
+		  RMSprop_with_momentum_weight_update(ms1,grad_w1,w1,m1,0.9f,learning_rate,b.CURRENT_BATCH->rows, momentum);
+		  RMSprop_with_momentum_weight_update(ms2,grad_w2,w2,m2,0.9f,learning_rate,b.CURRENT_BATCH->rows, momentum);
+
+		  RMSprop_with_momentum_weight_update(msb1,grad_b1,b1,mb1,0.9f,learning_rate,b.CURRENT_BATCH->rows, momentum);
+		  RMSprop_with_momentum_weight_update(msb2,grad_b2,b2,mb2,0.9f,learning_rate,b.CURRENT_BATCH->rows, momentum);
+
+
+
+/*
+		  scalarMul(grad_w1,learning_rate/(float)b.CURRENT_BATCH->rows,grad_w1);
+		  scalarMul(grad_w2,learning_rate/(float)b.CURRENT_BATCH->rows,grad_w2);
+		  scalarMul(grad_b1,learning_rate/(float)b.CURRENT_BATCH->rows,grad_b1);
+		  scalarMul(grad_b2,learning_rate/(float)b.CURRENT_BATCH->rows,grad_b2);
+
+
+
+		  //classical momentum
+		  scalarMul(m1,momentum,m1);
+		  scalarMul(m2,momentum,m2);
+		  scalarMul(mb1,momentum,mb1);
+		  scalarMul(mb2,momentum,mb2);
+		  sub(m1,grad_w1,m1);
+		  sub(m2,grad_w2,m2);
+		  sub(mb1,grad_b1,mb1);
+		  sub(mb2,grad_b2,mb2);
+
+		  add(w1,m1,w1);
+		  add(w2,m2,w2);
+		  add(b1,mb1,b1);
+		  add(b2,mb2,b2);
+
+		  */
+
+
+
+		  /*
+		  sub(w1,grad_w1,w1);
+		  sub(w2,grad_w2,w2);
+		  sub(b1,grad_b1,b1);
+		  sub(b2,grad_b2,b2);
+		  */
+
+
+
+		  cudaFree(e1->data);
+		  cudaFree(e2->data);
+		  cudaFree(e2_partial->data);
+		  cudaFree(z1->data);
+		  cudaFree(a1->data);
+		  cudaFree(a1_idx->data);
+		  cudaFree(a2->data);
+		  cudaFree(out->data);
+		  cudaFree(t->data);
+		  cudaFree(d0->data);
+		  cudaFree(d1->data);
+		  cudaFree(aB->data);
+		  free(a_paired);
+
+		  b.replace_current_batch_with_next();
+
+	  }
+
+
+
+	  train_error = 0;
+	  for(int i = 0; i < b.TOTAL_BATCHES; i++)
+	  {
+
+		  b.broadcast_batch_to_processes();
+
+		  Matrix *d0 = scalarMul(b.CURRENT_BATCH,0.8);
+		  Matrix *z1 = gpus.dot(d0,w1);
+		  Matrix **a1_pair = maxout(z1,maxout_Size);
+		  Matrix *a1 = a1_pair[0];
+		  Matrix *d1 = scalarMul(a1,0.5);
+		  Matrix *a2 = gpus.dot(d1,w2);
+		  Matrix *out = softmax(a2);
+		  Matrix *result = argmax(out);
+		  Matrix *eq = equal(result,b.CURRENT_BATCH_Y);
+		  b.allocate_next_batch_async();
+		  float sum_value = sum(eq);
+
+		  train_error += (b.CURRENT_BATCH->rows - sum_value)/ (1.0f * b.CURRENT_BATCH->rows *b.TOTAL_BATCHES) ;
+
+		  cudaFree(z1->data);
+		  cudaFree(a1->data);
+		  cudaFree(a1_pair[1]->data);
+		  cudaFree(a2->data);
+		  cudaFree(out->data);
+		  cudaFree(result->data);
+		  cudaFree(eq->data);
+		  cudaFree(d0->data);
+		  cudaFree(d1->data);
+		  free(a1_pair);
+
+		  b.replace_current_batch_with_next();
+	  }
+
+	  std::cout << "MAXOUT Train error: " << train_error << std::endl;
+
+
+
+	  cv_error = 0;
+	  for(int i = 0; i < b.TOTAL_BATCHES_CV; i++)
+	  {
+		  b.broadcast_batch_cv_to_processes();
+		  Matrix *d0 = scalarMul(b.CURRENT_BATCH_CV,0.8);
+		  Matrix *z1 = gpus.dot(d0,w1);
+		  Matrix **a1_pair = maxout(z1,maxout_Size);
+		  Matrix *a1 = a1_pair[0];
+		  Matrix *d1 = scalarMul(a1,0.5);
+		  Matrix *a2 = gpus.dot(d1,w2);
+		  Matrix *out = softmax(a2);
+		  Matrix *result = argmax(out);
+		  Matrix *eq = equal(result,b.CURRENT_BATCH_CV_Y);
+		  b.allocate_next_batch_async();
+		  float sum_value = sum(eq);
+
+		  cv_error += (b.CURRENT_BATCH_CV->rows  - sum_value)/ (1.0f * b.CURRENT_BATCH_CV->rows *b.TOTAL_BATCHES_CV) ;
+
+		  cudaFree(z1->data);
+		  cudaFree(a1->data);
+		  cudaFree(a1_pair[1]->data);
+		  cudaFree(a2->data);
+		  cudaFree(out->data);
+		  cudaFree(result->data);
+		  cudaFree(eq->data);
+		  cudaFree(d0->data);
+		  cudaFree(d1->data);
+		  free(a1_pair);
+
+		  b.replace_current_cv_batch_with_next();
+	  }
+
+	  std::cout << "MAXOUT Cross validation error: " << cv_error << std::endl;
+
+	}
+
+}
+
+
+void run_normal_net()
+{
+	cudaSetDevice(2);
+    Matrix *X = read_hdf5("/home/tim/mnist_full_X.hdf5");
+    Matrix *y = read_hdf5("/home/tim/mnist_full_y.hdf5");
+
+  	ClusterNet gpus = ClusterNet(12345);
+
+  	int hiddenunits = 1024;
+  	int maxout_Size = 1;
+  	int batch_size = 128;
+
+	Matrix *w1 = gpus.uniformSqrtWeight(784,hiddenunits);
+	Matrix *w2 = gpus.uniformSqrtWeight(hiddenunits/maxout_Size,10);
+	Matrix *b1 = zeros(1,hiddenunits);
+	Matrix *b2 = zeros(1,10);
+	Matrix *m1 = zeros(784,hiddenunits);
+	Matrix *m2 = zeros(hiddenunits/maxout_Size,10);
+	Matrix *mb1 = zeros(1,hiddenunits);
+	Matrix *mb2 = zeros(1,10);
+	Matrix *ms1 = zeros(784,hiddenunits);
+	Matrix *ms2 = zeros(hiddenunits/maxout_Size,10);
+	Matrix *msb1 = zeros(1,hiddenunits);
+	Matrix *msb2 = zeros(1,10);
+	Matrix *grad_w1 = zeros(784,hiddenunits);
+	Matrix *grad_w2 = zeros(hiddenunits/maxout_Size,10);
+	Matrix *grad_b1 = zeros(1,hiddenunits);
+	Matrix *grad_b2 = zeros(1,10);
+
+
+	float cv_error = 0.0f;
+	float train_error = 0.0f;
+
+	BatchAllocator b = BatchAllocator();
+	b.init(X, y, 0.4, batch_size, 512);
+	int epochs  = 500;
+	float learning_rate = 0.000001;
+	float momentum = 0.5;
+	for(int EPOCH = 1; EPOCH < epochs; EPOCH++)
+	{
+	  cout << "EPOCH: " << EPOCH << endl;
+	  momentum += 0.01;
+	  if(momentum > 0.95) momentum = 0.95;
+	  for(int i = 0; i < b.TOTAL_BATCHES; i++)
+	  {
+		  b.broadcast_batch_to_processes();
+
+		  //nesterov updates
+		  scalarMul(m1,momentum,m1);
+		  scalarMul(m2,momentum,m2);
+		  scalarMul(mb1,momentum,mb1);
+		  scalarMul(mb2,momentum,mb2);
+		  add(w1,m1,w1);
+		  add(w2,m2,w2);
+		  add(b1,mb1,b1);
+		  add(b2,mb2,b2);
+
+
+
+
+
+
+
+		  //feedforward
+		  Matrix *d0 = gpus.dropout(b.CURRENT_BATCH,0.2);
+		  Matrix *z1 = gpus.dot(d0, w1);
+		  addMatrixVector(z1,b1,z1);
+		  Matrix *a1 = logistic(z1);
+		  //Matrix *a1 = rectified_linear(z1);
+		  Matrix *d1 = gpus.dropout(a1,0.5);
+		  Matrix *a2 = gpus.dot(d1,w2);
+		  addMatrixVector(a2,b2,a2);
+		  Matrix *out = softmax(a2);
+		  Matrix *t = create_t_matrix(b.CURRENT_BATCH_Y,10);
+
+		  b.allocate_next_batch_async();
+
+		  //backprop
+		  Matrix *e1 = sub(out, t);
+		  Matrix *e2 = gpus.dotT(e1, w2);
+		  Matrix *aB = ones(1,b.CURRENT_BATCH->rows);
+
+
+		  gpus.Tdot(a1,e1,grad_w2);
+		  gpus.dot(aB,e1,grad_b2);
+		  //rectified_linear_derivative(a1,a1);
+		  logisticGrad(a1,a1);
+		  mul(e2,a1,e2);
+		  gpus.Tdot(b.CURRENT_BATCH,e2,grad_w1);
+		  gpus.dot(aB,e2,grad_b1);
+
+
+
+		  /*
+		  //about equal to momentum update + nesterov update -> momentum applyied to gradient+momentum better?
+		  RMSprop_with_momentum_weight_update(ms1,grad_w1,w1,m1,0.9f,learning_rate,b.CURRENT_BATCH->rows, momentum);
+		  RMSprop_with_momentum_weight_update(ms2,grad_w2,w2,m2,0.9f,learning_rate,b.CURRENT_BATCH->rows, momentum);
+
+		  RMSprop_with_momentum_weight_update(msb1,grad_b1,b1,mb1,0.9f,learning_rate,b.CURRENT_BATCH->rows, momentum);
+		  RMSprop_with_momentum_weight_update(msb2,grad_b2,b2,mb2,0.9f,learning_rate,b.CURRENT_BATCH->rows, momentum);
+		  */
+
+		  /*
+		  //slow and generally worse error, but sometimes better results in the end
+		  RMSprop_with_momentum_update(ms1,grad_w1,w1,m1,0.9f,learning_rate,b.CURRENT_BATCH->rows, momentum);
+		  RMSprop_with_momentum_update(ms2,grad_w2,w2,m2,0.9f,learning_rate,b.CURRENT_BATCH->rows, momentum);
+
+		  RMSprop_with_momentum_update(msb1,grad_b1,b1,mb1,0.9f,learning_rate,b.CURRENT_BATCH->rows, momentum);
+		  RMSprop_with_momentum_update(msb2,grad_b2,b2,mb2,0.9f,learning_rate,b.CURRENT_BATCH->rows, momentum);
+		  */
+
+
+
+
+		  RMSprop_with_nesterov_weight_update(ms1,grad_w1,w1,m1,0.9f,learning_rate,b.CURRENT_BATCH->rows, momentum);
+		  RMSprop_with_nesterov_weight_update(ms2,grad_w2,w2,m2,0.9f,learning_rate,b.CURRENT_BATCH->rows, momentum);
+
+		  RMSprop_with_nesterov_weight_update(msb1,grad_b1,b1,mb1,0.9f,learning_rate,b.CURRENT_BATCH->rows, momentum);
+		  RMSprop_with_nesterov_weight_update(msb2,grad_b2,b2,mb2,0.9f,learning_rate,b.CURRENT_BATCH->rows, momentum);
+
+
+		  /*
+		  //slower but equally good to nesterov momentum
+		  RMSprop_with_weight_update(ms1,grad_w1,w1,m1,0.9f,learning_rate,b.CURRENT_BATCH->rows, momentum);
+		  RMSprop_with_weight_update(ms2,grad_w2,w2,m2,0.9f,learning_rate,b.CURRENT_BATCH->rows, momentum);
+
+		  RMSprop_with_weight_update(msb1,grad_b1,b1,mb1,0.9f,learning_rate,b.CURRENT_BATCH->rows, momentum);
+		  RMSprop_with_weight_update(msb2,grad_b2,b2,mb2,0.9f,learning_rate,b.CURRENT_BATCH->rows, momentum);
+		  */
+		  /*
+
+
+
+
+
+		  scalarMul(grad_w1,learning_rate/(float)b.CURRENT_BATCH->rows,grad_w1);
+		  scalarMul(grad_w2,learning_rate/(float)b.CURRENT_BATCH->rows,grad_w2);
+		  scalarMul(grad_b1,learning_rate/(float)b.CURRENT_BATCH->rows,grad_b1);
+		  scalarMul(grad_b2,learning_rate/(float)b.CURRENT_BATCH->rows,grad_b2);
+
+
+
+		  //classical momentum
+		  scalarMul(m1,momentum,m1);
+		  scalarMul(m2,momentum,m2);
+		  scalarMul(mb1,momentum,mb1);
+		  scalarMul(mb2,momentum,mb2);
+		  sub(m1,grad_w1,m1);
+		  sub(m2,grad_w2,m2);
+		  sub(mb1,grad_b1,mb1);
+		  sub(mb2,grad_b2,mb2);
+
+
+		  add(w1,m1,w1);
+		  add(w2,m2,w2);
+		  add(b1,mb1,b1);
+		  add(b2,mb2,b2);
+		  */
+
+
+
+
+		  /*
+		  sub(w1,grad_w1,w1);
+		  sub(w2,grad_w2,w2);
+		  sub(b1,grad_b1,b1);
+		  sub(b2,grad_b2,b2);
+		  */
+
+
+
+		  cudaFree(e1->data);
+		  cudaFree(e2->data);
+		  cudaFree(z1->data);
+		  cudaFree(a1->data);
+		  cudaFree(a2->data);
+		  cudaFree(out->data);
+		  cudaFree(t->data);
+		  cudaFree(d0->data);
+		  cudaFree(d1->data);
+		  cudaFree(aB->data);
+
+		  b.replace_current_batch_with_next();
+
+	  }
+
+
+
+	  train_error = 0;
+	  for(int i = 0; i < b.TOTAL_BATCHES; i++)
+	  {
+
+		  b.broadcast_batch_to_processes();
+
+		  Matrix *d0 = scalarMul(b.CURRENT_BATCH,0.8);
+		  Matrix *z1 = gpus.dot(d0,w1);
+		  Matrix *a1 = logistic(z1);
+		  //Matrix *a1 = rectified_linear(z1);
+		  Matrix *d1 = scalarMul(a1,0.5);
+		  Matrix *a2 = gpus.dot(d1,w2);
+		  Matrix *out = softmax(a2);
+		  Matrix *result = argmax(out);
+		  Matrix *eq = equal(result,b.CURRENT_BATCH_Y);
+		  b.allocate_next_batch_async();
+		  float sum_value = sum(eq);
+
+		  train_error += (b.CURRENT_BATCH->rows - sum_value)/ (1.0f * b.CURRENT_BATCH->rows *b.TOTAL_BATCHES) ;
+
+		  cudaFree(z1->data);
+		  cudaFree(a1->data);
+		  cudaFree(a2->data);
+		  cudaFree(out->data);
+		  cudaFree(result->data);
+		  cudaFree(eq->data);
+		  cudaFree(d0->data);
+		  cudaFree(d1->data);
+
+		  b.replace_current_batch_with_next();
+	  }
+
+	  std::cout << "MAXOUT Train error: " << train_error << std::endl;
+
+
+
+	  cv_error = 0;
+	  for(int i = 0; i < b.TOTAL_BATCHES_CV; i++)
+	  {
+		  b.broadcast_batch_cv_to_processes();
+		  Matrix *d0 = scalarMul(b.CURRENT_BATCH_CV,0.8);
+		  Matrix *z1 = gpus.dot(d0,w1);
+		  Matrix *a1 = logistic(z1);
+		  //Matrix *a1 = rectified_linear(z1);
+		  Matrix *d1 = scalarMul(a1,0.5);
+		  Matrix *a2 = gpus.dot(d1,w2);
+		  Matrix *out = softmax(a2);
+		  Matrix *result = argmax(out);
+		  Matrix *eq = equal(result,b.CURRENT_BATCH_CV_Y);
+		  b.allocate_next_batch_async();
+		  float sum_value = sum(eq);
+
+		  cv_error += (b.CURRENT_BATCH_CV->rows  - sum_value)/ (1.0f * b.CURRENT_BATCH_CV->rows *b.TOTAL_BATCHES_CV) ;
+
+		  cudaFree(z1->data);
+		  cudaFree(a1->data);
+		  cudaFree(a2->data);
+		  cudaFree(out->data);
+		  cudaFree(result->data);
+		  cudaFree(eq->data);
+		  cudaFree(d0->data);
+		  cudaFree(d1->data);
+
+		  b.replace_current_cv_batch_with_next();
+	  }
+
+	  std::cout << "MAXOUT Cross validation error: " << cv_error << std::endl;
+
+	}
+
 }
 
 void MPI_benchmark_P2P(int argc, char *argv[])
@@ -732,219 +1234,87 @@ void dotMPI_test(int argc, char *argv[])
 }
 
 
+void async_test()
+{
+
+	ClusterNet gpu = ClusterNet(1324);
+
+	cudaSetDevice(0);
+	Matrix *A1 = gpu.rand(10,2);
+	Matrix *B1 = gpu.rand(2,10);
+	cudaSetDevice(1);
+	Matrix *A2 = ones(10,10);
+	Matrix *B2 = empty(10,10);
+
+	cudaSetDevice(0);
+	cudaStream_t s;
+	cudaStreamCreate(&s);
+	//cudaDeviceEnablePeerAccess(1,0);
+	Matrix *C1 = gpu.dot(A1,B1);
+
+	cudaMemcpyPeerAsync(B2->data,1,C1->data,0,C1->bytes,s);
+
+	cudaStreamSynchronize(s);
+	printmat(C1);
+	cudaSetDevice(1);
+	printmat(B2);
+	/*
+	printmat(C1);
+	add(C1,A2,A2);
+	printmat(A2);
+	*/
+
+
+}
+
 
 
 int main(int argc, char *argv[])
 {
 
+	//run_normal_net();
+	//run_maxout_network();
+
+
+	//async_test();
+
+
+	/*
+	ClusterNet gpus = ClusterNet(1234565);
+
+	Matrix *X = read_hdf5("/home/tim/mnist_full_X.hdf5");
+	Matrix *y = read_hdf5("/home/tim/mnist_full_y.hdf5");
+
+	std::vector<int> layers;
+	layers.push_back(512);
+
+	BatchAllocator allocator = BatchAllocator();
+	allocator.init(X,y,0.2,128,512,gpus, Single_GPU);
+	DeepNeuralNetwork net = DeepNeuralNetwork(layers,Classification, gpus, allocator, 10);
+
+	net.train();
+
+	*/
 
 
 
-	cudaSetDevice(2);
+
+
+
+	//cudaSetDevice(1);
 	ClusterNet gpus = ClusterNet(1245);
 	WikiMaxoutNet net = WikiMaxoutNet(gpus);
 	net.run();
 
-	gpus.shutdown_MPI();
 
 
-
-	/*
-
-	ClusterNet gpus = ClusterNet(argc,argv, 1245);
-	BatchAllocator b = BatchAllocator();
-	if(gpus.MYGPUID == 0)
-	{
-		Matrix *X = read_hdf5("/home/tim/data/higgs/X_bootstrap.hdf5");
-		Matrix *y = read_hdf5("/home/tim/data/higgs/y_bootstrap.hdf5");
-		Matrix *test = read_hdf5("/home/tim/data/higgs/test.hdf5");
-		Matrix *ids = read_hdf5("/home/tim/data/higgs/ids.hdf5");
-
-		b.init(X,y,0.2,128,512);
-
-		std::vector<int> layers;
-		//layers.push_back(1000);
-		//layers.push_back(1000);
-		layers.push_back(500);
-		layers.push_back(500);
-
-		BatchAllocator allocator = BatchAllocator();
-		allocator.init(X,y,0.2,128,512,gpus, Single_GPU);
-		DeepNeuralNetwork net = DeepNeuralNetwork(layers,Classification, gpus, allocator, 2);
-
-		net.LEARNING_RATE = 0.0003;
-		net.EPOCHS = 10;
-		net.TRANSITION_EPOCH = 500;
-		net.train();
-
-		Matrix *result = net.predict(test);
-
-		write_csv("/home/tim/data/higgs/result.csv",result,"EventId,RankOrder,Class",ids);
-	}
-
-	gpus.shutdown_MPI();
-
-	*/
-
-	/*
-	ClusterNet gpus = ClusterNet(argc,argv, 1245);
-	BatchAllocator b = BatchAllocator();
-	if(gpus.MYGPUID == 0)
-	{
-		Matrix *X = read_hdf5("/home/tim/data/KDD2014/X_nontext_dense.hdf5");
-		Matrix *y = read_hdf5("/home/tim/data/KDD2014/y_nontext_dense.hdf5");
-		Matrix *test = read_hdf5("/home/tim/data/KDD2014/test_nontext_dense.hdf5");
-		//Matrix *ids = read_hdf5("/home/tim/data/KDD2014/ids.hdf5");
-
-		cout << X->rows << "x" << X->cols << endl;
-
-		b.init(X,y,0.2,128,512);
-
-		std::vector<int> layers;
-		//layers.push_back(1000);
-		//layers.push_back(1000);
-		layers.push_back(500);
-
-		BatchAllocator allocator = BatchAllocator();
-		allocator.init(X,y,0.2,128,512,gpus, Single_GPU);
-		DeepNeuralNetwork net = DeepNeuralNetwork(layers,Classification, gpus, allocator, 2);
-		net.LEARNING_RATE = 0.0003;
-		net.EPOCHS = 500;
-		net.TRANSITION_EPOCH = 500;
-		net.train();
-
-		Matrix *result = net.predict(test);
-
-		//write_csv("/home/tim/data/KDD2014/result.csv",result,"EventId,RankOrder,Class",ids);
-	}
-
-	gpus.shutdown_MPI();
-	*/
-
-
-	/*
-	ClusterNet gpus = ClusterNet(argc,argv,1245);
-	BatchAllocator b = BatchAllocator();
-	Matrix *X;
-	Matrix *y;
-	//Matrix *test;
-	if(gpus.MYGPUID == 0)
-	{
-		X = read_sparse_hdf5("/home/tim/crowdflower_X.hdf5");
-		y = read_sparse_hdf5("/home/tim/crowdflower_y.hdf5");
-		//test = read_sparse_hdf5("/home/tim/crowdflower_test.hdf5");
-
-		//X = read_hdf5("/home/tim/mnist_full_X.hdf5");
-		//y = to_host(create_t_matrix(to_gpu(read_hdf5("/home/tim/mnist_full_y.hdf5")),10));
-		//y = read_hdf5("/home/tim/mnist_full_y.hdf5");
-		//test = read_hdf5("/home/tim/mnist_full_X.hdf5");
-
-		//X = read_hdf5("/home/tim/crowdflower_X_dense.hdf5");
-		//y = read_hdf5("/home/tim/crowdflower_y_dense.hdf5");
-	}
-	MPI_Barrier(MPI_COMM_WORLD);
-
-	if(gpus.MYGPUID == 1)
-	{
-		X = read_sparse_hdf5("/home/tim/crowdflower_X.hdf5");
-		y = read_sparse_hdf5("/home/tim/crowdflower_y.hdf5");
-		//test = read_sparse_hdf5("/home/tim/crowdflower_test.hdf5");
-
-		//X = read_hdf5("/home/tim/mnist_full_X.hdf5");
-		//y = to_host(create_t_matrix(to_gpu(read_hdf5("/home/tim/mnist_full_y.hdf5")),10));
-		//y = read_hdf5("/home/tim/mnist_full_y.hdf5");
-		//test = read_hdf5("/home/tim/mnist_full_X.hdf5");
-
-		//X = read_hdf5("/home/tim/crowdflower_X_dense.hdf5");
-		//y = read_hdf5("/home/tim/crowdflower_y_dense.hdf5");
-	}
-	MPI_Barrier(MPI_COMM_WORLD);
-
-	if(gpus.MYGPUID == 2)
-	{
-		X = read_sparse_hdf5("/home/tim/crowdflower_X.hdf5");
-		y = read_sparse_hdf5("/home/tim/crowdflower_y.hdf5");
-		//test = read_sparse_hdf5("/home/tim/crowdflower_test.hdf5");
-
-		//X = read_hdf5("/home/tim/mnist_full_X.hdf5");
-		//y = to_host(create_t_matrix(to_gpu(read_hdf5("/home/tim/mnist_full_y.hdf5")),10));
-		//y = read_hdf5("/home/tim/mnist_full_y.hdf5");
-		//test = read_hdf5("/home/tim/mnist_full_X.hdf5");
-
-		//X = read_hdf5("/home/tim/crowdflower_X_dense.hdf5");
-		//y = read_hdf5("/home/tim/crowdflower_y_dense.hdf5");
-	}
-	MPI_Barrier(MPI_COMM_WORLD);
-*/
-
-	/*
-	Matrix *B = gpus.rand(b.CURRENT_BATCH->cols,20);
-
-	//cout << sum(b.CURRENT_BATCH) << endl;
-
-
-
-	//size_t total, free;
-	for(int i = 0; i < b.TOTAL_BATCHES; i++)
-	{
-
-		//cout << i << endl;
-		b.broadcast_batch_to_processes();
-		b.allocate_next_batch_async();
-		b.replace_current_batch_with_next();
-
-
-		Matrix *out = empty(b.CURRENT_BATCH->rows,20);
-
-
-*/
-
-
-	/*
-	Matrix *A = ones(10,10);
-	gpus.dropout(A,0.5);
-	A = gpus.dense_to_sparse(A);
-	Matrix *B = zeros(10,10);
-	Matrix *C = empty(10,10);
-
-	gpus.dot(A,B,C);
-	gpus.dot(A,B,C);
-	*/
-
-
-	/*
-
-
-	b.init(X,y,0.2,128,512,gpus, Distributed_weights_sparse);
-	std::vector<int> layers;
-	layers.push_back(4000);
-	layers.push_back(4000);
-
-	DeepNeuralNetwork net = DeepNeuralNetwork(layers,Regression,gpus,b,24);
-	net.EPOCHS = 4;
-	net.TRANSITION_EPOCH = 4;
-	net.LEARNING_RATE = 0.0001;
-	net.OUTPUT_IS_PROBABILITY = true;
-	//net.PRINT_MISSCLASSIFICATION = true;
-	net.train();
-	//out = net.predict(test);
-
-	/*
-	if(gpus.MYRANK == 0)
-	{
-		Matrix *ids =  read_sparse_hdf5("/home/tim/crowdflower_ids.hdf5");
-		write_csv("/home/tim/crowdflower_result.csv",out,"id,s1,s2,s3,s4,s5,w1,w2,w3,w4,k1,k2,k3,k4,k5,k6,k7,k8,k9,k10,k11,k12,k13,k14,k15",ids);
-	}
-*/
-
-
-	//gpus.shutdown_MPI();
 
 
 
 
 
 }
+
 
 
 

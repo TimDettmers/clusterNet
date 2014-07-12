@@ -73,6 +73,8 @@ public:
 	 void vStack_queued_matricies(Matrix **gpuArray, std::vector<MPI_Request> send_request, std::vector<MPI_Request> receive_request, Matrix *out);
 	 void gather_queued_matricies(Matrix **gpuArray, std::vector<MPI_Request> send_request, std::vector<MPI_Request> receive_request);
 
+	 void queue_matricies2(Matrix **gpuArray, MPI_Request *request, int offset);
+
 	 int MYRANK;
 	 int NODES;
 	 int MYGPUID;
@@ -80,7 +82,7 @@ public:
 	 std::vector<int> PCIe_RANKS;
 	 std::vector<int> MASTER_GPU_RANKS;
 private:
-	 cublasHandle_t m_handle;
+	 std::vector<cublasHandle_t> m_handle;
 	 cusparseHandle_t m_sparse_handle;
 	 curandGenerator_t m_generator;
 	 std::map<std::string,cudaEvent_t*> m_dictTickTock;

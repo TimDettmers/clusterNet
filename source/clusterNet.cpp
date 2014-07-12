@@ -331,6 +331,9 @@ void ClusterNet::dot_sparse(Matrix *A, Matrix *B, Matrix *out, cublasOperation_t
 
 void ClusterNet::dot(Matrix *A, Matrix *B, Matrix *out, cublasOperation_t T1, cublasOperation_t T2)
 {
+	int current_device = 0;
+	cudaGetDevice(&current_device);
+
 	if(A->isSparse == 0)
 	{
 		if(checkMatrixOperation(A, B, out, T1, T2, 1) == 1){ throw "Matrix *size error:\n"; }
@@ -338,7 +341,16 @@ void ClusterNet::dot(Matrix *A, Matrix *B, Matrix *out, cublasOperation_t T1, cu
 		if(!m_cublasInitialized)
 		{
 			m_cublasInitialized = true;
-			cublasCreate_v2(&m_handle);
+			int gpus = 0;
+			cudaGetDeviceCount(&gpus);
+			for(int i = 0; i < gpus; i++)
+			{
+				cudaSetDevice(i);
+				cublasHandle_t handle;
+				cublasCreate_v2(&handle);
+				m_handle.push_back(handle);
+			}
+			cudaSetDevice(current_device);
 		}
 
 		const float alpha = 1.0f;
@@ -376,7 +388,7 @@ void ClusterNet::dot(Matrix *A, Matrix *B, Matrix *out, cublasOperation_t T1, cu
 
 
 
-		status = cublasSgemm(m_handle, T1, T2, A_rows, B_cols,
+		status = cublasSgemm(m_handle[current_device], T1, T2, A_rows, B_cols,
 				A_cols, &alpha, A->data, A->rows, B->data, B->rows, &beta,
 				out->data, out->rows);
 
@@ -897,6 +909,23 @@ void ClusterNet::vStack_queued_matricies(Matrix **gpuArray,  std::vector<MPI_Req
 		MPI_Wait(&send_request[i],&m_status);
 
 	vStackN(gpuArray, out, MPI_SIZE);
+
+}
+
+void ClusterNet::queue_matricies2(Matrix **gpuArray, MPI_Request *request, int offset)
+{
+
+	int send_matrix_idx = (MYRANK + 1) == MPI_SIZE ? 0 : (MYRANK + 1);
+	int receive_matrix_idx = (MYRANK - 1) < 0 ? MPI_SIZE - 1 : (MYRANK - 1);
+	for(int i = 0; i < offset; i++)
+	{
+		send_matrix_idx = (send_matrix_idx + 1) == MPI_SIZE ? 0 : (send_matrix_idx + 1);
+		receive_matrix_idx = (receive_matrix_idx - 1) < 0 ? MPI_SIZE - 1 : (receive_matrix_idx - 1);
+	}
+
+	MPI_Irecv(gpuArray[receive_matrix_idx]->data, gpuArray[receive_matrix_idx]->size, MPI_FLOAT, receive_matrix_idx, receive_matrix_idx, MPI_COMM_WORLD, &request[0]);
+	MPI_Isend(gpuArray[MYRANK]->data, gpuArray[MYRANK]->size, MPI_FLOAT, send_matrix_idx, MYRANK, MPI_COMM_WORLD, &request[1]);
+
 
 }
 

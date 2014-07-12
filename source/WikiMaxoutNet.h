@@ -26,35 +26,33 @@ public:
 	void run();
 
 private:
-	Matrix *_currentBatchIdx_X;
-	Matrix *_currentBatchIdx_Y;
-	Matrix *_nextBatchIdx;
+	std::vector<Matrix*> _currentBatchIdx_X;
+	std::vector<Matrix*> _currentBatchIdx_Y;
+	std::vector<Matrix*> _nextBatchIdx;
 	ClusterNet gpu;
 	Matrix *_X;
 	Matrix *_CV_X;
-	Matrix *_Vocab;
-	Matrix *_Vocab_grad;
-	Matrix *_MSVocab_grad;
-	Matrix *_MSVocab_grad_Y;
-	Matrix *M_VocabX;
-	Matrix *M_VocabY;
-	Matrix *_Vocab_grad_idx;
-	Matrix *_batchX;
-	Matrix *_batchY;
+	std::vector<Matrix*>_Vocab;
+	std::vector<Matrix*>_Vocab_grad;
+	std::vector<Matrix*>_MSVocab_grad;
+	std::vector<Matrix*>_MSVocab_grad_Y;
+	std::vector<Matrix*> M_VocabX;
+	std::vector<Matrix*> M_VocabY;
+	std::vector<Matrix*> _Vocab_grad_idx;
+	std::vector<Matrix*> _batchX;
+	std::vector<Matrix*> _batchY;
 	Matrix *stackedVocabGrad_X;
 	Matrix *stackedVocabGrad_Y;
 	Matrix *stackedBatchIdx_X;
 	Matrix *stackedBatchIdx_Y;
-
-	Matrix *out;
-	Matrix *pairwise_grad;
-	Matrix *e1;
-	Matrix *aB;
-	Matrix *e2_partial;
-	Matrix *e2;
 	Matrix *CV_container;
 
-	Matrix *learning_rate_matrix;
+	std::vector<Matrix*> out;
+	std::vector<Matrix*> pairwise_grad;
+	std::vector<Matrix*> e1;
+	std::vector<Matrix*> aB;
+	std::vector<Matrix*> e2_partial;
+	std::vector<Matrix*> e2;
 
 
 
@@ -65,27 +63,30 @@ private:
 	int _nBatchSize;
 	int _batches;
 	std::vector<int> _layers;
-	std::vector<Matrix*> W;
-	std::vector<Matrix*> B;
-	std::vector<Matrix*> M;
-	std::vector<Matrix*> M_B;
+	std::vector<Matrix**> W;
+	std::vector<Matrix**> B;
+	std::vector<Matrix**> M;
+	std::vector<Matrix**> M_B;
 	std::vector<Matrix**> arrGRAD;
-	std::vector<Matrix*> MSGRAD;
+	std::vector<Matrix**> MSGRAD;
 	std::vector<Matrix**> arrGRAD_B;
-	std::vector<Matrix*> MSBGRAD;
+	std::vector<Matrix**> MSBGRAD;
 	clock_t start,stop;
+	int GPU_COUNT;
+	int CURRENT_GPU;
 
-	Matrix *d0;
-	Matrix *z1;
-	Matrix *a1_Y;
-	Matrix *a1_idx_Y;
-	Matrix *a1_X;
-	Matrix *a1_idx_X;
-	Matrix *d1;
-	Matrix *z2_X;
-	Matrix *z2_Y;
+	std::vector<Matrix*> d0;
+	std::vector<Matrix*> z1;
+	std::vector<Matrix*> a1_Y;
+	std::vector<Matrix*> a1_idx_Y;
+	std::vector<Matrix*> a1_X;
+	std::vector<Matrix*> a1_idx_X;
+	std::vector<Matrix*> d1;
+	std::vector<Matrix*> z2_X;
+	std::vector<Matrix*> z2_Y;
 
-	cudaStream_t _streamNextBatch;
+	std::vector<cudaStream_t> _streamNextBatch;
+	cudaStream_t *STREAMS;
 	double _dSumError;
 	int _nCVErrorPeriodicity;
 	int _nCVErrorLength;
@@ -93,11 +94,10 @@ private:
 	float MOMENTUM;
 	float _learningRate;
 	int _totalNumberOfBatches;
-	int TRANSITION;
 
 	bool useRMSProp;
 	bool useMaxout;
-	bool useMomentum;
+
 
 
 	void loadNextDataSet();
@@ -107,6 +107,7 @@ private:
 	double calculateError();
 	void backprop();
 	void weightUpdates();
+
 };
 
 

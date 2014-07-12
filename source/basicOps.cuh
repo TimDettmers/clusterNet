@@ -87,9 +87,10 @@ Matrix *scalarAdd(Matrix *A, float a);
 void scalarAdd(Matrix *A, float a, Matrix *out);
 void dropout(Matrix *A, Matrix *out, float dropout_rate);
 void RMSprop(Matrix *RMS, Matrix *grad, float RMS_multiplier, float learning_rate, int batch_size);
+void RMSprop_with_momentum_update(Matrix *RMS, Matrix *grad, Matrix *w, Matrix *m, float RMS_multiplier, float learning_rate, int batch_size, float momentum);
 void RMSprop_with_momentum_weight_update(Matrix *RMS, Matrix *grad, Matrix *w, Matrix *m, float RMS_multiplier, float learning_rate, int batch_size, float momentum);
 void RMSprop_with_nesterov_weight_update(Matrix *RMS, Matrix *grad, Matrix *w, Matrix *m, float RMS_multiplier, float learning_rate, int batch_size, float momentum);
-void RMSprop_with_weight_update(Matrix *RMS, Matrix *grad, Matrix *w, float RMS_multiplier, float learning_rate, int batch_size);
+void RMSprop_with_weight_update(Matrix *RMS, Matrix *grad, Matrix *w, Matrix *m, float RMS_multiplier, float learning_rate, int batch_size, float momentum);
 
 Matrix *square(Matrix *A);
 void square(Matrix *A, Matrix *out);
@@ -165,8 +166,5 @@ void construct_vocab_matrix(Matrix *vocab_idx, Matrix *vocab_idx_y, Matrix *batc
 void expand_double_vocab_gradient(Matrix *gradX, Matrix *gradY, Matrix *vocab_idx_X, Matrix *vocab_idx_Y, Matrix *vocab, Matrix *vocab_grad, Matrix *vocab_grad_idx, float learning_rate);
 void expand_vocab_gradient(Matrix *grad, Matrix *vocab_idx, Matrix *vocab_grad);
 void update_vocab_with_gradient(Matrix *grad, Matrix *vocab_idx, Matrix *vocab, float learning_rate);
-void update_vocab_with_gradient(Matrix *grad, Matrix *vocab_idx, Matrix *vocab, Matrix *learning_rate);
-void NesterovVocabUpdate(Matrix *M, Matrix *vocab_idx, Matrix *vocab, Matrix *vocabIdxPlaceholder, float momentum);
-void RMSpropVocab_with_nesterov_weight_update(Matrix *RMS, Matrix *grad, Matrix *vocab, Matrix *M, Matrix *vocab_idx, Matrix *vocabIdxPlaceholder,
-										 float RMS_multiplier, float learning_rate, int batch_size, float momentum);
+void expand_vocab_gradient_middle_word(Matrix *grad, Matrix *vocab_idx, Matrix *vocab_grad);
 #endif

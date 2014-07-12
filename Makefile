@@ -1,5 +1,6 @@
 CC = nvcc
 MPI_DIR=/usr/mpi/openmpi-1.7.4
+#MPI_DIR=/usr/mpi/openmpi-1.8.1
 HDF5_DIR = /home/tim/hdf5/
 SZIP_DIR = /home/tim/Downloads/szip-2.1/szip/
 TOP := $(dir $(CURDIR)/$(word $(words $(MAKEFILE_LIST)),$(MAKEFILE_LIST)))
@@ -9,8 +10,8 @@ NODES=tim@10.0.0.2
 #HOSTFILE=/home/tim/cluster_other_node
 HOSTFILE=/home/tim/cluster
 SCR := $(wildcard source/*.cu) $(wildcard source/*.cpp)
-INCLUDE = -I $(MPI_DIR)/include -I $(TOP)source -I $(TOP)tests -I /usr/local/cuda-5.5/include -I $(HDF5_DIR)include -I $(SZIP_DIR)include
-LIB = -L $(MPI_DIR)/lib -L /usr/local/cuda-5.5/lib64 -L $(HDF5_DIR)lib -L $(SZIP_DIR)lib
+INCLUDE = -I $(MPI_DIR)/include -I $(TOP)source -I $(TOP)tests -I /usr/local/cuda-6.0/include -I $(HDF5_DIR)include -I $(SZIP_DIR)include
+LIB = -L $(MPI_DIR)/lib -L /usr/local/cuda-6.0/lib64 -L $(HDF5_DIR)lib -L $(SZIP_DIR)lib
 CFLAGS = -gencode arch=compute_35,code=sm_35 -lcusparse -lcublas -lcurand -lmpi_cxx -lmpi -lhdf5 -lhdf5_hl -lz $(LIB) $(INCLUDE) 
 LINK = source/util.cu source/clusterKernels.cu source/basicOps.cu $(wildcard source/*.cpp)
 
@@ -30,5 +31,5 @@ test:
 	$(MPI_DIR)/bin/mpirun -x LD_LIBRARY_PATH -np 4 -hostfile $(HOSTFILE) $(TOP)$(EXECTEST)  
 
 run:
-	#scp $(TOP)$(EXECSRC) $(NODES):$(TOP)build/;
+	scp $(TOP)$(EXECSRC) $(NODES):$(TOP)build/;
 	$(MPI_DIR)/bin/mpirun -x LD_LIBRARY_PATH -np 1 -hostfile $(HOSTFILE) $(TOP)$(EXECSRC)

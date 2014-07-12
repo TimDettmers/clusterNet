@@ -26,7 +26,8 @@ typedef enum Unittype_t
 	Rectified_Linear = 1,
 	Softmax = 2,
 	Linear = 4,
-	Double_Rectified_Linear = 8
+	Double_Rectified_Linear = 8,
+	Maxout = 16
 } Unittype_t;
 
 typedef enum Networktype_t
@@ -58,6 +59,7 @@ public:
 	float LEARNING_RATE;
 	float MOMENTUM;
 	int EPOCHS;
+	int MAXOUT_LEVEL;
 	bool OUTPUT_IS_PROBABILITY;
 	int TRANSITION_EPOCH;
     bool PRINT_MISSCLASSIFICATION;
@@ -83,6 +85,8 @@ private:
 	std::vector<Matrix*> MS;
 	std::vector<Matrix*> B_MS;
 	std::vector<int> m_lLayers;
+
+	Matrix **maxout1;
 	ClusterNet m_gpus;
 	int m_output_dim;
 	Networktype_t m_net_type;

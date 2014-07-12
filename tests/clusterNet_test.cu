@@ -673,11 +673,31 @@ int run_clusterNet_test(ClusterNet gpus)
 		receive.push_back(b);
 	}
 
+	MPI_Request *r = (MPI_Request*)malloc(sizeof(MPI_Request)*2);
+	int *uden = (int*)malloc(sizeof(int)*2);
+	uden[0] = 0;
+	uden[1] = 0;
+	r[0] = MPI_REQUEST_NULL;
+	r[1] = MPI_REQUEST_NULL;
+
+
 	gpuArray[gpus.MYRANK] = ones(783,8379);
 
+
+	for(int i = 0; i < gpus.MPI_SIZE-1; i++)
+	{
+		gpus.queue_matricies2(gpuArray,r,i);
+		while(uden[0] != 1)
+		{
+			MPI_Testall(2,r,uden,MPI_STATUSES_IGNORE);
+		}
+		uden[0] = 0;
+	}
+
+
 	out = zeros(783*gpus.MPI_SIZE,8379);
-	gpus.queue_matricies(gpuArray,send,receive);
-	gpus.vStack_queued_matricies(gpuArray,send,receive,out);
+	//gpus.vStack_queued_matricies(gpuArray,send,receive,out);
+	vStackN(gpuArray,out,gpus.MPI_SIZE);
 
 	assert(test_eq(sum(out),783*8379*gpus.MPI_SIZE*1.0f,"queue and gather matricies test"));
 

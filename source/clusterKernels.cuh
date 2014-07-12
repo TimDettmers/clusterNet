@@ -43,9 +43,10 @@ __global__ void kLogisticGrad(float *A, float *out, int size);
 __global__ void kArange(float *out, int start, int rows, int cols, int size);
 __global__ void kDropout(float *A, float *rdm, float dropout, int size);
 __global__ void kRMSprop(float *RMS, float *grad, float RMS_multiplier, float learning_rate, int batch_size, int size);
-__global__ void kRMSprop_with_nesterov_weight_update(float *RMS, float *grad, float *w, float *m, float RMS_multiplier, float learning_rate, int batch_size, int size, float momentum);
+__global__ void kRMSprop_with_momentum_update(float *RMS, float *grad, float *w, float *m, float RMS_multiplier, float learning_rate, int batch_size, int size, float momentum);
 __global__ void kRMSprop_with_momentum_weight_update(float *RMS, float *grad, float *w, float *m, float RMS_multiplier, float learning_rate, int batch_size, int size, float momentum);
-__global__ void kRMSprop_with_weight_update(float *RMS, float *grad, float *w, float RMS_multiplier, float learning_rate, int batch_size, int size);
+__global__ void kRMSprop_with_nesterov_weight_update(float *RMS, float *grad, float *w, float *m, float RMS_multiplier, float learning_rate, int batch_size, int size, float momentum);
+__global__ void kRMSprop_with_weight_update(float *RMS, float *grad, float *w, float *m, float RMS_multiplier, float learning_rate, int batch_size, int size, float momentum);
 __global__ void kCreateRdmSqrtWeight_Logistic(float *A, int in, int out, int size);
 __global__ void kRandInt(float *A, int lower_limit, int upper_limit, int size);
 __global__ void kCreateSparseRdmWeight(float *rdm, float* indicies, float *out, int rows, int cols, int connections);
@@ -68,9 +69,6 @@ __global__ void kConstructVocabMatrix(float *vocab_idx, float *vocab_idx_y, floa
 __global__ void kExpandDoubleVocabGradient(float *gradX, float *gradY, float *vocab_idx_X, float *vocab_idx_Y, float* vocab,
 										 float *vocab_grad, float *vocab_grad_idx, float learning_rate, int grad_size);
 __global__ void kExpandVocabGradient(float *grad, float *vocab_idx, float *vocab_grad);
+__global__ void kExpandVocabGradientMiddleWord(float *grad, float *vocab_idx, float *vocab_grad);
 __global__ void kUpdateVocabWithGradient(float *grad, float *vocab_idx, float* vocab, float learning_rate);
-__global__ void kUpdateVocabWithGradient_LearningRateMatrix(float *grad, float *vocab_idx, float* vocab, float *learning_rate);
-__global__ void kNesterovVocabUpdate(float *M, float *vocab_idx, float* vocab, float* vocab_idx_placeholder, float momentum, int vocab_cols);
-__global__ void kRMSpropVocab_with_nesterov_weight_update(float *RMS, float *grad, float *M, float *vocab_idx, float* vocab, float* vocab_idx_placeholder,
-														  float RMS_multiplier, float learning_rate, int batch_size, int vocab_size, float momentum);
 #endif
