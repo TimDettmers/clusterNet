@@ -5,8 +5,8 @@
  *      Author: tim
  */
 
-#ifndef WIKIMAXOUTNET_H_
-#define WIKIMAXOUTNET_H_
+#ifndef WIKIMAXOUTNET_PCIE2_H_
+#define WIKIMAXOUTNET_PCIE2_H_
 
 #include <stdlib.h>
 #include <vector>
@@ -20,15 +20,29 @@
 #include <ctime>
 #include <unistd.h>
 
-class WikiMaxoutNet
+class WikiMaxoutNet_PCIe2
 {
 public:
-	WikiMaxoutNet(ClusterNet gpus);
+	WikiMaxoutNet_PCIe2();
 	void run();
 
+	 void *hello(void)
+	 {
+		 run();
+
+		 return 0;
+	 }
+
+	 static void *hello_helper(void *context)
+	 {
+		 return ((WikiMaxoutNet_PCIe2 *)context)->hello();
+	 }
+
+	 void init();
+
 private:
-	Matrix **_currentBatchIdx_X;
-	Matrix **_currentBatchIdx_Y;
+	Matrix *_currentBatchIdx_X;
+	Matrix *_currentBatchIdx_Y;
 	Matrix *_nextBatchIdx;
 	ClusterNet gpu;
 	Matrix *_X;
@@ -57,6 +71,8 @@ private:
 
 	Matrix *learning_rate_matrix;
 
+
+
 	int _nCurrentDataSet;
 	int _nNextBatchNumber;
 	int _nNextBatchNumber_CV;
@@ -73,6 +89,8 @@ private:
 	std::vector<Matrix**> arrGRAD_B;
 	std::vector<Matrix*> MSBGRAD;
 	clock_t start,stop;
+
+	int current_device;
 
 	Matrix *d0;
 	Matrix *z1;

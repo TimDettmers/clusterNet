@@ -7,6 +7,7 @@
 
 #define RDM_NUMBERS_PER_THREAD (1024)
 #define THREADS_PER_BLOCKS (512)
+#define BLOCKS (4096)
 
 #define DOT_BLOCKS (128)
 #define TILE_SIZE (32)
@@ -160,6 +161,8 @@ void hStackN(float** arrA, int general_size, Matrix *out, int matrices_count);
 void hStackN(Matrix** arrA, int general_size, Matrix *out, int matrices_count);
 void vStackN(Matrix** arrA, Matrix *out, int matrices_count);
 
+void addGradientsN(Matrix** arrA,  int myrank, int matrices_count, float multiplier);
+
 void sparse_dot(Matrix *A, Matrix *B, Matrix *out);
 void construct_vocab_matrix(Matrix *vocab_idx, Matrix *vocab_idx_y, Matrix *batch_X, Matrix *batch_y, Matrix *vocab, Matrix *rdm_idx);
 //void update_vocab_with_gradient(Matrix *grad, Matrix *vocab_idx, Matrix *vocab, float learning_rate);
@@ -167,4 +170,5 @@ void expand_double_vocab_gradient(Matrix *gradX, Matrix *gradY, Matrix *vocab_id
 void expand_vocab_gradient(Matrix *grad, Matrix *vocab_idx, Matrix *vocab_grad);
 void update_vocab_with_gradient(Matrix *grad, Matrix *vocab_idx, Matrix *vocab, float learning_rate);
 void expand_vocab_gradient_middle_word(Matrix *grad, Matrix *vocab_idx, Matrix *vocab_grad);
+void matmul(Matrix *A, Matrix *B, Matrix *out, int T1, int T2);
 #endif

@@ -360,9 +360,8 @@ Matrix *fill_matrix(int rows, int cols, float fill_value)
   }
  
   Matrix *out = empty(rows, cols);
-  
-  thrust::device_ptr<float> ptr(out->data);
-  thrust::fill(ptr, ptr + out->size,fill_value);
+
+  kFill_with<<<4096, THREADS_PER_BLOCKS>>>(out->data,fill_value,out->size);
  
   return out;
 }
@@ -489,6 +488,25 @@ void vStackN(Matrix** arrA, Matrix *out, int matrices_count)
 
 	dim3 griddim(matrices_count,1,1) ;
 	vStackN<<<griddim,THREADS_PER_BLOCKS>>>(d_arrA, out->data, out->rows/matrices_count,out->cols);
+
+	free(h_arrA);
+	cudaFree(d_arrA);
+}
+
+
+void addGradientsN(Matrix** arrA,  int myrank, int matrices_count, float multiplier)
+{
+	float **h_arrA = (float**)malloc(sizeof(float*) * matrices_count);
+	for (int i = 0; i < matrices_count; i++)
+		h_arrA[i] = arrA[i]->data;
+
+	float **d_arrA;
+	cudaMalloc((void**) &d_arrA, sizeof(float*) * matrices_count);
+	cudaMemcpy(d_arrA, h_arrA, sizeof(float*) * matrices_count,cudaMemcpyDefault);
+
+
+	int block_size = (arrA[0]->size/THREADS_PER_BLOCKS) + 1;
+	AddGradientsN<<<block_size,THREADS_PER_BLOCKS>>>(d_arrA, arrA[0]->size, myrank, matrices_count, multiplier);
 
 	free(h_arrA);
 	cudaFree(d_arrA);
@@ -1192,5 +1210,28 @@ void expand_vocab_gradient_middle_word(Matrix *grad, Matrix *vocab_idx, Matrix *
 	assert(vocab_grad->rows <= 1024);
 	dim3 grid(vocab_idx->rows,vocab_idx->cols,1);
 	kExpandVocabGradientMiddleWord<<<grid,vocab_grad->rows>>>(grad->data, vocab_idx->data, vocab_grad->data);
+}
+
+void matmul(Matrix *A, Matrix *B, Matrix *out, int T1, int T2)
+{
+
+	if(T1 == 0 && T2 == 0)
+	{
+		dim3 threads( 16, 4 );
+		dim3 grid( (A->rows - 1)/64 + 1, (B->cols - 1)/16 + 1 );
+	   sgemm_kernel_N_N_64_16_16_16_4<<< grid, threads >>>( out->data, A->data, B->data, A->rows, B->cols, A->cols, A->rows, B->rows, out->rows, 1, 0 );
+	}
+	else if(T1 == 0 && T2 == 1)
+	{
+		dim3 threads( 16, 4 );
+		dim3 grid( (A->rows - 1)/64 + 1, (B->rows - 1)/16 + 1 );
+	   sgemm_kernel_N_T_64_16_4_16_4<<< grid, threads >>>( out->data, A->data, B->data, A->rows, B->rows, A->cols, A->rows, B->rows, out->rows, 1, 0 );
+	}
+	else
+	{
+		dim3 threads( 8, 8 );
+		dim3 grid( (A->cols - 1)/32 + 1, (B->cols - 1)/32 + 1 );
+		sgemm_kernel_T_N_32_32_8_8_8<<< grid, threads >>>( out->data, A->data, B->data, A->cols, B->cols, A->rows, A->rows, B->rows, out->rows, 1, 0 );
+	}
 }
 

@@ -29,6 +29,7 @@ __global__ void hStack(float *A, float *B, float *out, int size_out, int size_a)
 __global__ void hStackN(float **arrA, int general_size, float *out, int size_out, int matrices_count);
 __global__ void hStackN(Matrix **arrA, int general_size, float *out, int size_out, int matrices_count);
 __global__ void vStackN(float **arrA, float *out, int rows, int cols);
+__global__ void AddGradientsN(float **arrA, int size, int myrank, int matrix_count, float multiplier);
 __global__ void kSoftMax(float* A, float* out, unsigned int rows, unsigned int cols);
 __device__ void reduceToMax(float* sdata, unsigned int tid);
 __device__ void reduceToSumLocal(float* sdata, unsigned int tid);
@@ -71,4 +72,9 @@ __global__ void kExpandDoubleVocabGradient(float *gradX, float *gradY, float *vo
 __global__ void kExpandVocabGradient(float *grad, float *vocab_idx, float *vocab_grad);
 __global__ void kExpandVocabGradientMiddleWord(float *grad, float *vocab_idx, float *vocab_grad);
 __global__ void kUpdateVocabWithGradient(float *grad, float *vocab_idx, float* vocab, float learning_rate);
+__global__ void MatMul(float* A, float* B, float* C, int ARows, int ACols, int BRows, int BCols, int CRows, int CCols);
+__global__ void sgemm_kernel_N_N_64_16_16_16_4(float* C,const float* A,const float* B, int m, int n, int k, int lda, int ldb, int ldc, float alpha, float beta );
+__global__ void sgemm_kernel_N_T_64_16_4_16_4(float* C, const float* A, const float* B, int m, int n, int k, int lda, int ldb, int ldc, float alpha, float beta );
+__global__ void sgemm_kernel_T_N_32_32_8_8_8(float* C, const float* A, const float* B, int m, int n, int k, int lda, int ldb, int ldc, float alpha, float beta );
+__global__ void sgemmNN( const float *A, int lda, const float *B, int ldb, float* C, int ldc, int k, float alpha, float beta );
 #endif

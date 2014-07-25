@@ -695,6 +695,35 @@ int run_clusterNet_test(ClusterNet gpus)
 
 	assert(test_eq(sum(out),783*8379*gpus.MPI_SIZE*1.0f,"queue and gather matricies test"));
 
+	/*
+
+	for(int i = 0; i < gpus.MPI_SIZE; i++)
+	{
+		gpuArray[i] = zeros(783,8379);
+		MPI_Request a = MPI_REQUEST_NULL;
+		MPI_Request b = MPI_REQUEST_NULL;
+		send.push_back(a);
+		receive.push_back(b);
+	}
+
+
+	Matrix **array = gpus.uniformSqrtWeight_PCIe(100,200);
+	cudaSetDevice(0);
+	out = zeros(gpus.GPU_COUNT*100,200);
+
+	gpus.add_to_queue_PCIe(array,out);
+
+	float sum_value = 0.0f;
+	for(int i = 0; i < gpus.GPU_COUNT; i++)
+	{
+		cudaSetDevice(i);
+		sum_value += sum(array[i]);
+	}
+	cudaSetDevice(0);
+
+	assert(test_eq(sum(out),sum_value,"queue and gather matricies test"));
+	*/
+
 	//This should just pass without error
 	ticktock_test.tock("ClusterNet test ran in");
 

@@ -18,8 +18,8 @@ DeepNeuralNetwork::DeepNeuralNetwork(std::vector<int> lLayerSizes, Networktype_t
 
 	EPOCHS = 250;
 	TRANSITION_EPOCH = 99999;
-	LEARNING_RATE = 0.001;
-	MOMENTUM = 0.5;
+	LEARNING_RATE = 0.01;
+	MOMENTUM = 0.9;
 	OUTPUT_IS_PROBABILITY = false;
 	MAXOUT_LEVEL = 8;
 	PRINT_MISSCLASSIFICATION = net_type == Classification ? true : false;

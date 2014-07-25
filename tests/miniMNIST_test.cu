@@ -40,7 +40,7 @@ void run_miniMNIST_test(ClusterNet gpus)
 	BatchAllocator b = BatchAllocator();
 	b.init(X, y, 0.2, 32, 64);
 	int epochs  = 20;
-	float learning_rate = 0.003;
+	float learning_rate = 0.03;
 	float momentum = 0.5;
 	for(int EPOCH = 1; EPOCH < epochs; EPOCH++)
 	{
@@ -325,7 +325,7 @@ void run_miniMNIST_test(ClusterNet gpus)
 	b = BatchAllocator();
 	b.init(X, y, 0.2, 32, 64);
 	epochs  = 17;
-	learning_rate = 0.003;
+	learning_rate = 0.01;
 	momentum = 0.5;
 	for(int EPOCH = 1; EPOCH < epochs; EPOCH++)
 	{

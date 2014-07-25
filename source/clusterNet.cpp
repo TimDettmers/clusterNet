@@ -51,11 +51,54 @@ void ClusterNet::init(int seed)
 	 *
 	 *
 	 * */
+
+
 	curandCreateGenerator(&m_generator, CURAND_RNG_PSEUDO_DEFAULT);
 	curandSetPseudoRandomGeneratorSeed(m_generator, seed);
 	curandSetGeneratorOffset(m_generator, 100);
+
+
+
+	int current_device = 0;
+	cudaGetDevice(&current_device);
+	/*
+	for(int i = 0; i < GPU_COUNT; i++)
+	{
+		cudaSetDevice(i);
+		curandGenerator_t gen;
+		curandCreateGenerator(&m_generator, CURAND_RNG_PSEUDO_DEFAULT);
+		curandSetPseudoRandomGeneratorSeed(gen, seed);
+		curandSetGeneratorOffset(gen, 100);
+		m_generator.push_back(gen);
+	}
+	*/
+
+
+
 	m_cublasInitialized = false;
 	m_cusparseInitialized = false;
+
+
+	cudaGetDeviceCount(&GPU_COUNT);
+
+
+
+
+	for(int i = 0; i < GPU_COUNT; i++)
+	{
+		cudaSetDevice(i);
+		cudaStream_t t;
+		cudaStreamCreate(&t);
+		m_streams_PCIe.push_back(t);
+
+		//for(int j = 0; j < GPU_COUNT; j++)
+			//if(i != j)
+				//cudaDeviceEnablePeerAccess(j,0);
+	}
+
+	cudaSetDevice(current_device);
+
+
 
 	if (!m_hasMPI)
 	{
@@ -67,6 +110,7 @@ void ClusterNet::init(int seed)
 
 
 
+
 	m_request_queue = (MPI_Request*)malloc(sizeof(MPI_Request)*2);
 	m_flag_queue = (int*)malloc(sizeof(int));
 	m_flag_queue[0] = 0;
@@ -74,6 +118,12 @@ void ClusterNet::init(int seed)
 	m_request_queue[1] = MPI_REQUEST_NULL;
 	QUEUE_EMPTY = true;
 	waitingForTransfer = false;
+
+
+	StartBackgroundQueue = false;
+
+
+
 
 }
 
@@ -386,10 +436,6 @@ void ClusterNet::dot(Matrix *A, Matrix *B, Matrix *out, cublasOperation_t T1, cu
 		 //MPI_Barrier(MPI_COMM_WORLD);
 
 
-
-
-
-
 		status = cublasSgemm(m_handle[current_device], T1, T2, A_rows, B_cols,
 				A_cols, &alpha, A->data, A->rows, B->data, B->rows, &beta,
 				out->data, out->rows);
@@ -402,6 +448,17 @@ void ClusterNet::dot(Matrix *A, Matrix *B, Matrix *out, cublasOperation_t T1, cu
 			throw "CUBLAS ERROR";
 
 		}
+
+
+			/*
+		if( T1 == CUBLAS_OP_N && T2 == CUBLAS_OP_N)
+			matmul(A,B,out,0,0);
+		else if( T1 == CUBLAS_OP_N && T2 == CUBLAS_OP_T)
+			matmul(A,B,out,0,1);
+		else
+			matmul(A,B,out,1,0);
+			*/
+
 	}
 	else
 	{
@@ -612,6 +669,8 @@ Matrix *ClusterNet::rand(int rows, int cols)
 }
 void ClusterNet::rand(int rows, int cols, Matrix *out)
 {
+	int current_device = 0;
+	cudaGetDevice(&current_device);
 	curandGenerateUniform(m_generator, out->data, rows * cols);
 }
 
@@ -629,6 +688,8 @@ Matrix *ClusterNet::randn(int rows, int cols, float mean, float std)
 }
 void ClusterNet::randn(int rows, int cols, float mean, float std, Matrix *out)
 {
+	int current_device = 0;
+	cudaGetDevice(&current_device);
 	curandGenerateNormal(m_generator, out->data, rows * cols, 0.0f, 1.0f);
 }
 
@@ -692,6 +753,8 @@ Matrix *ClusterNet::dropout(Matrix *A, float dropout_rate)
 		out = rand(A->rows, A->cols);
 	else
 	{
+		int current_device = 0;
+		cudaGetDevice(&current_device);
 		out = empty_sparse(A->rows,A->cols,A->size);
 		curandGenerateUniform(m_generator, out->data, A->size);
 	}
@@ -701,7 +764,8 @@ Matrix *ClusterNet::dropout(Matrix *A, float dropout_rate)
 
 void ClusterNet::dropout(Matrix *A, Matrix *out, float dropout_rate)
 {
-
+	int current_device = 0;
+	cudaGetDevice(&current_device);
 	if(A->isSparse == 0)
 		curandGenerateUniform(m_generator, out->data, out->rows*out->cols);
 	else
@@ -918,6 +982,7 @@ bool ClusterNet::pop_queue()
 	}
 	else
 	{
+		//MPI_Waitall(2,m_request_queue,MPI_STATUSES_IGNORE);
 		MPI_Testall(2,m_request_queue,m_flag_queue,MPI_STATUSES_IGNORE);
 
 		if(m_flag_queue[0] == 1)
@@ -938,5 +1003,235 @@ bool ClusterNet::pop_queue()
 
 	return QUEUE_EMPTY;
 }
+
+Matrix **ClusterNet::zeros_PCIe(int rows, int cols)
+{
+	Matrix **out = (Matrix**)malloc(sizeof(Matrix*)*GPU_COUNT);
+
+	for(int i = 0; i < GPU_COUNT; i++)
+	{
+		cudaSetDevice(i);
+		out[i] = zeros(rows,cols);
+	}
+
+	return out;
+
+}
+
+
+Matrix **ClusterNet::zeros_gradient_PCIe(int rows, int cols)
+{
+	Matrix **out = (Matrix**)malloc(sizeof(Matrix*)*GPU_COUNT*GPU_COUNT);
+
+	for(int j = 0; j < GPU_COUNT; j++)
+	{
+		for(int i = 0; i < GPU_COUNT; i++)
+		{
+			cudaSetDevice(i);
+			out[i+(j*GPU_COUNT)] = zeros(rows,cols);
+		}
+	}
+
+	return out;
+}
+
+Matrix **ClusterNet::ones_PCIe(int rows, int cols)
+{
+	Matrix **out = (Matrix**)malloc(sizeof(Matrix*)*GPU_COUNT);
+
+	for(int i = 0; i < GPU_COUNT; i++)
+	{
+		cudaSetDevice(i);
+		out[i] = zeros(rows,cols);
+	}
+
+	return out;
+
+}
+
+Matrix **ClusterNet::uniformSqrtWeight_PCIe(int rows, int cols)
+{
+	Matrix **out = (Matrix**)malloc(sizeof(Matrix*)*GPU_COUNT);
+
+	for(int i = 0; i < GPU_COUNT; i++)
+	{
+		cudaSetDevice(i);
+		out[i] = uniformSqrtWeight(rows,cols);
+	}
+
+	return out;
+
+}
+
+void ClusterNet::dotPCIe(Matrix **A, Matrix **B, Matrix **out)
+{
+	for(int i = 0; i < GPU_COUNT; i++)
+	{
+		cudaSetDevice(i);
+		dot(A[i],B[i],out[i]);
+	}
+
+}
+
+void ClusterNet::dotTPCIe(Matrix **A, Matrix **B, Matrix **out)
+{
+	for(int i = 0; i < GPU_COUNT; i++)
+	{
+		cudaSetDevice(i);
+		dotT(A[i],B[i],out[i]);
+	}
+
+}
+
+void ClusterNet::TdotPCIe(Matrix **A, Matrix **B, Matrix **out)
+{
+	for(int i = 0; i < GPU_COUNT; i++)
+	{
+		cudaSetDevice(i);
+		Tdot(A[i],B[i],out[i]);
+	}
+
+}
+
+
+
+void ClusterNet::add_PCIe(Matrix **A, Matrix **B, Matrix **out)
+{
+	for(int i = 0; i < GPU_COUNT; i++)
+	{
+		cudaSetDevice(i);
+		add(A[i],B[i],out[i]);
+	}
+}
+
+void ClusterNet::mul_PCIe(Matrix **A, Matrix **B, Matrix **out)
+{
+	for(int i = 0; i < GPU_COUNT; i++)
+	{
+		cudaSetDevice(i);
+		mul(A[i],B[i],out[i]);
+	}
+}
+
+void ClusterNet::scalarMul_PCIe(Matrix **A, float a, Matrix **out)
+{
+	for(int i = 0; i < GPU_COUNT; i++)
+	{
+		cudaSetDevice(i);
+		scalarMul(A[i],a,out[i]);
+	}
+}
+
+
+void ClusterNet::addMatrixVector_PCIe(Matrix **A, Matrix **v, Matrix **out)
+{
+	for(int i = 0; i < GPU_COUNT; i++)
+	{
+		cudaSetDevice(i);
+		addMatrixVector(A[i],v[i],out[i]);
+	}
+}
+
+void ClusterNet::logistic_PCIe(Matrix **A, Matrix **out)
+{
+	for(int i = 0; i < GPU_COUNT; i++)
+	{
+		cudaSetDevice(i);
+		logistic(A[i],out[i]);
+	}
+}
+
+
+void ClusterNet::RMSprop_with_nesterov_weight_update_PCIe(Matrix **RMS, Matrix **grad, Matrix **w, Matrix **m, float RMS_multiplier, float learning_rate, int batch_size, float momentum)
+{
+	for(int i = 0; i < GPU_COUNT; i++)
+	{
+		cudaSetDevice(i);
+		RMSprop_with_nesterov_weight_update(RMS[i],grad[i],w[i],m[i],RMS_multiplier,learning_rate,batch_size,momentum);
+	}
+}
+
+
+void ClusterNet::add_to_queue_PCIe(Matrix **gpuArray)
+{
+	for(int j = 1; j < GPU_COUNT; j++)
+	{
+		int receive_matrix_idx = j;
+		for(int i = 0; i < GPU_COUNT; i++)
+		{
+			m_send_queue.push_back(gpuArray[i]);
+			m_sendid_queue.push_back(i);
+			m_receive_queue.push_back(gpuArray[receive_matrix_idx+(GPU_COUNT*j)]);
+			m_receiveid_queue.push_back(receive_matrix_idx);
+
+			cout << "added " << i << " to " << receive_matrix_idx << " for entry with idx " << receive_matrix_idx+(GPU_COUNT*j) << endl;
+
+			receive_matrix_idx = receive_matrix_idx + 1 == GPU_COUNT ? 0 : receive_matrix_idx + 1;
+		}
+	}
+
+
+	QUEUE_EMPTY = false;
+
+	if(StartBackgroundQueue == false)
+	{
+		StartBackgroundQueue = true;
+		pthread_t t;
+		//pthread_create(&t,NULL,&ClusterNet::hello_helper,this);
+	}
+}
+
+
+
+bool ClusterNet::pop_queue_PCIe()
+{
+	if(QUEUE_EMPTY){ return true;}
+
+
+
+		cout << "copy stream" << endl;
+		for(int i = 0; i < GPU_COUNT; i++)
+		{
+			cout << m_sendid_queue[i] << " to " << m_receiveid_queue[i] << endl;
+			cudaSetDevice(m_sendid_queue[i]);
+			cout << "receive: " << m_receive_queue[i]->bytes << " send: " << m_send_queue[i]->bytes << endl;
+			cudaMemcpyPeer(m_receive_queue[i]->data, m_receiveid_queue[i],m_send_queue[i]->data,m_sendid_queue[i],m_send_queue[i]->bytes);
+		}
+
+		for(int i = 0; i < GPU_COUNT; i++)
+		{
+			m_receive_queue.erase(m_receive_queue.begin() + 0);
+			m_send_queue.erase(m_send_queue.begin() + 0);
+			m_receiveid_queue.erase(m_receiveid_queue.begin() + 0);
+			m_sendid_queue.erase(m_sendid_queue.begin() + 0);
+		}
+		if(m_receive_queue.size() > 0)
+			pop_queue_PCIe();
+		else
+			QUEUE_EMPTY = true;
+
+
+	return QUEUE_EMPTY;
+}
+
+
+void ClusterNet::addGradients_PCIe(Matrix **grad)
+{
+	for(int j = 1; j < GPU_COUNT; j++)
+	{
+		int receive_matrix_idx = j;
+		for(int i = 0; i < GPU_COUNT; i++)
+		{
+			cudaSetDevice(i);
+			add(grad[i],grad[receive_matrix_idx],grad[i]);
+
+			receive_matrix_idx = receive_matrix_idx + 1 == GPU_COUNT ? 0 : receive_matrix_idx + 1;
+		}
+	}
+
+	QUEUE_EMPTY = false;
+
+}
+
 
 

@@ -1,20 +1,20 @@
 #include <WikiMaxoutNet.h>
+#include <sched.h>
 using std::cout;
 using std::endl;
 
 WikiMaxoutNet::WikiMaxoutNet(ClusterNet gpus)
 {
 
-
 	int vocabSize = 100002;
-	int nWordVectorDim = 256;
+	int nWordVectorDim = 64;
 	int nWindowSize = 11;
 	_layers.push_back(512);
 	_nMaxoutSize = 1;
 	_learningRate = 0.01;
-	_nCVErrorPeriodicity = 5000;
-	_nCVErrorLength = 5000;
-	MOMENTUM = 0.5;
+	_nCVErrorPeriodicity = 6000;
+	_nCVErrorLength = 6000;
+	MOMENTUM = 0.9;
 	gpu = gpus;
 	_nCurrentDataSet = gpu.MYRANK;
 	_X = 0;
@@ -24,6 +24,8 @@ WikiMaxoutNet::WikiMaxoutNet(ClusterNet gpus)
 	_nNextBatchNumber_CV = 0;
 	_nBatchSize = 128;
 	_RMS_multiplier = 0.9f;
+
+
 	cudaStreamCreate(&_streamNextBatch);
 
 	Matrix *learning_rate_matrix_cpu = empty_cpu(nWordVectorDim,vocabSize);
@@ -58,7 +60,6 @@ WikiMaxoutNet::WikiMaxoutNet(ClusterNet gpus)
 
 
 	useRMSProp = true;
-	useMaxout = false;
 
 	cout << "_nMaxoutSize: " << _nMaxoutSize << endl;
 	cout << "_layers: " << _layers[0] << endl;
@@ -132,9 +133,11 @@ WikiMaxoutNet::WikiMaxoutNet(ClusterNet gpus)
 	}
 
 
-	MSGRAD.push_back(zeros(_nBatchSize*gpu.MPI_SIZE,nWordVectorDim*nWindowSize));
-	MSGRAD.push_back(zeros(_nBatchSize*gpu.MPI_SIZE,nWordVectorDim*nWindowSize));
 
+	stackedVocabGrad_X = zeros(_nBatchSize*gpu.MPI_SIZE,nWordVectorDim*nWindowSize);
+	stackedVocabGrad_Y = zeros(_nBatchSize*gpu.MPI_SIZE,nWordVectorDim*nWindowSize);
+	stackedBatchIdx_X = zeros(_nBatchSize*gpu.MPI_SIZE,nWindowSize);
+	stackedBatchIdx_Y = zeros(_nBatchSize*gpu.MPI_SIZE,nWindowSize);
 	_Vocab = gpu.uniformSqrtWeight(nWordVectorDim,vocabSize);
 	//_Vocab = gpu.sparseInitWeight(nWordVectorDim,vocabSize);
 	//_Vocab = gpu.rand(nWordVectorDim,vocabSize);
@@ -168,13 +171,21 @@ WikiMaxoutNet::WikiMaxoutNet(ClusterNet gpus)
 
 	_batchX = zeros(_nBatchSize, nWordVectorDim*nWindowSize);
 	_batchY = zeros(_nBatchSize, nWordVectorDim*nWindowSize);
-	_currentBatchIdx_X = zeros(_nBatchSize,nWindowSize);
-	_currentBatchIdx_Y = zeros(_nBatchSize,nWindowSize);
+
+	_currentBatchIdx_X = (Matrix**)malloc(sizeof(Matrix*)*gpu.MPI_SIZE);
+	_currentBatchIdx_Y = (Matrix**)malloc(sizeof(Matrix*)*gpu.MPI_SIZE);
+	for(int i = 0; i < gpu.MPI_SIZE; i++)
+	{
+		_currentBatchIdx_X[i] = zeros(_nBatchSize, nWindowSize);
+		_currentBatchIdx_Y[i] = zeros(_nBatchSize, nWindowSize);
+	}
 	_nextBatchIdx = zeros(_nBatchSize,nWindowSize);
 
 	_dSumError = 0.0;
 
 	loadNextDataSet();
+
+
 }
 void WikiMaxoutNet::run()
 {
@@ -193,7 +204,7 @@ void WikiMaxoutNet::run()
 	{
 		if(i > 0 && i % _nCVErrorPeriodicity == 0)
 		{
-			if( i > 0 && i % 100000 == 0)
+			if( i > 0 && i % 120000 == 0)
 			{
 				cout << "Saving vocabulary matrix to disk..." << endl;
 				Matrix *host = to_host(_Vocab);
@@ -207,7 +218,7 @@ void WikiMaxoutNet::run()
 			CV_container->data[i/_nCVErrorPeriodicity] = (float)error;
 			cout << "BatchNo: " << i << endl;
 			cout << "Cross validation error: " <<  error << endl;
-			i++;
+			i+=gpu.MPI_SIZE;
 
 			//MOMENTUM+= 0.01;
 			//if( MOMENTUM > 0.95)
@@ -216,6 +227,11 @@ void WikiMaxoutNet::run()
 			_RMS_multiplier-= 0.01;
 			if( _RMS_multiplier < 0.25)
 				_RMS_multiplier = 0.25;
+
+
+			MOMENTUM-= 0.01;
+			if( MOMENTUM < 0.25)
+				MOMENTUM = 0.25;
 
 			stop = clock();
 
@@ -232,8 +248,9 @@ void WikiMaxoutNet::run()
 			weightUpdates();
 		}
 
+		//cout << i << endl;
 		allocateNextBatch(false);
-		i++;
+		i+=gpu.MPI_SIZE;
 	}
 }
 
@@ -274,8 +291,11 @@ void WikiMaxoutNet::allocateNextBatch(bool isCV)
 		if(_nNextBatchNumber > 0 || _nCurrentDataSet > gpu.MYRANK)
 		{
 			cudaStreamSynchronize(_streamNextBatch);
-			to_col_major(_nextBatchIdx, _currentBatchIdx_X);
-			gpu.construct_vocab_matrix(_currentBatchIdx_X, _currentBatchIdx_Y, _batchX, _batchY, _Vocab);
+			to_col_major(_nextBatchIdx, _currentBatchIdx_X[gpu.MYRANK]);
+			gpu.construct_vocab_matrix(_currentBatchIdx_X[gpu.MYRANK], _currentBatchIdx_Y[gpu.MYRANK], _batchX, _batchY, _Vocab);
+
+			gpu.add_to_queue(_currentBatchIdx_X);
+			gpu.add_to_queue(_currentBatchIdx_Y);
 		}
 
 
@@ -292,8 +312,8 @@ void WikiMaxoutNet::allocateNextBatch(bool isCV)
 		if(_nNextBatchNumber_CV > 0)
 		{
 			cudaStreamSynchronize(_streamNextBatch);
-			to_col_major(_nextBatchIdx, _currentBatchIdx_X);
-			gpu.construct_vocab_matrix(_currentBatchIdx_X, _currentBatchIdx_Y, _batchX, _batchY, _Vocab);
+			to_col_major(_nextBatchIdx, _currentBatchIdx_X[gpu.MYRANK]);
+			gpu.construct_vocab_matrix(_currentBatchIdx_X[gpu.MYRANK], _currentBatchIdx_Y[gpu.MYRANK], _batchX, _batchY, _Vocab);
 		}
 
 		cudaMemcpyAsync(_nextBatchIdx->data,&_CV_X->data[_nBatchSize*11*_nNextBatchNumber_CV],
@@ -316,7 +336,7 @@ void WikiMaxoutNet::nesterov()
 		add(W[i],M[i],W[i]);
 	}
 
-	for(int i = 0;i < B.size(); i++)
+	for(int i = 0;i < M_B.size(); i++)
 	{
 		scalarMul(M_B[i],MOMENTUM,M_B[i]);
 		add(B[i],M_B[i],B[i]);
@@ -333,38 +353,18 @@ void WikiMaxoutNet::nesterov()
 
 void WikiMaxoutNet::feedforward()
 {
+	gpu.dot(_batchX,W[0],z1);
+	addMatrixVector(z1,B[0],z1);
+	logistic(z1,a1_X);
+	gpu.dot(a1_X,W[1],z2_X);
+	addMatrixVector(z2_X,B[1],z2_X);
 
-	if(useMaxout)
-	{
-		//gpu.dropout(_batchX,d0,0.1);
-		gpu.dot(_batchX,W[0],z1);
-		addMatrixVector(z1,B[0],z1);
-		maxout(z1, a1_X, a1_idx_X, _nMaxoutSize);
-		gpu.dot(a1_X,W[1],z2_X);
-		addMatrixVector(z2_X,B[1],z2_X);
+	gpu.dot(_batchY,W[0],z1);
+	addMatrixVector(z1,B[0],z1);
+	logistic(z1,a1_Y);
+	gpu.dot(a1_Y,W[1],z2_Y);
+	addMatrixVector(z2_Y,B[1],z2_Y);
 
-		//gpu.dropout(_batchY,d0,0.1);
-		gpu.dot(_batchY,W[0],z1);
-		addMatrixVector(z1,B[0],z1);
-		maxout(z1, a1_Y, a1_idx_Y, _nMaxoutSize);
-		gpu.dot(a1_Y,W[1],z2_Y);
-		addMatrixVector(z2_Y,B[1],z2_Y);
-	}
-	else
-	{
-		gpu.dot(_batchX,W[0],z1);
-		addMatrixVector(z1,B[0],z1);
-		logistic(z1,a1_X);
-		gpu.dot(a1_X,W[1],z2_X);
-		addMatrixVector(z2_X,B[1],z2_X);
-
-		gpu.dot(_batchY,W[0],z1);
-		addMatrixVector(z1,B[0],z1);
-		logistic(z1,a1_Y);
-		gpu.dot(a1_Y,W[1],z2_Y);
-		addMatrixVector(z2_Y,B[1],z2_Y);
-
-	}
 }
 
 void WikiMaxoutNet::weightUpdates()
@@ -373,70 +373,103 @@ void WikiMaxoutNet::weightUpdates()
 
 	if(!useRMSProp)
 	{
-		scalarMul(arrGRAD[0][gpu.MYRANK],multiplier/(float)arrGRAD[0][gpu.MYRANK]->rows,arrGRAD[0][gpu.MYRANK]);
-		scalarMul(arrGRAD[1][gpu.MYRANK],multiplier/(float)arrGRAD[1][gpu.MYRANK]->rows,arrGRAD[1][gpu.MYRANK]);
-		scalarMul(arrGRAD[2][gpu.MYRANK],multiplier/(float)arrGRAD[1][gpu.MYRANK]->rows,arrGRAD[2][gpu.MYRANK]);
-		scalarMul(arrGRAD[3][gpu.MYRANK],multiplier/(float)arrGRAD[1][gpu.MYRANK]->rows,arrGRAD[3][gpu.MYRANK]);
-		scalarMul(arrGRAD_B[0][gpu.MYRANK],multiplier,arrGRAD_B[0][gpu.MYRANK]);
-		scalarMul(arrGRAD_B[1][gpu.MYRANK],multiplier,arrGRAD_B[1][gpu.MYRANK]);
-		scalarMul(arrGRAD_B[2][gpu.MYRANK],multiplier,arrGRAD_B[2][gpu.MYRANK]);
-		scalarMul(arrGRAD_B[3][gpu.MYRANK],multiplier,arrGRAD_B[3][gpu.MYRANK]);
+		scalarMul(M_VocabX,MOMENTUM,M_VocabX);
+		scalarMul(M_VocabY,MOMENTUM,M_VocabY);
+		for(int i = 0; i < M.size(); i++)
+			scalarMul(M[i],MOMENTUM,M[i]);
+		for(int i = 0; i < M_B.size(); i++)
+			scalarMul(M_B[i],MOMENTUM,M_B[i]);
 
-		sub(W[1],arrGRAD[0][gpu.MYRANK],W[1]);
-		sub(W[1],arrGRAD[1][gpu.MYRANK],W[1]);
+		while(gpu.get_queue_length() > (9*(gpu.MPI_SIZE-1))){ gpu.pop_queue(); }
+		vStackN(arrGRAD[4],stackedVocabGrad_Y,gpu.MPI_SIZE);
+		update_vocab_with_gradient(stackedVocabGrad_Y,stackedBatchIdx_Y,_Vocab,multiplier/(float)gpu.MPI_SIZE);
+		update_vocab_with_gradient(stackedVocabGrad_Y,stackedBatchIdx_Y,M_VocabY,multiplier/(float)gpu.MPI_SIZE);
+		while(gpu.get_queue_length() > (8*(gpu.MPI_SIZE-1))){ gpu.pop_queue(); }
+		addGradientsN(arrGRAD[2],gpu.MYRANK,gpu.MPI_SIZE,multiplier/(float)(gpu.MPI_SIZE*arrGRAD[1][gpu.MYRANK]->rows));
 		sub(W[0],arrGRAD[2][gpu.MYRANK],W[0]);
+		sub(M[0],arrGRAD[2][gpu.MYRANK],M[0]);
+		while(gpu.get_queue_length() > (7*(gpu.MPI_SIZE-1))){ gpu.pop_queue(); }
+		vStackN(arrGRAD[5],stackedVocabGrad_X,gpu.MPI_SIZE);
+		update_vocab_with_gradient(stackedVocabGrad_X,stackedBatchIdx_X,_Vocab,multiplier/(float)gpu.MPI_SIZE);
+		update_vocab_with_gradient(stackedVocabGrad_X,stackedBatchIdx_X,M_VocabX,multiplier/(float)gpu.MPI_SIZE);
+		while(gpu.get_queue_length() > (6*(gpu.MPI_SIZE-1))){ gpu.pop_queue(); }
+		addGradientsN(arrGRAD[3],gpu.MYRANK,gpu.MPI_SIZE,multiplier/(float)(gpu.MPI_SIZE*arrGRAD[3][gpu.MYRANK]->rows));
 		sub(W[0],arrGRAD[3][gpu.MYRANK],W[0]);
-		sub(B[1],arrGRAD_B[0][gpu.MYRANK],B[1]);
-		sub(B[1],arrGRAD_B[1][gpu.MYRANK],B[1]);
+		sub(M[0],arrGRAD[3][gpu.MYRANK],M[0]);
+		while(gpu.get_queue_length() > (5*(gpu.MPI_SIZE-1))){ gpu.pop_queue(); }
+		addGradientsN(arrGRAD[0],gpu.MYRANK,gpu.MPI_SIZE,multiplier/(float)(gpu.MPI_SIZE*arrGRAD[0][gpu.MYRANK]->rows));
+		sub(W[1],arrGRAD[0][gpu.MYRANK],W[1]);
+		sub(M[1],arrGRAD[0][gpu.MYRANK],M[1]);
+		while(gpu.get_queue_length() > (4*(gpu.MPI_SIZE-1))){ gpu.pop_queue(); }
+		addGradientsN(arrGRAD[1],gpu.MYRANK,gpu.MPI_SIZE,multiplier/(float)(gpu.MPI_SIZE*arrGRAD[1][gpu.MYRANK]->rows));
+		sub(W[1],arrGRAD[1][gpu.MYRANK],W[1]);
+		sub(M[1],arrGRAD[1][gpu.MYRANK],M[1]);
+		while(gpu.get_queue_length() > (3*(gpu.MPI_SIZE-1))){ gpu.pop_queue(); }
+		addGradientsN(arrGRAD_B[2],gpu.MYRANK,gpu.MPI_SIZE,multiplier/(float)gpu.MPI_SIZE);
 		sub(B[0],arrGRAD_B[2][gpu.MYRANK],B[0]);
+		sub(M_B[0],arrGRAD_B[2][gpu.MYRANK],M_B[0]);
+		while(gpu.get_queue_length() > (2*(gpu.MPI_SIZE-1))){ gpu.pop_queue(); }
+		addGradientsN(arrGRAD_B[0],gpu.MYRANK,gpu.MPI_SIZE,multiplier/(float)gpu.MPI_SIZE);
+		sub(B[1],arrGRAD_B[0][gpu.MYRANK],B[1]);
+		sub(M_B[1],arrGRAD_B[0][gpu.MYRANK],M_B[1]);
+		while(gpu.get_queue_length() > (1*(gpu.MPI_SIZE-1))){ gpu.pop_queue(); }
+		addGradientsN(arrGRAD_B[1],gpu.MYRANK,gpu.MPI_SIZE,multiplier/(float)gpu.MPI_SIZE);
+		sub(B[1],arrGRAD_B[1][gpu.MYRANK],B[1]);
+		sub(M_B[1],arrGRAD_B[1][gpu.MYRANK],M_B[1]);
+		while(gpu.get_queue_length() > 0){ gpu.pop_queue(); }
+		addGradientsN(arrGRAD_B[3],gpu.MYRANK,gpu.MPI_SIZE,multiplier/(float)gpu.MPI_SIZE);
 		sub(B[0],arrGRAD_B[3][gpu.MYRANK],B[0]);
-
-		update_vocab_with_gradient(arrGRAD[4][gpu.MYRANK],_currentBatchIdx_Y,_Vocab,multiplier);
-		update_vocab_with_gradient(arrGRAD[5][gpu.MYRANK],_currentBatchIdx_X,_Vocab,multiplier);
+		sub(M_B[0],arrGRAD_B[3][gpu.MYRANK],M_B[0]);
 	}
 	else
 	{
 
 		//10*MPI_SIZE gradients added
 
-		while(gpu.get_queue_length() > (9*gpu.MPI_SIZE)){ gpu.pop_queue(); }
 		fill_matrix(_Vocab_grad,0.0f);
-		gpu.pop_queue();
-		expand_vocab_gradient(arrGRAD[4][gpu.MYRANK],_currentBatchIdx_Y,_Vocab_grad);
-		gpu.pop_queue();
-		RMSprop_with_nesterov_weight_update(_MSVocab_grad_Y,_Vocab_grad,_Vocab,M_VocabY,_RMS_multiplier,_learningRate/(float)_nBatchSize,1, MOMENTUM);
+		while(gpu.get_queue_length() > (9*(gpu.MPI_SIZE-1))){ gpu.pop_queue(); }
+		vStackN(arrGRAD[4],stackedVocabGrad_Y,gpu.MPI_SIZE);
+		expand_vocab_gradient(stackedVocabGrad_Y,stackedBatchIdx_Y,_Vocab_grad);
 
-		while(gpu.get_queue_length() > (8*gpu.MPI_SIZE)){ gpu.pop_queue(); }
-		RMSprop_with_nesterov_weight_update(MSGRAD[2],arrGRAD[2][gpu.MYRANK],W[0],M[0],0.9f,_learningRate/(float)arrGRAD[2][gpu.MYRANK]->rows,_nBatchSize, MOMENTUM);
+		RMSprop_with_nesterov_weight_update(_MSVocab_grad_Y,_Vocab_grad,_Vocab,M_VocabY,_RMS_multiplier,_learningRate/(float)_nBatchSize,_nBatchSize*gpu.MPI_SIZE, MOMENTUM);
+		while(gpu.get_queue_length() > (8*(gpu.MPI_SIZE-1))){ gpu.pop_queue(); }
+		addGradientsN(arrGRAD[2],gpu.MYRANK,gpu.MPI_SIZE,1.0f/(float)gpu.MPI_SIZE);
+		RMSprop_with_nesterov_weight_update(MSGRAD[2],arrGRAD[2][gpu.MYRANK],W[0],M[0],0.9f,_learningRate/(float)arrGRAD[2][gpu.MYRANK]->rows,_nBatchSize*gpu.MPI_SIZE, MOMENTUM);
 
-
-		while(gpu.get_queue_length() > (7*gpu.MPI_SIZE)){ gpu.pop_queue(); }
 		fill_matrix(_Vocab_grad,0.0f);
-		gpu.pop_queue();
-		expand_vocab_gradient(arrGRAD[5][gpu.MYRANK],_currentBatchIdx_X,_Vocab_grad);
-		gpu.pop_queue();
-		RMSprop_with_nesterov_weight_update(_MSVocab_grad,_Vocab_grad,_Vocab,M_VocabX,_RMS_multiplier,_learningRate/(float)_nBatchSize,1, MOMENTUM);
+		while(gpu.get_queue_length() > (7*(gpu.MPI_SIZE-1))){ gpu.pop_queue(); }
+		vStackN(arrGRAD[5],stackedVocabGrad_X,gpu.MPI_SIZE);
+		expand_vocab_gradient(stackedVocabGrad_X,stackedBatchIdx_X,_Vocab_grad);
+		RMSprop_with_nesterov_weight_update(_MSVocab_grad,_Vocab_grad,_Vocab,M_VocabX,_RMS_multiplier,_learningRate/(float)_nBatchSize,_nBatchSize*gpu.MPI_SIZE, MOMENTUM);
 
+		while(gpu.get_queue_length() > (6*(gpu.MPI_SIZE-1))){ gpu.pop_queue(); }
+		addGradientsN(arrGRAD[3],gpu.MYRANK,gpu.MPI_SIZE,1.0f/(float)gpu.MPI_SIZE);
+		RMSprop_with_nesterov_weight_update(MSGRAD[3],arrGRAD[3][gpu.MYRANK],W[0],M[0],0.9f,_learningRate/(float)arrGRAD[3][gpu.MYRANK]->rows,_nBatchSize*gpu.MPI_SIZE, MOMENTUM);
 
-		while(gpu.get_queue_length() > (6*gpu.MPI_SIZE)){ gpu.pop_queue(); }
-		RMSprop_with_nesterov_weight_update(MSGRAD[3],arrGRAD[3][gpu.MYRANK],W[0],M[0],0.9f,_learningRate/(float)arrGRAD[3][gpu.MYRANK]->rows,_nBatchSize, MOMENTUM);
-		gpu.pop_queue();
-
-		while(gpu.get_queue_length() > (5*gpu.MPI_SIZE)){ gpu.pop_queue(); }
-		RMSprop_with_nesterov_weight_update(MSGRAD[0],arrGRAD[0][gpu.MYRANK],W[1],M[1],0.9f,_learningRate/(float)arrGRAD[0][gpu.MYRANK]->rows,_nBatchSize, MOMENTUM);
-		while(gpu.get_queue_length() > (4*gpu.MPI_SIZE)){ gpu.pop_queue(); }
-		RMSprop_with_nesterov_weight_update(MSGRAD[1],arrGRAD[1][gpu.MYRANK],W[1],M[1],0.9f,_learningRate/(float)arrGRAD[1][gpu.MYRANK]->rows,_nBatchSize, MOMENTUM);
-		while(gpu.get_queue_length() > (3*gpu.MPI_SIZE)){ gpu.pop_queue(); }
-		RMSprop_with_nesterov_weight_update(MSBGRAD[2],arrGRAD_B[2][gpu.MYRANK],B[0],M_B[0],0.9f,_learningRate,_nBatchSize, MOMENTUM);
-		while(gpu.get_queue_length() > (2*gpu.MPI_SIZE)){ gpu.pop_queue(); }
-		RMSprop_with_nesterov_weight_update(MSBGRAD[0],arrGRAD_B[0][gpu.MYRANK],B[1],M_B[1],0.9f,_learningRate,_nBatchSize, MOMENTUM);
-		while(gpu.get_queue_length() > (1*gpu.MPI_SIZE)){ gpu.pop_queue(); }
-		RMSprop_with_nesterov_weight_update(MSBGRAD[1],arrGRAD_B[1][gpu.MYRANK],B[1],M_B[1],0.9f,_learningRate,_nBatchSize, MOMENTUM);
+		while(gpu.get_queue_length() > (5*(gpu.MPI_SIZE-1))){ gpu.pop_queue(); }
+		addGradientsN(arrGRAD[0],gpu.MYRANK,gpu.MPI_SIZE,1.0f/(float)gpu.MPI_SIZE);
+		RMSprop_with_nesterov_weight_update(MSGRAD[0],arrGRAD[0][gpu.MYRANK],W[1],M[1],0.9f,_learningRate/(float)arrGRAD[0][gpu.MYRANK]->rows,_nBatchSize*gpu.MPI_SIZE, MOMENTUM);
+		while(gpu.get_queue_length() > (4*(gpu.MPI_SIZE-1))){ gpu.pop_queue(); }
+		addGradientsN(arrGRAD[1],gpu.MYRANK,gpu.MPI_SIZE,1.0f/(float)gpu.MPI_SIZE);
+		RMSprop_with_nesterov_weight_update(MSGRAD[1],arrGRAD[1][gpu.MYRANK],W[1],M[1],0.9f,_learningRate/(float)arrGRAD[1][gpu.MYRANK]->rows,_nBatchSize*gpu.MPI_SIZE, MOMENTUM);
+		while(gpu.get_queue_length() > (3*(gpu.MPI_SIZE-1))){ gpu.pop_queue(); }
+		addGradientsN(arrGRAD_B[2],gpu.MYRANK,gpu.MPI_SIZE,1.0f/(float)gpu.MPI_SIZE);
+		RMSprop_with_nesterov_weight_update(MSBGRAD[2],arrGRAD_B[2][gpu.MYRANK],B[0],M_B[0],0.9f,_learningRate,_nBatchSize*gpu.MPI_SIZE, MOMENTUM);
+		while(gpu.get_queue_length() > (2*(gpu.MPI_SIZE-1))){ gpu.pop_queue(); }
+		addGradientsN(arrGRAD_B[0],gpu.MYRANK,gpu.MPI_SIZE,1.0f/(float)gpu.MPI_SIZE);
+		RMSprop_with_nesterov_weight_update(MSBGRAD[0],arrGRAD_B[0][gpu.MYRANK],B[1],M_B[1],0.9f,_learningRate,_nBatchSize*gpu.MPI_SIZE, MOMENTUM);
+		while(gpu.get_queue_length() > (1*(gpu.MPI_SIZE-1))){ gpu.pop_queue(); }
+		addGradientsN(arrGRAD_B[1],gpu.MYRANK,gpu.MPI_SIZE,1.0f/(float)gpu.MPI_SIZE);
+		RMSprop_with_nesterov_weight_update(MSBGRAD[1],arrGRAD_B[1][gpu.MYRANK],B[1],M_B[1],0.9f,_learningRate,_nBatchSize*gpu.MPI_SIZE, MOMENTUM);
 		while(gpu.get_queue_length() > 0){ gpu.pop_queue(); }
-		RMSprop_with_nesterov_weight_update(MSBGRAD[3],arrGRAD_B[3][gpu.MYRANK],B[0],M_B[0],0.9f,_learningRate,_nBatchSize, MOMENTUM);
+		addGradientsN(arrGRAD_B[3],gpu.MYRANK,gpu.MPI_SIZE,1.0f/(float)gpu.MPI_SIZE);
+		RMSprop_with_nesterov_weight_update(MSBGRAD[3],arrGRAD_B[3][gpu.MYRANK],B[0],M_B[0],0.9f,_learningRate,_nBatchSize*gpu.MPI_SIZE, MOMENTUM);
 
 
 	}
+
+
+	MPI_Barrier(MPI_COMM_WORLD);
 
 }
 
@@ -449,20 +482,22 @@ void WikiMaxoutNet::backprop()
 	gpu.dotT(e1, W[1],e2_partial);
 
 	gpu.dot(aB,e1,arrGRAD_B[0][gpu.MYRANK]);
+	gpu.tick();
 	gpu.Tdot(a1_Y,e1,arrGRAD[0][gpu.MYRANK]);
 
-    if(!useMaxout)
-    {
-    	logisticGrad(a1_Y,a1_Y);
-		mul(e2_partial,a1_Y,e2);
-    }
-    else
-    {
-        expand_to_maxout_grad(e2_partial, a1_idx_Y,e2);
-    }
+    logisticGrad(a1_Y,a1_Y);
+	mul(e2_partial,a1_Y,e2);
+
     gpu.Tdot(_batchY,e2,arrGRAD[2][gpu.MYRANK]);
     gpu.dot(aB,e2,arrGRAD_B[2][gpu.MYRANK]);
     gpu.dotT(e2,W[0],arrGRAD[4][gpu.MYRANK]);
+
+
+
+	while(gpu.get_queue_length() > 0){ gpu.pop_queue(); }
+
+	vStackN(_currentBatchIdx_X,stackedBatchIdx_X,gpu.MPI_SIZE);
+	vStackN(_currentBatchIdx_Y,stackedBatchIdx_Y,gpu.MPI_SIZE);
 
     gpu.add_to_queue(arrGRAD[4]);
     gpu.add_to_queue(arrGRAD[2]);
@@ -480,18 +515,11 @@ void WikiMaxoutNet::backprop()
 	gpu.dotT(e1, W[1],e2_partial);
 	gpu.pop_queue();
 
+	logisticGrad(a1_X,a1_X);
+	gpu.pop_queue();
+	mul(e2_partial,a1_X,e2);
+	gpu.pop_queue();
 
-    if(!useMaxout)
-    {
-    	logisticGrad(a1_X,a1_X);
-    	gpu.pop_queue();
- 		mul(e2_partial,a1_X,e2);
- 		gpu.pop_queue();
-    }
-    else
-    {
-        expand_to_maxout_grad(e2_partial, a1_idx_X,e2);
-    }
     gpu.Tdot(_batchX,e2,arrGRAD[3][gpu.MYRANK]);
 	gpu.pop_queue();
 	gpu.dot(aB,e2,arrGRAD_B[3][gpu.MYRANK]);
@@ -516,7 +544,7 @@ double WikiMaxoutNet::calculateError()
 {
 	//scalarMul(W[0],0.9,W[0]);
 	allocateNextBatch(true);
-	for(int i = 0; i < _nCVErrorLength; i++)
+	for(int i = 0; i < _nCVErrorLength; i+=gpu.MPI_SIZE)
 	{
 
 		feedforward();
@@ -533,7 +561,7 @@ double WikiMaxoutNet::calculateError()
 	//cout << "Free system memory: " << sysconf(_SC_PAGE_SIZE)*sysconf(_SC_PHYS_PAGES) << endl;
 
 
-	double error = _dSumError/(double)(_nBatchSize*_nCVErrorLength);
+	double error = _dSumError/(double)(_nBatchSize*_nCVErrorLength/gpu.MPI_SIZE);
 	_dSumError = 0.0;
 
 

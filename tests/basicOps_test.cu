@@ -245,7 +245,6 @@ int run_basicOps_test()
   assert(m_host->data[5]==59.1387f);
   assert(test_matrix(m_host,2,3));
 
-
   //slice rows
   m1 = gpu.rand(10,10);
   m2 = to_host(slice_rows(m1, 2,5));

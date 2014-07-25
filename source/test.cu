@@ -11,6 +11,8 @@
 #include <batchAllocator.h>
 #include <DeepNeuralNetwork.h>
 #include <WikiMaxoutNet.h>
+#include <WikiMaxoutNet_PCIe.h>
+#include <WikiMaxoutNet_PCIe2.h>
 
 using std::cout;
 using std::endl;
@@ -1234,40 +1236,151 @@ void dotMPI_test(int argc, char *argv[])
 }
 
 
-void async_test()
+void async_test(int argc, char *argv[])
 {
 
-	ClusterNet gpu = ClusterNet(1324);
+	ClusterNet gpu = ClusterNet(argc,argv,1324);
+	int rows = 512;
+	int cols = 128;
 
-	cudaSetDevice(0);
-	Matrix *A1 = gpu.rand(10,2);
-	Matrix *B1 = gpu.rand(2,10);
-	cudaSetDevice(1);
-	Matrix *A2 = ones(10,10);
-	Matrix *B2 = empty(10,10);
 
-	cudaSetDevice(0);
-	cudaStream_t s;
-	cudaStreamCreate(&s);
-	//cudaDeviceEnablePeerAccess(1,0);
-	Matrix *C1 = gpu.dot(A1,B1);
-
-	cudaMemcpyPeerAsync(B2->data,1,C1->data,0,C1->bytes,s);
-
-	cudaStreamSynchronize(s);
-	printmat(C1);
-	cudaSetDevice(1);
-	printmat(B2);
 	/*
-	printmat(C1);
-	add(C1,A2,A2);
-	printmat(A2);
+
+	MPI_Request r = MPI_REQUEST_NULL;
+	MPI_Request s = MPI_REQUEST_NULL;
+
+
+
+	Matrix *a = gpu.rand(rows,cols);
+	Matrix *b = zeros(rows,cols);
+
+	if(gpu.MYRANK == 0)
+	{
+		MPI_Irecv(b->data,b->size,MPI_FLOAT,1,0,MPI_COMM_WORLD,&r);
+		MPI_Isend(a->data,a->size,MPI_FLOAT,1,0,MPI_COMM_WORLD,&s);
+	}
+	else
+	{
+		MPI_Irecv(b->data,b->size,MPI_FLOAT,0,0,MPI_COMM_WORLD,&r);
+		MPI_Isend(a->data,a->size,MPI_FLOAT,0,0,MPI_COMM_WORLD,&s);
+	}
+
+	MPI_Wait(&s,MPI_STATUS_IGNORE);
+	MPI_Wait(&r,MPI_STATUS_IGNORE);
+
+
+	gpu.tick("MPI");
+	for(int i = 0; i < 100; i++)
+	{
+		if(gpu.MYRANK == 0)
+		{
+			MPI_Irecv(b->data,b->size,MPI_FLOAT,1,0,MPI_COMM_WORLD,&r);
+			MPI_Isend(a->data,a->size,MPI_FLOAT,1,0,MPI_COMM_WORLD,&s);
+		}
+		else
+		{
+			MPI_Irecv(b->data,b->size,MPI_FLOAT,0,0,MPI_COMM_WORLD,&r);
+			MPI_Isend(a->data,a->size,MPI_FLOAT,0,0,MPI_COMM_WORLD,&s);
+		}
+
+		MPI_Wait(&s,MPI_STATUS_IGNORE);
+		MPI_Wait(&r,MPI_STATUS_IGNORE);
+	}
+
+	gpu.tock("MPI");
 	*/
+
+
+
+
+
+	if(gpu.MYRANK == 0)
+	{
+		cudaSetDevice(0);
+		//cudaDeviceEnablePeerAccess(1,0);
+		cudaDeviceDisablePeerAccess(1);
+		Matrix *A1 = gpu.rand(rows,cols);
+		Matrix *A2 = gpu.rand(rows,cols);
+		cudaSetDevice(1);
+		//cudaDeviceEnablePeerAccess(0,0);
+		cudaDeviceDisablePeerAccess(0);
+		Matrix *B1 = gpu.rand(rows,cols);
+		Matrix *B2 = gpu.rand(rows,cols);
+
+		cudaSetDevice(0);
+		cudaStream_t s;
+		cudaStreamCreate(&s);
+		cudaSetDevice(1);
+		cudaStream_t s2;
+		cudaStreamCreate(&s2);
+		cudaSetDevice(0);
+
+		int access = 0;
+		cudaDeviceCanAccessPeer(&access,0,1);
+		cout << access << endl;
+		cudaDeviceCanAccessPeer(&access,1,0);
+		cout << access << endl;
+
+		cudaSetDevice(0);
+		gpu.tick("cuda");
+
+		for(int i = 0; i < 100; i++)
+		{
+			cudaMemcpyPeerAsync(B2->data,1,A2->data,0,A2->bytes,s);
+			cudaSetDevice(1);
+			cudaMemcpyPeerAsync(A1->data,0,B1->data,1,B1->bytes,s2);
+
+			cudaSetDevice(0);
+			cudaStreamSynchronize(s);
+			cudaSetDevice(1);
+			cudaStreamSynchronize(s2);
+			cudaSetDevice(0);
+		}
+		gpu.tock("cuda");
+	}
+
+
+
+
+
+	MPI_Barrier(MPI_COMM_WORLD);
+
+
+	gpu.shutdown_MPI();
+
+
+
+
+
 
 
 }
 
+struct arg_struct
+{
+		ClusterNet *gpus;
+		WikiMaxoutNet *net;
+		int device;
+};
 
+void *run_net(void * args)
+{
+	struct arg_struct *_args = (struct arg_struct*)args;
+	cout << "device: " << _args->device << endl;
+	cudaSetDevice(_args->device);
+	_args->net->run();
+
+	return 0;
+}
+
+void *print_message(void*)
+{
+    ClusterNet gpu = ClusterNet(124345);
+    WikiMaxoutNet net = WikiMaxoutNet(gpu);
+    net.run();
+
+    return 0;
+}
 
 int main(int argc, char *argv[])
 {
@@ -1293,29 +1406,81 @@ int main(int argc, char *argv[])
 	DeepNeuralNetwork net = DeepNeuralNetwork(layers,Classification, gpus, allocator, 10);
 
 	net.train();
-
 	*/
 
 
+	
 
 
 
 
-	//cudaSetDevice(1);
-	//pthread_t t;
+	//async_test(argc,argv);
 
-	ClusterNet gpus = ClusterNet(argc, argv, 1245, true);
-	WikiMaxoutNet net = WikiMaxoutNet(gpus);
+
+	ClusterNet *gpus = new ClusterNet(argc,argv,123635,true);
+	WikiMaxoutNet net = WikiMaxoutNet(gpus[0]);
 	net.run();
 
 
 
+	//cudaSetDevice(1);
+	//ClusterNet *gpus = new ClusterNet(123635);
+	//WikiMaxoutNet_PCIe net = WikiMaxoutNet_PCIe(gpus);
+	//net.run();
 
 
+	/*
+	cudaSetDevice(0);
+	struct arg_struct *args0 = (arg_struct*)malloc(sizeof(arg_struct));
+	ClusterNet *gpus0 = new ClusterNet(23452345);
+	WikiMaxoutNet *net0 = new WikiMaxoutNet(gpus0[0]);
+	args0->gpus = gpus0;
+	args0->net = net0;
+	args0->device = 0;
+
+	net0->run();
+
+	pthread_t t0;
+	pthread_create(&t0, NULL, &run_net, args0);
+
+	cudaSetDevice(1);
+	struct arg_struct *args1 = (arg_struct*)malloc(sizeof(arg_struct));
+	ClusterNet *gpus1 = new ClusterNet(23452345);
+	WikiMaxoutNet *net1 = new WikiMaxoutNet(gpus1[0]);
+	args1->gpus = gpus1;
+	args1->net = net1;
+	args1->device = 1;
+
+	pthread_t t1;
+	//pthread_create(&t1, NULL, &run_net, args1);
+
+	cudaSetDevice(2);
+	struct arg_struct *args2 = (arg_struct*)malloc(sizeof(arg_struct));
+	ClusterNet *gpus2 = new ClusterNet(23452345);
+	WikiMaxoutNet *net2 = new WikiMaxoutNet(gpus2[0]);
+	args2->gpus = gpus2;
+	args2->net = net2;
+	args2->device = 2;
+
+	pthread_t t2;
+	//pthread_create(&t2, NULL, &run_net, args2);
+
+
+	cout << "rolfen kek!" << endl;
+
+	void* result0;
+	void* result1;
+	void* result2;
+	pthread_join(t0,&result0);
+	//pthread_join(t1,&result1);
+	//pthread_join(t2,&result2);
+	*/
 
 
 
 }
+
+
 
 
 

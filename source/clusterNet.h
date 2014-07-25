@@ -7,7 +7,6 @@
 #include <mpi.h>
 #include <list>
 #include <vector>
-#include <cusparse_v2.h>
 #include <pthread.h>
 #include <cstdlib>
 #include <iostream>
@@ -23,6 +22,7 @@
 #include <thrust/device_ptr.h>
 #include <thrust/device_vector.h>
 #include <thrust/fill.h>
+#include <unistd.h>
 
 
 class ClusterNet
@@ -36,6 +36,9 @@ public:
 	 ClusterNet(int argc, char *argv[], int seed);
 	 ClusterNet(int argc, char* argv[], int seed, bool useSameSeed);
 
+	 void dotPCIe(Matrix **A, Matrix **B, Matrix **out);
+	 void dotTPCIe(Matrix **A, Matrix **B, Matrix **out);
+	 void TdotPCIe(Matrix **A, Matrix **B, Matrix **out);
 	 Matrix *dot(Matrix *A, Matrix *B);
 	 Matrix *Tdot(Matrix *A, Matrix *B);
 	 Matrix *dotT(Matrix *A, Matrix *B);
@@ -49,12 +52,20 @@ public:
 	 void TdotMPI(Matrix *A, Matrix *B, Matrix *out);
 	 void dotTMPI(Matrix *A, Matrix *B, Matrix *out);
 
+	 void add_PCIe(Matrix **A, Matrix **B, Matrix **out);
+	 void mul_PCIe(Matrix **A, Matrix **B, Matrix **out);
+	 void scalarMul_PCIe(Matrix **A, float a, Matrix **out);
+	 void addMatrixVector_PCIe(Matrix **A, Matrix **v, Matrix **out);
+	 void logistic_PCIe(Matrix **A, Matrix **out);
+
 	 Matrix *dot_sparse(Matrix *A, Matrix *B);
 	 Matrix *Tdot_sparse(Matrix *A, Matrix *B);
 	 Matrix *dotT_sparse(Matrix *A, Matrix *B);
 	 void dot_sparse(Matrix *A, Matrix *B, Matrix *out);
 	 void dotT_sparse(Matrix *A, Matrix *B, Matrix *out);
 	 void Tdot_sparse(Matrix *A, Matrix *B, Matrix *out);
+
+	 void RMSprop_with_nesterov_weight_update_PCIe(Matrix **RMS, Matrix **grad, Matrix **w, Matrix **m, float RMS_multiplier, float learning_rate, int batch_size, float momentum);
 
 	 Matrix *rand(int rows, int cols);
 	 void rand(int rows, int cols, Matrix *out);
@@ -86,16 +97,46 @@ public:
 	 void construct_vocab_matrix(Matrix *vocab_idx, Matrix *vocab_idx_y, Matrix *batch_X, Matrix *batch_y, Matrix *vocab);
 	 void add_to_queue(Matrix **gpuArray);
 	 bool pop_queue();
+	 void add_to_queue_PCIe(Matrix **gpuArray);
+	 bool pop_queue_PCIe();
 	 int get_queue_length();
+
+	 void addGradients_PCIe(Matrix **grad);
+
+	 Matrix **zeros_PCIe(int rows, int cols);
+	 Matrix **zeros_gradient_PCIe(int rows, int cols);
+	 Matrix **ones_PCIe(int rows, int cols);
+	 Matrix **uniformSqrtWeight_PCIe(int rows, int cols);
 
 	 bool QUEUE_EMPTY;
 
+	 bool StartBackgroundQueue;
 	 int MYRANK;
 	 int NODES;
 	 int MYGPUID;
 	 int MPI_SIZE;
+	 int GPU_COUNT;
 	 std::vector<int> PCIe_RANKS;
 	 std::vector<int> MASTER_GPU_RANKS;
+
+	 void *hello(void)
+	 {
+		 bool uden = true;
+		 std::cout << "test kek" << std::endl;
+		 while(uden)
+		 {
+			 pop_queue_PCIe();
+			 usleep(100);
+		 }
+
+		 return 0;
+	 }
+
+	 static void *hello_helper(void *context)
+	 {
+		 return ((ClusterNet *)context)->hello();
+	 }
+
 private:
 	 std::vector<cublasHandle_t> m_handle;
 	 cusparseHandle_t m_sparse_handle;
@@ -123,6 +164,7 @@ private:
 	 std::vector<Matrix*> m_receive_queue;
 	 std::vector<int> m_sendid_queue;
 	 std::vector<int> m_receiveid_queue;
+	 std::vector<cudaStream_t> m_streams_PCIe;
 
 	 int m_destination;
 	 int m_source;

@@ -2,6 +2,7 @@
 #include <curand.h>
 #include <curand_kernel.h>
 #include <float.h>
+
 const int NUM_THREADS = 32;
 
 
@@ -171,6 +172,24 @@ __global__ void vStackN(float **arrA, float *out, int rows, int cols)
 
   for(unsigned int i = threadIdx.x; i < size; i+=blockDim.x)
 	  out[offset + i] = arrA[blockIdx.x][i];
+
+}
+
+__global__ void AddGradientsN(float **arrA, int size, int myrank, int matrix_count, float multiplier)
+{
+	const unsigned int numThreads = blockDim.x * gridDim.x;
+	const int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
+
+	for(int matrix_idx = 0; matrix_idx < matrix_count-1; matrix_idx++)
+	{
+		if(matrix_idx == myrank){ continue; }
+
+		for(unsigned int i = idx; i < size; i+=numThreads)
+			arrA[myrank][i] += arrA[matrix_idx][i];
+	}
+	//better numerical stability to do it afterwards
+	for(unsigned int i = idx; i < size; i+=numThreads)
+		arrA[myrank][i] *=multiplier;
 
 }
 
@@ -847,20 +866,20 @@ __global__ void kRMSprop_with_nesterov_weight_update (float *RMS, float *grad, f
 	  float grad_value = 0.0f;
 	  float RMS_value = 0.0f;
 	  float rms_reciprocal = 1.0f - RMS_multiplier;
-	  float momentum_matrix_value = 0.0f;
 
 	  for (unsigned int i = idx;i < size; i += numThreads)
 	  {
 		  grad_value = fdividef(grad[i],(float)batch_size);
+		  m[i] = (momentum*m[i]) - (learning_rate*grad_value);
 		  RMS_value = (RMS_multiplier*RMS[i]) + (powf(grad_value,2.0f)*rms_reciprocal);
 		  grad_value = learning_rate*fdividef(grad_value,(sqrtf(RMS_value)+1.0e-08f));
-		  m[i] = (momentum*momentum_matrix_value) - grad_value;
 
 		  RMS[i] = RMS_value;
 		  w[i] -= grad_value;
 
 	  }
 }
+
 
 __global__ void kRMSprop_with_weight_update (float *RMS, float *grad, float *w, float *m, float RMS_multiplier, float learning_rate, int batch_size, int size, float momentum)
 {
@@ -1110,9 +1129,8 @@ __global__ void kUpdateVocabWithGradient(float *grad, float *vocab_idx, float* v
 
 	int myIdx = (int)vocab_idx[blockIdx.x+(blockIdx.y*gridDim.x)];
 	int myVocabIdx = blockDim.x*myIdx;
-	atomicAdd(&vocab[myVocabIdx + threadIdx.x],grad[blockIdx.x + (blockIdx.y*blockDim.x*gridDim.x) + (threadIdx.x*gridDim.x)]*learning_rate);
+	atomicAdd(&vocab[myVocabIdx + threadIdx.x],-grad[blockIdx.x + (blockIdx.y*blockDim.x*gridDim.x) + (threadIdx.x*gridDim.x)]*learning_rate);
 }
-
 
 
 
@@ -1163,6 +1181,33 @@ __global__ void kExpandDoubleVocabGradient(float *gradX, float *gradY, float *vo
 }
 
 
+/*
+__global__ void kExpandVocabGradient_sharedMemory(float *grad, float *vocab_idx, float *vocab_grad, float *sorted_vocab_idx, vocab_idx_size)
+{
+	//vocab_vector_size = blockDim.x;
+	//batch_size = gridDim.x
+	//try different configs for gridDim.x, e.g 16, 32 etc.
+
+	//will have vocab_vector_size = blockDim.x elements e.g. 64
+	extern __shared__ float sGrads[];
+
+	float myWordIdx = 0.0f;
+	float last_word = 0.0f;
+	float currentIdx = 0.0f;
+
+	sGrads[threadIdx.x] = 0.0f;
+
+	for(int word = blockIdx.x; currentIdx < vocab_idx_size; word++)
+	{
+		for(int i = currentIdx; i < vocab_idx_size; i++, currentIdx++)
+		{
+
+		}
+	}
+}
+*/
+
+
 __global__ void kExpandVocabGradient(float *grad, float *vocab_idx, float *vocab_grad)
 {
 	//vocab_vector_size = blockDim.x;
@@ -1190,6 +1235,1046 @@ __global__ void kExpandVocabGradientMiddleWord(float *grad, float *vocab_idx, fl
 
 }
 
+__global__ void MatMul(float* A, float* B, float* C, int ARows, int ACols, int BRows, int BCols, int CRows, int CCols)
+{
+    float CValue = 0;
 
+    int Row = blockIdx.y*TILE_DIM + threadIdx.y;
+    int Col = blockIdx.x*TILE_DIM + threadIdx.x;
 
+    __shared__ float As[TILE_DIM][TILE_DIM];
+    __shared__ float Bs[TILE_DIM][TILE_DIM];
 
+    for (int k = 0; k < (TILE_DIM + ACols - 1)/TILE_DIM; k++) {
+
+         if (k*TILE_DIM + threadIdx.x < ACols && Row < ARows)   As[threadIdx.y][threadIdx.x] = A[Row*ACols + k*TILE_DIM + threadIdx.x];
+         else                                                   As[threadIdx.y][threadIdx.x] = 0.0;
+
+         if (k*TILE_DIM + threadIdx.y < BRows && Col < BCols)   Bs[threadIdx.y][threadIdx.x] = B[(k*TILE_DIM + threadIdx.y)*BCols + Col];
+         else                                                   Bs[threadIdx.y][threadIdx.x] = 0.0;
+
+         __syncthreads();
+
+         for (int n = 0; n < TILE_DIM; ++n) CValue += As[threadIdx.y][n] * Bs[n][threadIdx.x];
+
+         __syncthreads();
+    }
+
+    if (Row < CRows && Col < CCols) C[((blockIdx.y * blockDim.y + threadIdx.y)*CCols)+(blockIdx.x*blockDim.x)+threadIdx.x]=CValue;
+}
+
+static __device__ void saxpy(float alpha, const float*  b, float*        c )
+{
+    c[0]  += alpha * b[0];
+    c[1]  += alpha * b[1];
+    c[2]  += alpha * b[2];
+    c[3]  += alpha * b[3];
+    c[4]  += alpha * b[4];
+    c[5]  += alpha * b[5];
+    c[6]  += alpha * b[6];
+    c[7]  += alpha * b[7];
+    c[8]  += alpha * b[8];
+    c[9]  += alpha * b[9];
+    c[10] += alpha * b[10];
+    c[11] += alpha * b[11];
+    c[12] += alpha * b[12];
+    c[13] += alpha * b[13];
+    c[14] += alpha * b[14];
+    c[15] += alpha * b[15];
+}
+__global__ void sgemm_kernel_N_N_64_16_16_16_4(float* C,const float* A,const float* B, int m, int n, int k, int lda, int ldb, int ldc, float alpha, float beta )
+{
+    __shared__ float Bb[16][17];
+
+    const int tx = threadIdx.x;
+    const int ty = threadIdx.y;
+
+    int ibx = blockIdx.x * 64;
+    int iby = blockIdx.y * 16;
+
+    const int idt = ty * 16 + tx;
+
+    /*
+        Taking care of invalid memory access in dimension M
+    */
+    if ( ibx+idt >= m )
+        A += ibx+0;
+    else
+        A += ibx + idt;
+
+    C += ibx + idt + __mul24(iby, ldc);
+
+    B += tx+__mul24(iby, ldb);
+
+    /*
+        These variables guide the threads to avoid invalid memory accesses
+        in dimension N.
+        Simply it's the stopping criterion.
+        or you can say that access index wraps around to a valid memory location.
+    */
+    int s1=0, s2=4*ldb, s3=8*ldb, s4=12*ldb;
+
+    if ( iby+ty    >= n ) { s1=1;  s2=0*ldb;  s3=0*ldb;  s4=0*ldb; } else
+    if ( iby+ty+4  >= n ) { s1=0;  s2=0*ldb;  s3=0*ldb;  s4=0*ldb; } else
+    if ( iby+ty+8  >= n ) { s1=0;  s2=4*ldb;  s3=0*ldb;  s4=0*ldb; } else
+    if ( iby+ty+12 >= n ) { s1=0;  s2=4*ldb;  s3=8*ldb;  s4=0*ldb; }
+
+    if ( s1 == 0 )
+        B += __mul24(ty, ldb);
+    else
+        s1=0;
+
+    const float *Bend = B + k - k % 16;
+
+    float Cb[16] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+
+    if ( k > 15 ) {
+        do {
+            float Ab[4] = {A[0], A[lda], A[2*lda], A[3*lda]};
+
+            Bb[tx][ty+0 ] = B[s1];
+            Bb[tx][ty+4 ] = B[s2];
+            Bb[tx][ty+8 ] = B[s3];
+            Bb[tx][ty+12] = B[s4];
+
+            __syncthreads();
+
+            A += 4 * lda;
+            saxpy( Ab[0], &Bb[0][0], Cb );  Ab[0] = A[0*lda];
+            saxpy( Ab[1], &Bb[1][0], Cb );  Ab[1] = A[1*lda];
+            saxpy( Ab[2], &Bb[2][0], Cb );  Ab[2] = A[2*lda];
+            saxpy( Ab[3], &Bb[3][0], Cb );  Ab[3] = A[3*lda];
+
+            A += 4 * lda;
+            saxpy( Ab[0], &Bb[4][0], Cb );  Ab[0] = A[0*lda];
+            saxpy( Ab[1], &Bb[5][0], Cb );  Ab[1] = A[1*lda];
+            saxpy( Ab[2], &Bb[6][0], Cb );  Ab[2] = A[2*lda];
+            saxpy( Ab[3], &Bb[7][0], Cb );  Ab[3] = A[3*lda];
+
+            A += 4 * lda;
+            saxpy( Ab[0], &Bb[8][0],  Cb );  Ab[0] = A[0*lda];
+            saxpy( Ab[1], &Bb[9][0],  Cb );  Ab[1] = A[1*lda];
+            saxpy( Ab[2], &Bb[10][0], Cb );  Ab[2] = A[2*lda];
+            saxpy( Ab[3], &Bb[11][0], Cb );  Ab[3] = A[3*lda];
+
+            A += 4 * lda;
+            saxpy( Ab[0], &Bb[12][0], Cb );
+            saxpy( Ab[1], &Bb[13][0], Cb );
+            saxpy( Ab[2], &Bb[14][0], Cb );
+            saxpy( Ab[3], &Bb[15][0], Cb );
+
+            B += 16;
+
+            __syncthreads();
+        } while (B < Bend);
+    }
+
+    /*
+        Common sub expression elimination.
+    */
+    ibx = ibx + idt - m;
+
+    /*
+        remembering k dimension
+    */
+    ldb = m = k;
+
+    /*
+        k changed to support the generic case and reuse valuable registers
+    */
+    k = k % 16;
+
+    m -= k;
+
+    /*
+        Here we are taking care of k % dim_k portions
+    */
+    if ( k != 0 ) {
+        /*
+            Avoid Invalid Memory access in dimension K
+            If some thread enters this if ( ) block first access to B
+            should be valid as K isn't divisible by blk_K
+            Note that dimension N has been taken care of by s1, s2, s3, s4
+            But depending upon K and thread index tx, some memory access
+            may be still invalid, so take care of them now by setting
+            s1, s2, s3, s4 = 0
+            B might have been advanced in the previous loop, take care
+            of that, this is about right bottom corner.
+        */
+        if ( m + tx >= ldb ) {
+            s1 = s2 = s3 = s4 = 0;
+            B -= tx;
+        }
+
+        Bb[tx][ty+0 ] = B[s1];
+        Bb[tx][ty+4 ] = B[s2];
+        Bb[tx][ty+8 ] = B[s3];
+        Bb[tx][ty+12] = B[s4];
+        __syncthreads();
+
+        for(int i=0; i < k; i++) {
+            saxpy( A[0], &Bb[i+0][0], Cb );
+            A += lda;
+        }
+    }
+
+    /*
+        Now taking care of dimension M, N that doesnt fit into blocks
+    */
+    if ( (iby+16) >= n ) {
+        lda = n - iby;
+    }
+    else {
+        lda = 16;
+    }
+    if ( ibx >= 0 )
+        lda = 0;
+    else
+        lda = lda;
+
+    switch(lda) {
+        case 16:
+                C[ 0    ] = alpha * Cb[ 0] + beta * C[ 0    ];
+                C[ 1*ldc] = alpha * Cb[ 1] + beta * C[ 1*ldc];
+                C[ 2*ldc] = alpha * Cb[ 2] + beta * C[ 2*ldc];
+                C[ 3*ldc] = alpha * Cb[ 3] + beta * C[ 3*ldc];
+                C[ 4*ldc] = alpha * Cb[ 4] + beta * C[ 4*ldc];
+                C[ 5*ldc] = alpha * Cb[ 5] + beta * C[ 5*ldc];
+                C[ 6*ldc] = alpha * Cb[ 6] + beta * C[ 6*ldc];
+                C[ 7*ldc] = alpha * Cb[ 7] + beta * C[ 7*ldc];
+                C[ 8*ldc] = alpha * Cb[ 8] + beta * C[ 8*ldc];
+                C[ 9*ldc] = alpha * Cb[ 9] + beta * C[ 9*ldc];
+                C[10*ldc] = alpha * Cb[10] + beta * C[10*ldc];
+                C[11*ldc] = alpha * Cb[11] + beta * C[11*ldc];
+                C[12*ldc] = alpha * Cb[12] + beta * C[12*ldc];
+                C[13*ldc] = alpha * Cb[13] + beta * C[13*ldc];
+                C[14*ldc] = alpha * Cb[14] + beta * C[14*ldc];
+                C[15*ldc] = alpha * Cb[15] + beta * C[15*ldc];
+                break;
+        case 15:
+                C[ 0    ] = alpha * Cb[ 0] + beta * C[ 0    ];
+                C[ 1*ldc] = alpha * Cb[ 1] + beta * C[ 1*ldc];
+                C[ 2*ldc] = alpha * Cb[ 2] + beta * C[ 2*ldc];
+                C[ 3*ldc] = alpha * Cb[ 3] + beta * C[ 3*ldc];
+                C[ 4*ldc] = alpha * Cb[ 4] + beta * C[ 4*ldc];
+                C[ 5*ldc] = alpha * Cb[ 5] + beta * C[ 5*ldc];
+                C[ 6*ldc] = alpha * Cb[ 6] + beta * C[ 6*ldc];
+                C[ 7*ldc] = alpha * Cb[ 7] + beta * C[ 7*ldc];
+                C[ 8*ldc] = alpha * Cb[ 8] + beta * C[ 8*ldc];
+                C[ 9*ldc] = alpha * Cb[ 9] + beta * C[ 9*ldc];
+                C[10*ldc] = alpha * Cb[10] + beta * C[10*ldc];
+                C[11*ldc] = alpha * Cb[11] + beta * C[11*ldc];
+                C[12*ldc] = alpha * Cb[12] + beta * C[12*ldc];
+                C[13*ldc] = alpha * Cb[13] + beta * C[13*ldc];
+                C[14*ldc] = alpha * Cb[14] + beta * C[14*ldc];
+                break;
+        case 14:
+                C[ 0    ] = alpha * Cb[ 0] + beta * C[ 0    ];
+                C[ 1*ldc] = alpha * Cb[ 1] + beta * C[ 1*ldc];
+                C[ 2*ldc] = alpha * Cb[ 2] + beta * C[ 2*ldc];
+                C[ 3*ldc] = alpha * Cb[ 3] + beta * C[ 3*ldc];
+                C[ 4*ldc] = alpha * Cb[ 4] + beta * C[ 4*ldc];
+                C[ 5*ldc] = alpha * Cb[ 5] + beta * C[ 5*ldc];
+                C[ 6*ldc] = alpha * Cb[ 6] + beta * C[ 6*ldc];
+                C[ 7*ldc] = alpha * Cb[ 7] + beta * C[ 7*ldc];
+                C[ 8*ldc] = alpha * Cb[ 8] + beta * C[ 8*ldc];
+                C[ 9*ldc] = alpha * Cb[ 9] + beta * C[ 9*ldc];
+                C[10*ldc] = alpha * Cb[10] + beta * C[10*ldc];
+                C[11*ldc] = alpha * Cb[11] + beta * C[11*ldc];
+                C[12*ldc] = alpha * Cb[12] + beta * C[12*ldc];
+                C[13*ldc] = alpha * Cb[13] + beta * C[13*ldc];
+                break;
+        case 13:
+                C[ 0    ] = alpha * Cb[ 0] + beta * C[ 0    ];
+                C[ 1*ldc] = alpha * Cb[ 1] + beta * C[ 1*ldc];
+                C[ 2*ldc] = alpha * Cb[ 2] + beta * C[ 2*ldc];
+                C[ 3*ldc] = alpha * Cb[ 3] + beta * C[ 3*ldc];
+                C[ 4*ldc] = alpha * Cb[ 4] + beta * C[ 4*ldc];
+                C[ 5*ldc] = alpha * Cb[ 5] + beta * C[ 5*ldc];
+                C[ 6*ldc] = alpha * Cb[ 6] + beta * C[ 6*ldc];
+                C[ 7*ldc] = alpha * Cb[ 7] + beta * C[ 7*ldc];
+                C[ 8*ldc] = alpha * Cb[ 8] + beta * C[ 8*ldc];
+                C[ 9*ldc] = alpha * Cb[ 9] + beta * C[ 9*ldc];
+                C[10*ldc] = alpha * Cb[10] + beta * C[10*ldc];
+                C[11*ldc] = alpha * Cb[11] + beta * C[11*ldc];
+                C[12*ldc] = alpha * Cb[12] + beta * C[12*ldc];
+                break;
+        case 12:
+                C[ 0    ] = alpha * Cb[ 0] + beta * C[ 0    ];
+                C[ 1*ldc] = alpha * Cb[ 1] + beta * C[ 1*ldc];
+                C[ 2*ldc] = alpha * Cb[ 2] + beta * C[ 2*ldc];
+                C[ 3*ldc] = alpha * Cb[ 3] + beta * C[ 3*ldc];
+                C[ 4*ldc] = alpha * Cb[ 4] + beta * C[ 4*ldc];
+                C[ 5*ldc] = alpha * Cb[ 5] + beta * C[ 5*ldc];
+                C[ 6*ldc] = alpha * Cb[ 6] + beta * C[ 6*ldc];
+                C[ 7*ldc] = alpha * Cb[ 7] + beta * C[ 7*ldc];
+                C[ 8*ldc] = alpha * Cb[ 8] + beta * C[ 8*ldc];
+                C[ 9*ldc] = alpha * Cb[ 9] + beta * C[ 9*ldc];
+                C[10*ldc] = alpha * Cb[10] + beta * C[10*ldc];
+                C[11*ldc] = alpha * Cb[11] + beta * C[11*ldc];
+                break;
+        case 11:
+                C[ 0    ] = alpha * Cb[ 0] + beta * C[ 0    ];
+                C[ 1*ldc] = alpha * Cb[ 1] + beta * C[ 1*ldc];
+                C[ 2*ldc] = alpha * Cb[ 2] + beta * C[ 2*ldc];
+                C[ 3*ldc] = alpha * Cb[ 3] + beta * C[ 3*ldc];
+                C[ 4*ldc] = alpha * Cb[ 4] + beta * C[ 4*ldc];
+                C[ 5*ldc] = alpha * Cb[ 5] + beta * C[ 5*ldc];
+                C[ 6*ldc] = alpha * Cb[ 6] + beta * C[ 6*ldc];
+                C[ 7*ldc] = alpha * Cb[ 7] + beta * C[ 7*ldc];
+                C[ 8*ldc] = alpha * Cb[ 8] + beta * C[ 8*ldc];
+                C[ 9*ldc] = alpha * Cb[ 9] + beta * C[ 9*ldc];
+                C[10*ldc] = alpha * Cb[10] + beta * C[10*ldc];
+                break;
+        case 10:
+                C[0    ] = alpha * Cb[0] + beta * C[0    ];
+                C[1*ldc] = alpha * Cb[1] + beta * C[1*ldc];
+                C[2*ldc] = alpha * Cb[2] + beta * C[2*ldc];
+                C[3*ldc] = alpha * Cb[3] + beta * C[3*ldc];
+                C[4*ldc] = alpha * Cb[4] + beta * C[4*ldc];
+                C[5*ldc] = alpha * Cb[5] + beta * C[5*ldc];
+                C[6*ldc] = alpha * Cb[6] + beta * C[6*ldc];
+                C[7*ldc] = alpha * Cb[7] + beta * C[7*ldc];
+                C[8*ldc] = alpha * Cb[8] + beta * C[8*ldc];
+                C[9*ldc] = alpha * Cb[9] + beta * C[9*ldc];
+                break;
+        case 9:
+                C[0    ] = alpha * Cb[0] + beta * C[0    ];
+                C[1*ldc] = alpha * Cb[1] + beta * C[1*ldc];
+                C[2*ldc] = alpha * Cb[2] + beta * C[2*ldc];
+                C[3*ldc] = alpha * Cb[3] + beta * C[3*ldc];
+                C[4*ldc] = alpha * Cb[4] + beta * C[4*ldc];
+                C[5*ldc] = alpha * Cb[5] + beta * C[5*ldc];
+                C[6*ldc] = alpha * Cb[6] + beta * C[6*ldc];
+                C[7*ldc] = alpha * Cb[7] + beta * C[7*ldc];
+                C[8*ldc] = alpha * Cb[8] + beta * C[8*ldc];
+                break;
+        case 8:
+                C[0    ] = alpha * Cb[0] + beta * C[0    ];
+                C[1*ldc] = alpha * Cb[1] + beta * C[1*ldc];
+                C[2*ldc] = alpha * Cb[2] + beta * C[2*ldc];
+                C[3*ldc] = alpha * Cb[3] + beta * C[3*ldc];
+                C[4*ldc] = alpha * Cb[4] + beta * C[4*ldc];
+                C[5*ldc] = alpha * Cb[5] + beta * C[5*ldc];
+                C[6*ldc] = alpha * Cb[6] + beta * C[6*ldc];
+                C[7*ldc] = alpha * Cb[7] + beta * C[7*ldc];
+                break;
+        case 7:
+                C[0    ] = alpha * Cb[0] + beta * C[0    ];
+                C[1*ldc] = alpha * Cb[1] + beta * C[1*ldc];
+                C[2*ldc] = alpha * Cb[2] + beta * C[2*ldc];
+                C[3*ldc] = alpha * Cb[3] + beta * C[3*ldc];
+                C[4*ldc] = alpha * Cb[4] + beta * C[4*ldc];
+                C[5*ldc] = alpha * Cb[5] + beta * C[5*ldc];
+                C[6*ldc] = alpha * Cb[6] + beta * C[6*ldc];
+                break;
+        case 6:
+                C[0    ] = alpha * Cb[0] + beta * C[0    ];
+                C[1*ldc] = alpha * Cb[1] + beta * C[1*ldc];
+                C[2*ldc] = alpha * Cb[2] + beta * C[2*ldc];
+                C[3*ldc] = alpha * Cb[3] + beta * C[3*ldc];
+                C[4*ldc] = alpha * Cb[4] + beta * C[4*ldc];
+                C[5*ldc] = alpha * Cb[5] + beta * C[5*ldc];
+                break;
+        case 5:
+                C[0    ] = alpha * Cb[0] + beta * C[0    ];
+                C[1*ldc] = alpha * Cb[1] + beta * C[1*ldc];
+                C[2*ldc] = alpha * Cb[2] + beta * C[2*ldc];
+                C[3*ldc] = alpha * Cb[3] + beta * C[3*ldc];
+                C[4*ldc] = alpha * Cb[4] + beta * C[4*ldc];
+                break;
+        case 4:
+                C[0    ] = alpha * Cb[0] + beta * C[0    ];
+                C[1*ldc] = alpha * Cb[1] + beta * C[1*ldc];
+                C[2*ldc] = alpha * Cb[2] + beta * C[2*ldc];
+                C[3*ldc] = alpha * Cb[3] + beta * C[3*ldc];
+                break;
+        case 3:
+                C[0    ] = alpha * Cb[0] + beta * C[0    ];
+                C[1*ldc] = alpha * Cb[1] + beta * C[1*ldc];
+                C[2*ldc] = alpha * Cb[2] + beta * C[2*ldc];
+                break;
+        case 2:
+                C[0    ] = alpha * Cb[0] + beta * C[0    ];
+                C[1*ldc] = alpha * Cb[1] + beta * C[1*ldc];
+                break;
+        case 1:
+                C[0    ] = alpha * Cb[0] + beta * C[0    ];
+                break;
+        case 0:
+                break;
+    }
+}
+
+__global__ void sgemmNN( const float *A, int lda, const float *B, int ldb, float* C, int ldc, int k, float alpha, float beta )
+{
+    const int inx = threadIdx.x;
+    const int iny = threadIdx.y;
+    const int ibx = blockIdx.x * 64;
+    const int iby = blockIdx.y * 16;
+    const int id = inx + iny*16;
+
+    A += ibx + id;
+    B += inx + __mul24( iby + iny, ldb );
+    C += ibx + id  + __mul24( iby, ldc );
+
+    const float *Blast = B + k;
+
+    float c[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+
+    __shared__ float bs[16][17];
+    do
+    {
+#pragma unroll
+        for( int i = 0; i < 16; i += 4 )
+            bs[inx][iny+i]  = B[i*ldb];
+        __syncthreads();
+
+#pragma unroll
+        for( int i = 0; i < 16; i++, A += lda )
+            saxpy( A[0], &bs[i][0], c );
+
+        B += 16;
+        __syncthreads();
+    } while( B < Blast );
+
+    for( int i = 0; i < 16; i++, C += ldc )
+        C[0] = alpha*c[i] + beta*C[0];
+}
+
+__global__ void sgemm_kernel_N_T_64_16_4_16_4(float* C, const float* A, const float* B, int m, int n, int k, int lda, int ldb, int ldc, float alpha, float beta )
+{
+    const int tx = threadIdx.x;
+    const int ty = threadIdx.y;
+
+    const int ibx = blockIdx.x * 64;
+    const int iby = blockIdx.y * 16;
+
+    const int idt = ty * 16 + tx;
+
+    if ( iby + tx >= n )
+        B += iby + 0;
+    else
+        B += iby + tx;
+    /*
+        Taking care of boundary cases where K < 4.
+    */
+    if ( ty >= k )
+        B += __mul24( 0, ldb );
+    else
+        B += __mul24( ty, ldb );
+
+    if ( ibx + idt >= m )
+        A += ibx + 0;
+    else
+        A += ibx + idt;
+
+    int s2=lda, s3=2*lda, s4=3*lda;
+
+    switch (k) {
+        case 1: s2=0;    s3=0;      s4=0;  break;
+        case 2: s2=lda;  s3=0;      s4=0;  break;
+        case 3: s2=lda;  s3=2*lda;  s4=0;  break;
+    }
+
+    C += ibx + idt + __mul24( iby, ldc );
+
+    float Ap[4] = { A[0], A[s2], A[s3], A[s4] };
+
+    float b = B[0];
+
+    const float *Bend = B + ldb*(k - k % 4);
+
+    B += 4*ldb;
+    A += 4*lda;
+
+    __shared__ float Bb[4][16];
+
+    float Cb[16] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+
+    if ( k > 7 ) {
+        do {
+            float Ab[4] = {Ap[0], Ap[1], Ap[2], Ap[3]};
+
+            Bb[ty][tx]=b;
+
+            __syncthreads();
+
+            Ap[0] = A[0];
+            Ap[1] = A[s2];
+            Ap[2] = A[s3];
+            Ap[3] = A[s4];
+
+            b=B[0];
+
+            saxpy( Ab[0], &Bb[0][0], Cb );
+            saxpy( Ab[1], &Bb[1][0], Cb );
+            saxpy( Ab[2], &Bb[2][0], Cb );
+            saxpy( Ab[3], &Bb[3][0], Cb );
+
+            A += 4*lda;
+            B += 4*ldb;
+
+            __syncthreads();
+        } while (B < Bend);
+    }
+
+    if ( k > 3 ) {
+        Bb[ty][tx]=b;
+        int k1 = k - k % 4;
+
+        if ( (k1+ty) >= k )
+            B -= 4*ldb;
+        else
+            B -= 0*ldb;
+
+        if ( (k1+0) >= k ) {s2=0;    s3=0*lda;  s4=0;  A -= 4*lda; } else
+        if ( (k1+1) >= k ) {s2=0;    s3=0*lda;  s4=0;  A -= 0*lda; } else
+        if ( (k1+2) >= k ) {s2=lda;  s3=0*lda;  s4=0;  A -= 0*lda; } else
+        if ( (k1+3) >= k ) {s2=lda;  s3=2*lda;  s4=0;  A -= 0*lda; }
+
+        __syncthreads();
+
+        b=B[0];
+
+        saxpy( Ap[0], &Bb[0][0], Cb );  Ap[0] = A[0];
+        saxpy( Ap[1], &Bb[1][0], Cb );  Ap[1] = A[s2];
+        saxpy( Ap[2], &Bb[2][0], Cb );  Ap[2] = A[s3];
+        saxpy( Ap[3], &Bb[3][0], Cb );  Ap[3] = A[s4];
+    }
+
+    k = k % 4;
+
+    if ( k != 0 ) {
+        __syncthreads();
+
+        Bb[ty][tx]=b;
+
+        __syncthreads();
+
+        for(int i=0; i < k; i++) {
+            saxpy( Ap[i], &Bb[i][0], Cb );
+        }
+    }
+
+    if ( (iby+16)>=n) {
+        lda = n-iby;
+    }
+    else{
+        lda = 16;
+    }
+
+    if ( (ibx+idt) >= m )
+        lda = 0;
+    else
+        lda = lda;
+
+    switch(lda) {
+        case 16:
+                C[ 0    ] = alpha * Cb[0]  + beta * C[ 0    ];
+                C[ 1*ldc] = alpha * Cb[1]  + beta * C[ 1*ldc];
+                C[ 2*ldc] = alpha * Cb[2]  + beta * C[ 2*ldc];
+                C[ 3*ldc] = alpha * Cb[3]  + beta * C[ 3*ldc];
+                C[ 4*ldc] = alpha * Cb[4]  + beta * C[ 4*ldc];
+                C[ 5*ldc] = alpha * Cb[5]  + beta * C[ 5*ldc];
+                C[ 6*ldc] = alpha * Cb[6]  + beta * C[ 6*ldc];
+                C[ 7*ldc] = alpha * Cb[7]  + beta * C[ 7*ldc];
+                C[ 8*ldc] = alpha * Cb[8]  + beta * C[ 8*ldc];
+                C[ 9*ldc] = alpha * Cb[9]  + beta * C[ 9*ldc];
+                C[10*ldc] = alpha * Cb[10] + beta * C[10*ldc];
+                C[11*ldc] = alpha * Cb[11] + beta * C[11*ldc];
+                C[12*ldc] = alpha * Cb[12] + beta * C[12*ldc];
+                C[13*ldc] = alpha * Cb[13] + beta * C[13*ldc];
+                C[14*ldc] = alpha * Cb[14] + beta * C[14*ldc];
+                C[15*ldc] = alpha * Cb[15] + beta * C[15*ldc];
+                break;
+        case 15:
+                C[ 0    ] = alpha * Cb[0]  + beta * C[ 0    ];
+                C[ 1*ldc] = alpha * Cb[1]  + beta * C[ 1*ldc];
+                C[ 2*ldc] = alpha * Cb[2]  + beta * C[ 2*ldc];
+                C[ 3*ldc] = alpha * Cb[3]  + beta * C[ 3*ldc];
+                C[ 4*ldc] = alpha * Cb[4]  + beta * C[ 4*ldc];
+                C[ 5*ldc] = alpha * Cb[5]  + beta * C[ 5*ldc];
+                C[ 6*ldc] = alpha * Cb[6]  + beta * C[ 6*ldc];
+                C[ 7*ldc] = alpha * Cb[7]  + beta * C[ 7*ldc];
+                C[ 8*ldc] = alpha * Cb[8]  + beta * C[ 8*ldc];
+                C[ 9*ldc] = alpha * Cb[9]  + beta * C[ 9*ldc];
+                C[10*ldc] = alpha * Cb[10] + beta * C[10*ldc];
+                C[11*ldc] = alpha * Cb[11] + beta * C[11*ldc];
+                C[12*ldc] = alpha * Cb[12] + beta * C[12*ldc];
+                C[13*ldc] = alpha * Cb[13] + beta * C[13*ldc];
+                C[14*ldc] = alpha * Cb[14] + beta * C[14*ldc];
+                break;
+        case 14:
+                C[ 0    ] = alpha * Cb[0]  + beta * C[ 0    ];
+                C[ 1*ldc] = alpha * Cb[1]  + beta * C[ 1*ldc];
+                C[ 2*ldc] = alpha * Cb[2]  + beta * C[ 2*ldc];
+                C[ 3*ldc] = alpha * Cb[3]  + beta * C[ 3*ldc];
+                C[ 4*ldc] = alpha * Cb[4]  + beta * C[ 4*ldc];
+                C[ 5*ldc] = alpha * Cb[5]  + beta * C[ 5*ldc];
+                C[ 6*ldc] = alpha * Cb[6]  + beta * C[ 6*ldc];
+                C[ 7*ldc] = alpha * Cb[7]  + beta * C[ 7*ldc];
+                C[ 8*ldc] = alpha * Cb[8]  + beta * C[ 8*ldc];
+                C[ 9*ldc] = alpha * Cb[9]  + beta * C[ 9*ldc];
+                C[10*ldc] = alpha * Cb[10] + beta * C[10*ldc];
+                C[11*ldc] = alpha * Cb[11] + beta * C[11*ldc];
+                C[12*ldc] = alpha * Cb[12] + beta * C[12*ldc];
+                C[13*ldc] = alpha * Cb[13] + beta * C[13*ldc];
+                break;
+        case 13:
+                C[ 0    ] = alpha * Cb[0]  + beta * C[ 0    ];
+                C[ 1*ldc] = alpha * Cb[1]  + beta * C[ 1*ldc];
+                C[ 2*ldc] = alpha * Cb[2]  + beta * C[ 2*ldc];
+                C[ 3*ldc] = alpha * Cb[3]  + beta * C[ 3*ldc];
+                C[ 4*ldc] = alpha * Cb[4]  + beta * C[ 4*ldc];
+                C[ 5*ldc] = alpha * Cb[5]  + beta * C[ 5*ldc];
+                C[ 6*ldc] = alpha * Cb[6]  + beta * C[ 6*ldc];
+                C[ 7*ldc] = alpha * Cb[7]  + beta * C[ 7*ldc];
+                C[ 8*ldc] = alpha * Cb[8]  + beta * C[ 8*ldc];
+                C[ 9*ldc] = alpha * Cb[9]  + beta * C[ 9*ldc];
+                C[10*ldc] = alpha * Cb[10] + beta * C[10*ldc];
+                C[11*ldc] = alpha * Cb[11] + beta * C[11*ldc];
+                C[12*ldc] = alpha * Cb[12] + beta * C[12*ldc];
+                break;
+        case 12:
+                C[ 0    ] = alpha * Cb[0]  + beta * C[ 0    ];
+                C[ 1*ldc] = alpha * Cb[1]  + beta * C[ 1*ldc];
+                C[ 2*ldc] = alpha * Cb[2]  + beta * C[ 2*ldc];
+                C[ 3*ldc] = alpha * Cb[3]  + beta * C[ 3*ldc];
+                C[ 4*ldc] = alpha * Cb[4]  + beta * C[ 4*ldc];
+                C[ 5*ldc] = alpha * Cb[5]  + beta * C[ 5*ldc];
+                C[ 6*ldc] = alpha * Cb[6]  + beta * C[ 6*ldc];
+                C[ 7*ldc] = alpha * Cb[7]  + beta * C[ 7*ldc];
+                C[ 8*ldc] = alpha * Cb[8]  + beta * C[ 8*ldc];
+                C[ 9*ldc] = alpha * Cb[9]  + beta * C[ 9*ldc];
+                C[10*ldc] = alpha * Cb[10] + beta * C[10*ldc];
+                C[11*ldc] = alpha * Cb[11] + beta * C[11*ldc];
+                break;
+        case 11:
+                C[ 0    ] = alpha * Cb[0]  + beta * C[ 0    ];
+                C[ 1*ldc] = alpha * Cb[1]  + beta * C[ 1*ldc];
+                C[ 2*ldc] = alpha * Cb[2]  + beta * C[ 2*ldc];
+                C[ 3*ldc] = alpha * Cb[3]  + beta * C[ 3*ldc];
+                C[ 4*ldc] = alpha * Cb[4]  + beta * C[ 4*ldc];
+                C[ 5*ldc] = alpha * Cb[5]  + beta * C[ 5*ldc];
+                C[ 6*ldc] = alpha * Cb[6]  + beta * C[ 6*ldc];
+                C[ 7*ldc] = alpha * Cb[7]  + beta * C[ 7*ldc];
+                C[ 8*ldc] = alpha * Cb[8]  + beta * C[ 8*ldc];
+                C[ 9*ldc] = alpha * Cb[9]  + beta * C[ 9*ldc];
+                C[10*ldc] = alpha * Cb[10] + beta * C[10*ldc];
+                break;
+        case 10:
+                C[0    ] = alpha * Cb[0] + beta * C[0    ];
+                C[1*ldc] = alpha * Cb[1] + beta * C[1*ldc];
+                C[2*ldc] = alpha * Cb[2] + beta * C[2*ldc];
+                C[3*ldc] = alpha * Cb[3] + beta * C[3*ldc];
+                C[4*ldc] = alpha * Cb[4] + beta * C[4*ldc];
+                C[5*ldc] = alpha * Cb[5] + beta * C[5*ldc];
+                C[6*ldc] = alpha * Cb[6] + beta * C[6*ldc];
+                C[7*ldc] = alpha * Cb[7] + beta * C[7*ldc];
+                C[8*ldc] = alpha * Cb[8] + beta * C[8*ldc];
+                C[9*ldc] = alpha * Cb[9] + beta * C[9*ldc];
+                break;
+        case 9:
+                C[0    ] = alpha * Cb[0] + beta * C[0    ];
+                C[1*ldc] = alpha * Cb[1] + beta * C[1*ldc];
+                C[2*ldc] = alpha * Cb[2] + beta * C[2*ldc];
+                C[3*ldc] = alpha * Cb[3] + beta * C[3*ldc];
+                C[4*ldc] = alpha * Cb[4] + beta * C[4*ldc];
+                C[5*ldc] = alpha * Cb[5] + beta * C[5*ldc];
+                C[6*ldc] = alpha * Cb[6] + beta * C[6*ldc];
+                C[7*ldc] = alpha * Cb[7] + beta * C[7*ldc];
+                C[8*ldc] = alpha * Cb[8] + beta * C[8*ldc];
+                break;
+        case 8:
+                C[0    ] = alpha * Cb[0] + beta * C[0    ];
+                C[1*ldc] = alpha * Cb[1] + beta * C[1*ldc];
+                C[2*ldc] = alpha * Cb[2] + beta * C[2*ldc];
+                C[3*ldc] = alpha * Cb[3] + beta * C[3*ldc];
+                C[4*ldc] = alpha * Cb[4] + beta * C[4*ldc];
+                C[5*ldc] = alpha * Cb[5] + beta * C[5*ldc];
+                C[6*ldc] = alpha * Cb[6] + beta * C[6*ldc];
+                C[7*ldc] = alpha * Cb[7] + beta * C[7*ldc];
+                break;
+        case 7:
+                C[0    ] = alpha * Cb[0] + beta * C[0    ];
+                C[1*ldc] = alpha * Cb[1] + beta * C[1*ldc];
+                C[2*ldc] = alpha * Cb[2] + beta * C[2*ldc];
+                C[3*ldc] = alpha * Cb[3] + beta * C[3*ldc];
+                C[4*ldc] = alpha * Cb[4] + beta * C[4*ldc];
+                C[5*ldc] = alpha * Cb[5] + beta * C[5*ldc];
+                C[6*ldc] = alpha * Cb[6] + beta * C[6*ldc];
+                break;
+        case 6:
+                C[0    ] = alpha * Cb[0] + beta * C[0    ];
+                C[1*ldc] = alpha * Cb[1] + beta * C[1*ldc];
+                C[2*ldc] = alpha * Cb[2] + beta * C[2*ldc];
+                C[3*ldc] = alpha * Cb[3] + beta * C[3*ldc];
+                C[4*ldc] = alpha * Cb[4] + beta * C[4*ldc];
+                C[5*ldc] = alpha * Cb[5] + beta * C[5*ldc];
+                break;
+        case 5:
+                C[0    ] = alpha * Cb[0] + beta * C[0    ];
+                C[1*ldc] = alpha * Cb[1] + beta * C[1*ldc];
+                C[2*ldc] = alpha * Cb[2] + beta * C[2*ldc];
+                C[3*ldc] = alpha * Cb[3] + beta * C[3*ldc];
+                C[4*ldc] = alpha * Cb[4] + beta * C[4*ldc];
+                break;
+        case 4:
+                C[0    ] = alpha * Cb[0] + beta * C[0    ];
+                C[1*ldc] = alpha * Cb[1] + beta * C[1*ldc];
+                C[2*ldc] = alpha * Cb[2] + beta * C[2*ldc];
+                C[3*ldc] = alpha * Cb[3] + beta * C[3*ldc];
+                break;
+        case 3:
+                C[0    ] = alpha * Cb[0] + beta * C[0    ];
+                C[1*ldc] = alpha * Cb[1] + beta * C[1*ldc];
+                C[2*ldc] = alpha * Cb[2] + beta * C[2*ldc];
+                break;
+        case 2:
+                C[0    ] = alpha * Cb[0] + beta * C[0    ];
+                C[1*ldc] = alpha * Cb[1] + beta * C[1*ldc];
+                break;
+        case 1:
+                C[0    ] = alpha * Cb[0] + beta * C[0    ];
+                break;
+        case 0:
+                break;
+    }
+}
+
+__global__ void sgemm_kernel_T_N_32_32_8_8_8(float* C, const float* A, const float* B, int m, int n, int k, int lda, int ldb, int ldc, float alpha, float beta )
+{
+    const int ibx = blockIdx.x * 32;
+    const int iby = blockIdx.y * 32;
+
+    const int tx =  threadIdx.y;
+    const int ty =  threadIdx.x;
+
+    int idt = tx*8 + ty;
+
+    if ( ty >= k )
+        A += __mul24(ibx, lda) + 0;
+    else
+        A += __mul24(ibx, lda) + ty;
+
+    if ( (ibx + tx) >= m )
+        A += __mul24(0, lda);
+    else
+        A += __mul24(tx, lda);
+
+    if ( (iby+tx) >= n )
+        B += __mul24(iby+0, ldb);
+    else
+        B += __mul24(iby+tx, ldb);
+    if ( ty >= k )
+        B += 0;
+    else
+        B += ty;
+
+    C += ibx + idt % 32 + __mul24( iby + 16*(idt/32), ldc );
+
+    lda = lda * 8;
+    ldb = ldb * 8;
+
+    int as1=0, as2=lda, as3=2*lda, as4=3*lda;
+    int bs1=0, bs2=ldb, bs3=2*ldb, bs4=3*ldb;
+
+    switch(k) {
+        case 1: as2=0;    as3=0*lda;  as4=0;  bs2=0;    bs3=0*ldb;  bs4=0;  break;
+        case 2: as2=lda;  as3=0*lda;  as4=0;  bs2=ldb;  bs3=0*ldb;  bs4=0;  break;
+        case 3: as2=lda;  as3=2*lda;  as4=0;  bs2=ldb;  bs3=2*ldb;  bs4=0;  break;
+    }
+
+    if ( (ibx + tx     ) >= m ) { as1=0;  as2=0*lda;  as3=0*lda;  as4=0*lda; } else
+    if ( (ibx + tx + 8 ) >= m ) { as1=0;  as2=0*lda;  as3=0*lda;  as4=0*lda; } else
+    if ( (ibx + tx + 16) >= m ) { as1=0;  as2=1*lda;  as3=0*lda;  as4=0*lda; } else
+    if ( (ibx + tx + 24) >= m ) { as1=0;  as2=1*lda;  as3=2*lda;  as4=0*lda; }
+
+    if ( (iby + tx     ) >= n ) { bs1=0;  bs2=0*ldb;  bs3=0*ldb;  bs4=0*ldb; } else
+    if ( (iby + tx + 8 ) >= n ) { bs1=0;  bs2=0*ldb;  bs3=0*ldb;  bs4=0*ldb; } else
+    if ( (iby + tx + 16) >= n ) { bs1=0;  bs2=1*ldb;  bs3=0*ldb;  bs4=0*ldb; } else
+    if ( (iby + tx + 24) >= n ) { bs1=0;  bs2=1*ldb;  bs3=2*ldb;  bs4=0*ldb; }
+
+    float b  = B[bs1];
+    float b1 = B[bs2];
+    float b2 = B[bs3];
+    float b3 = B[bs4];
+
+    float Ap[4] = { A[as1], A[as2], A[as3], A[as4] };
+
+    const float *Bend = B + (k - k % 8);
+
+    B += 8;
+    A += 8;
+
+    __shared__ float Bb[8][33];
+    __shared__ float ABb[32][9];
+
+    float Cb[16] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+
+    const int l = 17*(idt/32);
+    int idt1 = idt;
+    idt = idt % 32;
+    if ( k > 15 ) {
+        do {
+            Bb[ty][tx   ] = b;
+            Bb[ty][tx+8 ] = b1;
+            Bb[ty][tx+17] = b2;
+            Bb[ty][tx+25] = b3;
+
+            ABb[tx   ][ty] = Ap[0];
+            ABb[tx+8 ][ty] = Ap[1];
+            ABb[tx+16][ty] = Ap[2];
+            ABb[tx+24][ty] = Ap[3];
+
+            __syncthreads();
+
+            saxpy( ABb[idt][0], &Bb[0][l], Cb );  Ap[0]=A[as1];
+            saxpy( ABb[idt][1], &Bb[1][l], Cb );  Ap[1]=A[as2];
+            saxpy( ABb[idt][2], &Bb[2][l], Cb );  Ap[2]=A[as3];
+            saxpy( ABb[idt][3], &Bb[3][l], Cb );  Ap[3]=A[as4];
+
+            saxpy( ABb[idt][4], &Bb[4][l], Cb );  b=B[bs1];
+            saxpy( ABb[idt][5], &Bb[5][l], Cb );  b1=B[bs2];
+            saxpy( ABb[idt][6], &Bb[6][l], Cb );  b2=B[bs3];
+            saxpy( ABb[idt][7], &Bb[7][l], Cb );  b3=B[bs4];
+
+            B += 8;
+            A += 8;
+
+            __syncthreads();
+        } while (B < Bend);
+    }
+    if ( k > 7 ) {
+        Bb[ty][tx   ] = b;
+        Bb[ty][tx+8 ] = b1;
+        Bb[ty][tx+17] = b2;
+        Bb[ty][tx+25] = b3;
+
+        ABb[tx   ][ty] = Ap[0];
+        ABb[tx+8 ][ty] = Ap[1];
+        ABb[tx+16][ty] = Ap[2];
+        ABb[tx+24][ty] = Ap[3];
+
+        __syncthreads();
+        as1 = k - k % 8;
+
+        if ( as1+ty >= k ) { bs1=0*ldb;  bs2=0*ldb;  bs3=0*ldb;  bs4=0*ldb;  B -= 8; }
+        if ( as1+ty >= k ) { as1=0*lda;  as2=0*lda;  as3=0*lda;  as4=0*lda;  A -= 8; }
+
+        as1=0;
+        saxpy( ABb[idt][0], &Bb[0][l], Cb );  Ap[0]=A[as1];
+        saxpy( ABb[idt][1], &Bb[1][l], Cb );  Ap[1]=A[as2];
+        saxpy( ABb[idt][2], &Bb[2][l], Cb );  Ap[2]=A[as3];
+        saxpy( ABb[idt][3], &Bb[3][l], Cb );  Ap[3]=A[as4];
+
+        saxpy( ABb[idt][4], &Bb[4][l], Cb );  b=B[bs1];
+        saxpy( ABb[idt][5], &Bb[5][l], Cb );  b1=B[bs2];
+        saxpy( ABb[idt][6], &Bb[6][l], Cb );  b2=B[bs3];
+        saxpy( ABb[idt][7], &Bb[7][l], Cb );  b3=B[bs4];
+    }
+    k = k % 8;
+    if ( k != 0 ) {
+        __syncthreads();
+
+        Bb[ty][tx   ] = b;
+        Bb[ty][tx+8 ] = b1;
+        Bb[ty][tx+17] = b2;
+        Bb[ty][tx+25] = b3;
+
+        ABb[tx   ][ty] = Ap[0];
+        ABb[tx+8 ][ty] = Ap[1];
+        ABb[tx+16][ty] = Ap[2];
+        ABb[tx+24][ty] = Ap[3];
+        __syncthreads();
+
+        for(int i=0; i < k; i++) {
+            saxpy( ABb[idt][i], &Bb[i][l], Cb );
+        }
+    }
+
+    if ( (iby+16*(idt1/32+1)) >= n ) {
+        lda = n - iby - 16*(idt1/32);
+    }
+    else {
+        lda = 16;
+    }
+    if ( (ibx+idt) >= m )
+        lda = 0;
+    else
+        lda = lda;
+
+    switch(lda) {
+        case 16:
+                C[ 0    ] = alpha * Cb[0]  + beta * C[ 0    ];
+                C[ 1*ldc] = alpha * Cb[1]  + beta * C[ 1*ldc];
+                C[ 2*ldc] = alpha * Cb[2]  + beta * C[ 2*ldc];
+                C[ 3*ldc] = alpha * Cb[3]  + beta * C[ 3*ldc];
+                C[ 4*ldc] = alpha * Cb[4]  + beta * C[ 4*ldc];
+                C[ 5*ldc] = alpha * Cb[5]  + beta * C[ 5*ldc];
+                C[ 6*ldc] = alpha * Cb[6]  + beta * C[ 6*ldc];
+                C[ 7*ldc] = alpha * Cb[7]  + beta * C[ 7*ldc];
+                C[ 8*ldc] = alpha * Cb[8]  + beta * C[ 8*ldc];
+                C[ 9*ldc] = alpha * Cb[9]  + beta * C[ 9*ldc];
+                C[10*ldc] = alpha * Cb[10] + beta * C[10*ldc];
+                C[11*ldc] = alpha * Cb[11] + beta * C[11*ldc];
+                C[12*ldc] = alpha * Cb[12] + beta * C[12*ldc];
+                C[13*ldc] = alpha * Cb[13] + beta * C[13*ldc];
+                C[14*ldc] = alpha * Cb[14] + beta * C[14*ldc];
+                C[15*ldc] = alpha * Cb[15] + beta * C[15*ldc];
+                break;
+        case 15:
+                C[ 0    ] = alpha * Cb[0]  + beta * C[ 0    ];
+                C[ 1*ldc] = alpha * Cb[1]  + beta * C[ 1*ldc];
+                C[ 2*ldc] = alpha * Cb[2]  + beta * C[ 2*ldc];
+                C[ 3*ldc] = alpha * Cb[3]  + beta * C[ 3*ldc];
+                C[ 4*ldc] = alpha * Cb[4]  + beta * C[ 4*ldc];
+                C[ 5*ldc] = alpha * Cb[5]  + beta * C[ 5*ldc];
+                C[ 6*ldc] = alpha * Cb[6]  + beta * C[ 6*ldc];
+                C[ 7*ldc] = alpha * Cb[7]  + beta * C[ 7*ldc];
+                C[ 8*ldc] = alpha * Cb[8]  + beta * C[ 8*ldc];
+                C[ 9*ldc] = alpha * Cb[9]  + beta * C[ 9*ldc];
+                C[10*ldc] = alpha * Cb[10] + beta * C[10*ldc];
+                C[11*ldc] = alpha * Cb[11] + beta * C[11*ldc];
+                C[12*ldc] = alpha * Cb[12] + beta * C[12*ldc];
+                C[13*ldc] = alpha * Cb[13] + beta * C[13*ldc];
+                C[14*ldc] = alpha * Cb[14] + beta * C[14*ldc];
+                break;
+        case 14:
+                C[ 0    ] = alpha * Cb[0]  + beta * C[ 0    ];
+                C[ 1*ldc] = alpha * Cb[1]  + beta * C[ 1*ldc];
+                C[ 2*ldc] = alpha * Cb[2]  + beta * C[ 2*ldc];
+                C[ 3*ldc] = alpha * Cb[3]  + beta * C[ 3*ldc];
+                C[ 4*ldc] = alpha * Cb[4]  + beta * C[ 4*ldc];
+                C[ 5*ldc] = alpha * Cb[5]  + beta * C[ 5*ldc];
+                C[ 6*ldc] = alpha * Cb[6]  + beta * C[ 6*ldc];
+                C[ 7*ldc] = alpha * Cb[7]  + beta * C[ 7*ldc];
+                C[ 8*ldc] = alpha * Cb[8]  + beta * C[ 8*ldc];
+                C[ 9*ldc] = alpha * Cb[9]  + beta * C[ 9*ldc];
+                C[10*ldc] = alpha * Cb[10] + beta * C[10*ldc];
+                C[11*ldc] = alpha * Cb[11] + beta * C[11*ldc];
+                C[12*ldc] = alpha * Cb[12] + beta * C[12*ldc];
+                C[13*ldc] = alpha * Cb[13] + beta * C[13*ldc];
+                break;
+        case 13:
+                C[ 0    ] = alpha * Cb[0]  + beta * C[ 0    ];
+                C[ 1*ldc] = alpha * Cb[1]  + beta * C[ 1*ldc];
+                C[ 2*ldc] = alpha * Cb[2]  + beta * C[ 2*ldc];
+                C[ 3*ldc] = alpha * Cb[3]  + beta * C[ 3*ldc];
+                C[ 4*ldc] = alpha * Cb[4]  + beta * C[ 4*ldc];
+                C[ 5*ldc] = alpha * Cb[5]  + beta * C[ 5*ldc];
+                C[ 6*ldc] = alpha * Cb[6]  + beta * C[ 6*ldc];
+                C[ 7*ldc] = alpha * Cb[7]  + beta * C[ 7*ldc];
+                C[ 8*ldc] = alpha * Cb[8]  + beta * C[ 8*ldc];
+                C[ 9*ldc] = alpha * Cb[9]  + beta * C[ 9*ldc];
+                C[10*ldc] = alpha * Cb[10] + beta * C[10*ldc];
+                C[11*ldc] = alpha * Cb[11] + beta * C[11*ldc];
+                C[12*ldc] = alpha * Cb[12] + beta * C[12*ldc];
+                break;
+        case 12:
+                C[ 0    ] = alpha * Cb[0]  + beta * C[ 0    ];
+                C[ 1*ldc] = alpha * Cb[1]  + beta * C[ 1*ldc];
+                C[ 2*ldc] = alpha * Cb[2]  + beta * C[ 2*ldc];
+                C[ 3*ldc] = alpha * Cb[3]  + beta * C[ 3*ldc];
+                C[ 4*ldc] = alpha * Cb[4]  + beta * C[ 4*ldc];
+                C[ 5*ldc] = alpha * Cb[5]  + beta * C[ 5*ldc];
+                C[ 6*ldc] = alpha * Cb[6]  + beta * C[ 6*ldc];
+                C[ 7*ldc] = alpha * Cb[7]  + beta * C[ 7*ldc];
+                C[ 8*ldc] = alpha * Cb[8]  + beta * C[ 8*ldc];
+                C[ 9*ldc] = alpha * Cb[9]  + beta * C[ 9*ldc];
+                C[10*ldc] = alpha * Cb[10] + beta * C[10*ldc];
+                C[11*ldc] = alpha * Cb[11] + beta * C[11*ldc];
+                break;
+        case 11:
+                C[ 0    ] = alpha * Cb[0]  + beta * C[ 0    ];
+                C[ 1*ldc] = alpha * Cb[1]  + beta * C[ 1*ldc];
+                C[ 2*ldc] = alpha * Cb[2]  + beta * C[ 2*ldc];
+                C[ 3*ldc] = alpha * Cb[3]  + beta * C[ 3*ldc];
+                C[ 4*ldc] = alpha * Cb[4]  + beta * C[ 4*ldc];
+                C[ 5*ldc] = alpha * Cb[5]  + beta * C[ 5*ldc];
+                C[ 6*ldc] = alpha * Cb[6]  + beta * C[ 6*ldc];
+                C[ 7*ldc] = alpha * Cb[7]  + beta * C[ 7*ldc];
+                C[ 8*ldc] = alpha * Cb[8]  + beta * C[ 8*ldc];
+                C[ 9*ldc] = alpha * Cb[9]  + beta * C[ 9*ldc];
+                C[10*ldc] = alpha * Cb[10] + beta * C[10*ldc];
+                break;
+        case 10:
+                C[0    ] = alpha * Cb[0] + beta * C[0    ];
+                C[1*ldc] = alpha * Cb[1] + beta * C[1*ldc];
+                C[2*ldc] = alpha * Cb[2] + beta * C[2*ldc];
+                C[3*ldc] = alpha * Cb[3] + beta * C[3*ldc];
+                C[4*ldc] = alpha * Cb[4] + beta * C[4*ldc];
+                C[5*ldc] = alpha * Cb[5] + beta * C[5*ldc];
+                C[6*ldc] = alpha * Cb[6] + beta * C[6*ldc];
+                C[7*ldc] = alpha * Cb[7] + beta * C[7*ldc];
+                C[8*ldc] = alpha * Cb[8] + beta * C[8*ldc];
+                C[9*ldc] = alpha * Cb[9] + beta * C[9*ldc];
+                break;
+        case 9:
+                C[0    ] = alpha * Cb[0] + beta * C[0    ];
+                C[1*ldc] = alpha * Cb[1] + beta * C[1*ldc];
+                C[2*ldc] = alpha * Cb[2] + beta * C[2*ldc];
+                C[3*ldc] = alpha * Cb[3] + beta * C[3*ldc];
+                C[4*ldc] = alpha * Cb[4] + beta * C[4*ldc];
+                C[5*ldc] = alpha * Cb[5] + beta * C[5*ldc];
+                C[6*ldc] = alpha * Cb[6] + beta * C[6*ldc];
+                C[7*ldc] = alpha * Cb[7] + beta * C[7*ldc];
+                C[8*ldc] = alpha * Cb[8] + beta * C[8*ldc];
+                break;
+        case 8:
+                C[0    ] = alpha * Cb[0] + beta * C[0    ];
+                C[1*ldc] = alpha * Cb[1] + beta * C[1*ldc];
+                C[2*ldc] = alpha * Cb[2] + beta * C[2*ldc];
+                C[3*ldc] = alpha * Cb[3] + beta * C[3*ldc];
+                C[4*ldc] = alpha * Cb[4] + beta * C[4*ldc];
+                C[5*ldc] = alpha * Cb[5] + beta * C[5*ldc];
+                C[6*ldc] = alpha * Cb[6] + beta * C[6*ldc];
+                C[7*ldc] = alpha * Cb[7] + beta * C[7*ldc];
+                break;
+        case 7:
+                C[0    ] = alpha * Cb[0] + beta * C[0    ];
+                C[1*ldc] = alpha * Cb[1] + beta * C[1*ldc];
+                C[2*ldc] = alpha * Cb[2] + beta * C[2*ldc];
+                C[3*ldc] = alpha * Cb[3] + beta * C[3*ldc];
+                C[4*ldc] = alpha * Cb[4] + beta * C[4*ldc];
+                C[5*ldc] = alpha * Cb[5] + beta * C[5*ldc];
+                C[6*ldc] = alpha * Cb[6] + beta * C[6*ldc];
+                break;
+        case 6:
+                C[0    ] = alpha * Cb[0] + beta * C[0    ];
+                C[1*ldc] = alpha * Cb[1] + beta * C[1*ldc];
+                C[2*ldc] = alpha * Cb[2] + beta * C[2*ldc];
+                C[3*ldc] = alpha * Cb[3] + beta * C[3*ldc];
+                C[4*ldc] = alpha * Cb[4] + beta * C[4*ldc];
+                C[5*ldc] = alpha * Cb[5] + beta * C[5*ldc];
+                break;
+        case 5:
+                C[0    ] = alpha * Cb[0] + beta * C[0    ];
+                C[1*ldc] = alpha * Cb[1] + beta * C[1*ldc];
+                C[2*ldc] = alpha * Cb[2] + beta * C[2*ldc];
+                C[3*ldc] = alpha * Cb[3] + beta * C[3*ldc];
+                C[4*ldc] = alpha * Cb[4] + beta * C[4*ldc];
+                break;
+        case 4:
+                C[0    ] = alpha * Cb[0] + beta * C[0    ];
+                C[1*ldc] = alpha * Cb[1] + beta * C[1*ldc];
+                C[2*ldc] = alpha * Cb[2] + beta * C[2*ldc];
+                C[3*ldc] = alpha * Cb[3] + beta * C[3*ldc];
+                break;
+        case 3:
+                C[0    ] = alpha * Cb[0] + beta * C[0    ];
+                C[1*ldc] = alpha * Cb[1] + beta * C[1*ldc];
+                C[2*ldc] = alpha * Cb[2] + beta * C[2*ldc];
+                break;
+        case 2:
+                C[0    ] = alpha * Cb[0] + beta * C[0    ];
+                C[1*ldc] = alpha * Cb[1] + beta * C[1*ldc];
+                break;
+        case 1:
+                C[0    ] = alpha * Cb[0] + beta * C[0    ];
+                break;
+        case 0:
+                break;
+    }
+}
