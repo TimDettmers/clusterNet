@@ -994,6 +994,8 @@ void ClusterNet::add_to_queue(Matrix **gpuArray)
 
 		QUEUE_EMPTY = false;
 	}
+
+	pop_queue();
 }
 
 

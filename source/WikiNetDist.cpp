@@ -7,10 +7,10 @@ WikiNetDist::WikiNetDist(ClusterNet gpus)
 {
 
 	int vocabSize = 100002;
-	int nWordVectorDim = 2;
+	int nWordVectorDim = 256;
 	int nWindowSize = 11;
-	_layers.push_back(128);
-	_learningRate = 0.1;
+	_layers.push_back(1024);
+	_learningRate = 0.01;
 	_nCVErrorPeriodicity = 6000;
 	_nCVErrorLength = 6000;
 	MOMENTUM = 0.9;
@@ -21,13 +21,13 @@ WikiNetDist::WikiNetDist(ClusterNet gpus)
 	_CV_X = read_hdf5(("/home/tim/data/wiki/extracted2/AA/data100000/wiki_" + NumberToString(cv_set_number) + ".p").c_str());
 	_nNextBatchNumber = 0;
 	_nNextBatchNumber_CV = 0;
-	_nBatchSize = 2;
+	_nBatchSize = 128;
 	_RMS_multiplier = 0.9f;
 
 
 	cudaStreamCreate(&_streamNextBatch);
 
-	useRMSProp = false;
+	useRMSProp = true;
 
 
 	cout << "_layers: " << _layers[0] << endl;
@@ -101,11 +101,11 @@ WikiNetDist::WikiNetDist(ClusterNet gpus)
 		arrGRAD[5][j] = zeros(_nBatchSize,nWordVectorDim*nWindowSize);
 	}
 
-	_Vocab = gpu.uniformSqrtWeight(nWordVectorDim/gpu.MPI_SIZE,vocabSize);
+	//_Vocab = gpu.uniformSqrtWeight(nWordVectorDim/gpu.MPI_SIZE,vocabSize);
 	//_Vocab = gpu.sparseInitWeight(nWordVectorDim,vocabSize);
-	//_Vocab = gpu.rand(nWordVectorDim,vocabSize);
+	_Vocab = gpu.rand(nWordVectorDim/gpu.MPI_SIZE,vocabSize);
 	//scalarMul(_Vocab,0.01f,_Vocab);
-	//scalarAdd(_Vocab,-0.5f,_Vocab);
+	scalarAdd(_Vocab,-0.5f,_Vocab);
 	cout << sum(_Vocab) << endl;
 	_Vocab_grad = zeros(nWordVectorDim/gpu.MPI_SIZE,vocabSize);
 	_MSVocab_grad = zeros(nWordVectorDim/gpu.MPI_SIZE,vocabSize);
@@ -170,14 +170,14 @@ void WikiNetDist::run()
 	{
 		if(i > 0 && i % _nCVErrorPeriodicity == 0)
 		{
-			if( i > 0 && i % 120000 == 0)
+			if( i > 0 && i % 12000 == 0)
 			{
 				cout << "Saving vocabulary matrix to disk..." << endl;
 				Matrix *host = to_host(_Vocab);
-				write_hdf5("/home/tim/data/wiki/vocab.hdf5",host);
+				write_hdf5(("/home/tim/data/wiki/vocab" + NumberToString(gpu.MYRANK) + ".hdf5").c_str(),host);
 				free(host->data);
 				free(host);
-				write_hdf5("/home/tim/data/wiki/CV_values.hdf5",CV_container);
+				write_hdf5(("/home/tim/data/wiki/CV_values" + NumberToString(gpu.MYRANK) + ".hdf5").c_str(),CV_container);
 			}
 
 			double error = calculateError();
@@ -259,31 +259,10 @@ void WikiNetDist::allocateNextBatch(bool isCV)
 			cudaStreamSynchronize(_streamNextBatch);
 			to_col_major(_nextBatchIdx, _currentBatchIdx_X[gpu.MYRANK]);
 			gpu.construct_vocab_matrix(_currentBatchIdx_X[gpu.MYRANK], _currentBatchIdx_Y[gpu.MYRANK], stackedBatch_X[gpu.MYRANK], stackedBatch_Y[gpu.MYRANK], _Vocab);
-			if(gpu.MYRANK == 0)
-			{
-				cout << "begin 1" << endl;
-				printmat(stackedBatch_X[gpu.MYRANK]);
-				cout << "end 1" << endl;
-			}
 			gpu.add_to_queue(stackedBatch_X);
 			gpu.add_to_queue(stackedBatch_Y);
 			while(gpu.get_queue_length() > 0){ gpu.pop_queue(); }
 			concatVocabBatchesN(stackedBatch_X, stackedBatch_Y, _batchX, _batchY,11,gpu.MPI_SIZE);
-
-			cout << sum(stackedBatch_X[0]) + sum(stackedBatch_X[1]) << " vs " << sum(_batchX) << endl;
-
-
-
-			if(gpu.MYRANK == 0)
-			{
-				cout << "begin" << endl;
-				printmat(stackedBatch_X[0]);
-				printmat(stackedBatch_X[1]);
-				printmat(_batchX);
-				cout << "end" << endl;
-			}
-
-
 		}
 
 
@@ -399,15 +378,21 @@ void WikiNetDist::weightUpdates()
 
 		//10*MPI_SIZE gradients added
 
-		fill_matrix(_Vocab_grad,0.0f);
-		expand_vocab_gradient(arrGRAD[4][gpu.MYRANK],_currentBatchIdx_Y[gpu.MYRANK],_Vocab_grad);
 
-		RMSprop_with_nesterov_weight_update(_MSVocab_grad_Y,_Vocab_grad,_Vocab,M_VocabY,_RMS_multiplier,_learningRate/(float)_nBatchSize,_nBatchSize*gpu.MPI_SIZE, MOMENTUM);
+		fill_matrix(_Vocab_grad,0.0f);
+		expand_partial_vocab_gradient(arrGRAD[4][gpu.MYRANK],_currentBatchIdx_Y[gpu.MYRANK],_Vocab_grad,gpu.MYRANK);
+
+
+		RMSprop_with_nesterov_weight_update(_MSVocab_grad_Y,_Vocab_grad,_Vocab,M_VocabY,_RMS_multiplier,_learningRate/(float)_nBatchSize,_nBatchSize, MOMENTUM);
+
+		fill_matrix(_Vocab_grad,0.0f);
+		expand_partial_vocab_gradient(arrGRAD[5][gpu.MYRANK],_currentBatchIdx_X[gpu.MYRANK],_Vocab_grad, gpu.MYRANK);
+		RMSprop_with_nesterov_weight_update(_MSVocab_grad,_Vocab_grad,_Vocab,M_VocabX,_RMS_multiplier,_learningRate/(float)_nBatchSize,_nBatchSize*gpu.MPI_SIZE, MOMENTUM);
+
+
+
 		RMSprop_with_nesterov_weight_update(MSGRAD[2],arrGRAD[2][gpu.MYRANK],W[0],M[0],0.9f,_learningRate/(float)arrGRAD[2][gpu.MYRANK]->rows,_nBatchSize*gpu.MPI_SIZE, MOMENTUM);
 
-		fill_matrix(_Vocab_grad,0.0f);
-		expand_vocab_gradient(arrGRAD[5][gpu.MYRANK],_currentBatchIdx_X[gpu.MYRANK],_Vocab_grad);
-		RMSprop_with_nesterov_weight_update(_MSVocab_grad,_Vocab_grad,_Vocab,M_VocabX,_RMS_multiplier,_learningRate/(float)_nBatchSize,_nBatchSize*gpu.MPI_SIZE, MOMENTUM);
 
 		RMSprop_with_nesterov_weight_update(MSGRAD[3],arrGRAD[3][gpu.MYRANK],W[0],M[0],0.9f,_learningRate/(float)arrGRAD[3][gpu.MYRANK]->rows,_nBatchSize*gpu.MPI_SIZE, MOMENTUM);
 
@@ -417,6 +402,7 @@ void WikiNetDist::weightUpdates()
 		RMSprop_with_nesterov_weight_update(MSBGRAD[0],arrGRAD_B[0][gpu.MYRANK],B[1],M_B[1],0.9f,_learningRate,_nBatchSize*gpu.MPI_SIZE, MOMENTUM);
 		RMSprop_with_nesterov_weight_update(MSBGRAD[1],arrGRAD_B[1][gpu.MYRANK],B[1],M_B[1],0.9f,_learningRate,_nBatchSize*gpu.MPI_SIZE, MOMENTUM);
 		RMSprop_with_nesterov_weight_update(MSBGRAD[3],arrGRAD_B[3][gpu.MYRANK],B[0],M_B[0],0.9f,_learningRate,_nBatchSize*gpu.MPI_SIZE, MOMENTUM);
+
 
 
 	}

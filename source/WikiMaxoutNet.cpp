@@ -7,9 +7,9 @@ WikiMaxoutNet::WikiMaxoutNet(ClusterNet gpus)
 {
 
 	int vocabSize = 100002;
-	int nWordVectorDim = 256;
+	int nWordVectorDim = 128;
 	int nWindowSize = 11;
-	_layers.push_back(2048);
+	_layers.push_back(256);
 	_nMaxoutSize = 1;
 	_learningRate = 0.1;
 	_nCVErrorPeriodicity = 6000;

@@ -70,6 +70,7 @@ __global__ void kConstructVocabMatrix(float *vocab_idx, float *vocab_idx_y, floa
 __global__ void kExpandDoubleVocabGradient(float *gradX, float *gradY, float *vocab_idx_X, float *vocab_idx_Y, float* vocab,
 										 float *vocab_grad, float *vocab_grad_idx, float learning_rate, int grad_size);
 __global__ void kExpandVocabGradient(float *grad, float *vocab_idx, float *vocab_grad);
+__global__ void kExpandPartialVocabGradient(float *grad, float *vocab_idx, float *vocab_grad, int offset);
 __global__ void kExpandVocabGradientMiddleWord(float *grad, float *vocab_idx, float *vocab_grad);
 __global__ void kUpdateVocabWithGradient(float *grad, float *vocab_idx, float* vocab, float learning_rate);
 __global__ void MatMul(float* A, float* B, float* C, int ARows, int ACols, int BRows, int BCols, int CRows, int CCols);

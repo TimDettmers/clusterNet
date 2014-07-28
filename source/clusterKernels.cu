@@ -1242,6 +1242,18 @@ __global__ void kExpandVocabGradient(float *grad, float *vocab_idx, float *vocab
 
 }
 
+__global__ void kExpandPartialVocabGradient(float *grad, float *vocab_idx, float *vocab_grad, int offset)
+{
+	//vocab_vector_size = blockDim.x;
+	//vocab_idx_rows = batch_size = gridDim.x
+	//vocab_idx_cols = window_size = gridDim.y
+
+	int myIdx = (int)vocab_idx[blockIdx.x+(blockIdx.y*gridDim.x)];
+	int myVocabIdx = blockDim.x*myIdx;
+	atomicAdd(&vocab_grad[myVocabIdx + threadIdx.x],grad[blockIdx.x + offset + (blockIdx.y*blockDim.x*gridDim.x) + (threadIdx.x*gridDim.x)]);
+
+}
+
 __global__ void kExpandVocabGradientMiddleWord(float *grad, float *vocab_idx, float *vocab_grad)
 {
 	//vocab_vector_size = blockDim.x;

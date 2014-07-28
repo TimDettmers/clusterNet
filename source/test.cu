@@ -1418,11 +1418,18 @@ int main(int argc, char *argv[])
 	//async_test(argc,argv);
 
 
-	ClusterNet *gpus = new ClusterNet(argc,argv,123635);
+
+	ClusterNet *gpus = new ClusterNet(argc,argv,123635, true);
 	WikiNetDist net = WikiNetDist(gpus[0]);
 	net.run();
 
 
+
+	/*
+	ClusterNet *gpus = new ClusterNet(argc, argv, 123635, true);
+	WikiMaxoutNet net = WikiMaxoutNet(gpus[0]);
+	net.run();
+	*/
 
 	//cudaSetDevice(1);
 	//ClusterNet *gpus = new ClusterNet(123635);
