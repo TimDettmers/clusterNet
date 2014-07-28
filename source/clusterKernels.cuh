@@ -77,4 +77,5 @@ __global__ void sgemm_kernel_N_N_64_16_16_16_4(float* C,const float* A,const flo
 __global__ void sgemm_kernel_N_T_64_16_4_16_4(float* C, const float* A, const float* B, int m, int n, int k, int lda, int ldb, int ldc, float alpha, float beta );
 __global__ void sgemm_kernel_T_N_32_32_8_8_8(float* C, const float* A, const float* B, int m, int n, int k, int lda, int ldb, int ldc, float alpha, float beta );
 __global__ void sgemmNN( const float *A, int lda, const float *B, int ldb, float* C, int ldc, int k, float alpha, float beta );
+__global__ void concat_batches(float **batch_X, float **batch_Y, float *out_X, float *out_Y);
 #endif

@@ -58,6 +58,11 @@ void ClusterNet::init(int seed)
 	curandSetGeneratorOffset(m_generator, 100);
 
 
+	curandCreateGenerator(&m_generator_same_seed, CURAND_RNG_PSEUDO_DEFAULT);
+	curandSetPseudoRandomGeneratorSeed(m_generator_same_seed, 12345);
+	curandSetGeneratorOffset(m_generator_same_seed, 100);
+
+
 
 	int current_device = 0;
 	cudaGetDevice(&current_device);
@@ -663,15 +668,25 @@ Matrix *ClusterNet::rand(int rows, int cols)
 {
 	Matrix *out = empty(rows, cols);
 
-	rand(rows, cols, out);
+	rand(rows, cols, false, out);
 
 	return out;
 }
-void ClusterNet::rand(int rows, int cols, Matrix *out)
+
+Matrix *ClusterNet::rand_same_seed_MPI(int rows, int cols)
 {
-	int current_device = 0;
-	cudaGetDevice(&current_device);
-	curandGenerateUniform(m_generator, out->data, rows * cols);
+	Matrix *out = empty(rows, cols);
+
+	rand(rows, cols, true, out);
+
+	return out;
+}
+void ClusterNet::rand(int rows, int cols, bool useSameSeedGenerator, Matrix *out)
+{
+	if(useSameSeedGenerator)
+		curandGenerateUniform(m_generator_same_seed, out->data, rows * cols);
+	else
+		curandGenerateUniform(m_generator, out->data, rows * cols);
 }
 
 //Gaussian
@@ -806,6 +821,12 @@ Matrix *ClusterNet::sparseInitWeight(int rows, int cols, int connections)
 Matrix *ClusterNet::distributed_uniformSqrtWeight(int rows, int cols)
 {
 	assert(m_hasMPI);
+	if(cols == 1)
+	{
+		cout << "Warning: Columns size 1, cannot split by column! Create normal uniformSqrtWeight( instead!" << endl;
+		return uniformSqrtWeight(rows, cols);
+	}
+
 	Matrix *W;
 	int split_size = cols / MPI_SIZE;
 	int remainder = cols - (split_size * MPI_SIZE);
@@ -824,6 +845,12 @@ Matrix *ClusterNet::distributed_uniformSqrtWeight(int rows, int cols)
 Matrix *ClusterNet::distributed_zeros(int rows, int cols)
 {
 	assert(m_hasMPI);
+	if(cols == 1)
+	{
+		cout << "Warning: Columns size 1, cannot split by column! Create normal zeros instead!" << endl;
+		return ::zeros(rows, cols);
+	}
+
 	Matrix *W;
 	int split_size = cols / MPI_SIZE;
 	int remainder = cols - (split_size * MPI_SIZE);
@@ -939,7 +966,9 @@ Matrix *ClusterNet::sparse_to_dense(Matrix *A)
 
 void ClusterNet::construct_vocab_matrix(Matrix *vocab_idx, Matrix *vocab_idx_y, Matrix *batch_X, Matrix *batch_y, Matrix *vocab)
 {
-	Matrix *rdm_idx = rand_int(batch_X->rows,1, 0,vocab->cols-1);
+	Matrix *rdm_idx = empty(batch_X->rows, 1);
+	rand(batch_X->rows, 1, true, rdm_idx);
+	::rand_int(rdm_idx, 0, vocab->cols-1);
 	::construct_vocab_matrix(vocab_idx,vocab_idx_y,batch_X,batch_y,vocab,rdm_idx);
 	cudaFree(rdm_idx->data);
 	free(rdm_idx);
@@ -1030,6 +1059,31 @@ Matrix **ClusterNet::zeros_gradient_PCIe(int rows, int cols)
 			cudaSetDevice(i);
 			out[i+(j*GPU_COUNT)] = zeros(rows,cols);
 		}
+	}
+
+	return out;
+}
+
+
+Matrix **ClusterNet::zeros_stacked(int rows, int cols)
+{
+	Matrix **out = (Matrix**)malloc(sizeof(Matrix*)*GPU_COUNT);
+
+	for(int i = 0; i < GPU_COUNT; i++)
+	{
+		out[i] = zeros(rows,cols);
+	}
+
+	return out;
+}
+
+Matrix **ClusterNet::uniformSqrtWeight_stacked(int rows, int cols)
+{
+	Matrix **out = (Matrix**)malloc(sizeof(Matrix*)*GPU_COUNT);
+
+	for(int i = 0; i < GPU_COUNT; i++)
+	{
+		out[i] = uniformSqrtWeight(rows,cols);
 	}
 
 	return out;

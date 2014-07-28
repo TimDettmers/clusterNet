@@ -169,6 +169,7 @@ void construct_vocab_matrix(Matrix *vocab_idx, Matrix *vocab_idx_y, Matrix *batc
 void expand_double_vocab_gradient(Matrix *gradX, Matrix *gradY, Matrix *vocab_idx_X, Matrix *vocab_idx_Y, Matrix *vocab, Matrix *vocab_grad, Matrix *vocab_grad_idx, float learning_rate);
 void expand_vocab_gradient(Matrix *grad, Matrix *vocab_idx, Matrix *vocab_grad);
 void update_vocab_with_gradient(Matrix *grad, Matrix *vocab_idx, Matrix *vocab, float learning_rate);
+void concatVocabBatchesN(Matrix** arrBatch_X, Matrix **arrBatch_Y, Matrix *out_X, Matrix *out_Y, int window_size, int matrices_count);
 void expand_vocab_gradient_middle_word(Matrix *grad, Matrix *vocab_idx, Matrix *vocab_grad);
 void matmul(Matrix *A, Matrix *B, Matrix *out, int T1, int T2);
 #endif

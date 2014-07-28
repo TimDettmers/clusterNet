@@ -1060,10 +1060,10 @@ __global__ void kConstructVocabMatrix(float *vocab_idx, float *vocab_idx_y, floa
 	//vocab_idx_rows = batch_size = gridDim.x
 	//vocab_idx_cols = window_size = gridDim.y
 
-	//middle index is replaced by rdm word for batch_Y, but we still need to write the correct into batch_X!
+	//middle index is replaced by rdm word for batch_Y, but we still need to write the correct word into batch_X!
 	if(blockIdx.y != middleIdx)
 	{
-		myIdx = (int)vocab_idx[blockIdx.x+(blockIdx.y*gridDim.x)];//gridDim.x = vocab_idx_vector rows == batch size
+		myIdx = (int)vocab_idx[blockIdx.x+(blockIdx.y*gridDim.x)];
 		vocab_idx_y[blockIdx.x+(blockIdx.y*gridDim.x)] = (float)myIdx;
 	}
 	else
@@ -1086,6 +1086,28 @@ __global__ void kConstructVocabMatrix(float *vocab_idx, float *vocab_idx_y, floa
 		batch_X[blockIdx.x + (blockIdx.y*blockDim.x*gridDim.x) + (threadIdx.x*gridDim.x)] = vocab[myVocabIdx + threadIdx.x];
 		batch_Y[blockIdx.x + (blockIdx.y*blockDim.x*gridDim.x) + (threadIdx.x*gridDim.x)] = vocab[myVocabRdmIdx + threadIdx.x];
 	}
+
+
+
+}
+
+
+__global__ void concat_batches(float **batch_X, float **batch_Y, float *out_X, float *out_Y)
+{
+	//gridDim.z = matrix_count
+	//gridDim.y = batch size
+	//gridDim.x = window_size
+	//blockDim.x = partial vocab size
+
+	int full_vocab_size = gridDim.z*blockDim.x;
+	int cols = gridDim.x*full_vocab_size;
+	int partial_cols = full_vocab_size/gridDim.z;
+
+	//full_size times current row = current row idx
+	//current window position times partial_threads times current matrix = current word idx
+	//threadIdx.x current parameter within a word
+	out_X[(blockIdx.y *cols) + (blockIdx.x*full_vocab_size) + (blockIdx.z*blockDim.x)  +threadIdx.x] = batch_X[blockIdx.z][(blockIdx.y *partial_cols) + (blockIdx.x*blockDim.x)  + threadIdx.x];
+	out_Y[(blockIdx.y *cols) + (blockIdx.x*full_vocab_size) + (blockIdx.z*blockDim.x)  +threadIdx.x] = batch_Y[blockIdx.z][(blockIdx.y *partial_cols) + (blockIdx.x*blockDim.x)  + threadIdx.x];
 
 
 

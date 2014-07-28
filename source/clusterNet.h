@@ -68,7 +68,10 @@ public:
 	 void RMSprop_with_nesterov_weight_update_PCIe(Matrix **RMS, Matrix **grad, Matrix **w, Matrix **m, float RMS_multiplier, float learning_rate, int batch_size, float momentum);
 
 	 Matrix *rand(int rows, int cols);
-	 void rand(int rows, int cols, Matrix *out);
+	 Matrix *rand_same_seed_MPI(int rows, int cols);
+	 void rand(int rows, int cols, bool useSameSeedGenerator, Matrix *out);
+
+
 	 Matrix *randn(int rows, int cols);
 	 Matrix *randn(int rows, int cols, float mean, float std);
 	 void randn(int rows, int cols, float mean, float std, Matrix *out);
@@ -104,7 +107,9 @@ public:
 	 void addGradients_PCIe(Matrix **grad);
 
 	 Matrix **zeros_PCIe(int rows, int cols);
+	 Matrix **zeros_stacked(int rows, int cols);
 	 Matrix **zeros_gradient_PCIe(int rows, int cols);
+	 Matrix **uniformSqrtWeight_stacked(int rows, int cols);
 	 Matrix **ones_PCIe(int rows, int cols);
 	 Matrix **uniformSqrtWeight_PCIe(int rows, int cols);
 
@@ -141,6 +146,7 @@ private:
 	 std::vector<cublasHandle_t> m_handle;
 	 cusparseHandle_t m_sparse_handle;
 	 curandGenerator_t m_generator;
+	 curandGenerator_t m_generator_same_seed;
 	 std::map<std::string,cudaEvent_t*> m_dictTickTock;
 	 std::map<std::string,float> m_dictTickTockCumulative;
 	 MPI_Request* m_requests;

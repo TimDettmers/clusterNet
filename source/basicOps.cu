@@ -1185,6 +1185,44 @@ void update_vocab_with_gradient(Matrix *grad, Matrix *vocab_idx, Matrix *vocab, 
 	kUpdateVocabWithGradient<<<grid,vocab->rows>>>(grad->data, vocab_idx->data, vocab->data, learning_rate);
 }
 
+void concatVocabBatchesN(Matrix** arrBatch_X, Matrix **arrBatch_Y, Matrix *out_X, Matrix *out_Y, int window_size, int matrices_count)
+{
+	float **h_arrBatch_X = (float**)malloc(sizeof(float*) * matrices_count);
+	for (int i = 0; i < matrices_count; i++)
+		h_arrBatch_X[i] = arrBatch_X[i]->data;
+
+	float **d_arrBatch_X;
+	cudaMalloc((void**) &d_arrBatch_X, sizeof(float*) * matrices_count);
+	cudaMemcpy(d_arrBatch_X, h_arrBatch_X, sizeof(float*) * matrices_count,cudaMemcpyDefault);
+
+	float **h_arrBatch_Y = (float**)malloc(sizeof(float*) * matrices_count);
+	for (int i = 0; i < matrices_count; i++)
+		h_arrBatch_Y[i] = arrBatch_Y[i]->data;
+
+	float **d_arrBatch_Y;
+	cudaMalloc((void**) &d_arrBatch_Y, sizeof(float*) * matrices_count);
+	cudaMemcpy(d_arrBatch_Y, h_arrBatch_Y, sizeof(float*) * matrices_count,cudaMemcpyDefault);
+
+	//gridDim.z = matrix_count
+	//gridDim.y = batch size
+	//gridDim.x = window_size
+	//blockDim.x = partial vocab size
+
+	dim3 griddims(window_size,arrBatch_X[0]->rows,matrices_count);
+
+	std::cout << "sizes: " << window_size << "x" << arrBatch_X[0]->rows << "x" << matrices_count <<  "x" << arrBatch_X[0]->cols/window_size << std::endl;
+
+	concat_batches<<<griddims,matrices_count*arrBatch_X[0]->cols/window_size>>>(d_arrBatch_X,d_arrBatch_Y, out_X->data, out_Y->data);
+
+	free(h_arrBatch_X);
+	cudaFree(d_arrBatch_X);
+
+	free(h_arrBatch_Y);
+	cudaFree(d_arrBatch_Y);
+}
+
+
+
 //float *gradX, float *gradY, float *vocab_idx_X, float *vocab_idx_Y, float* vocab,
 	//									 float *vocab_grad, float *vocab_grad_idx, float learning_rate, int grad_size
 

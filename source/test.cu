@@ -13,6 +13,7 @@
 #include <WikiMaxoutNet.h>
 #include <WikiMaxoutNet_PCIe.h>
 #include <WikiMaxoutNet_PCIe2.h>
+#include <WikiNetDist.h>
 
 using std::cout;
 using std::endl;
@@ -1417,8 +1418,8 @@ int main(int argc, char *argv[])
 	//async_test(argc,argv);
 
 
-	ClusterNet *gpus = new ClusterNet(argc,argv,123635,true);
-	WikiMaxoutNet net = WikiMaxoutNet(gpus[0]);
+	ClusterNet *gpus = new ClusterNet(argc,argv,123635);
+	WikiNetDist net = WikiNetDist(gpus[0]);
 	net.run();
 
 
