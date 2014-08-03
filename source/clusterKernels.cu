@@ -1240,15 +1240,15 @@ __global__ void kExpandVocabGradient(float *grad, float *vocab_idx, float *vocab
 
 }
 
-__global__ void kExpandPartialVocabGradient(float *grad, float *vocab_idx, float *vocab_grad, int offset)
+__global__ void kExpandPartialVocabGradient(float *grad, float *vocab_idx, float *vocab_grad, int matrix_idx, int matrix_count)
 {
 	//vocab_vector_size = blockDim.x;
 	//vocab_idx_rows = batch_size = gridDim.x
 	//vocab_idx_cols = window_size = gridDim.y
-
+	int offset = matrix_idx*gridDim.x*blockDim.x;
 	int myIdx = (int)vocab_idx[blockIdx.x+(blockIdx.y*gridDim.x)];
 	int myVocabIdx = blockDim.x*myIdx;
-	atomicAdd(&vocab_grad[myVocabIdx + threadIdx.x],grad[blockIdx.x + (offset*gridDim.x) + (blockIdx.y*blockDim.x*gridDim.x) + (threadIdx.x*gridDim.x)]);
+	atomicAdd(&vocab_grad[myVocabIdx + threadIdx.x],grad[blockIdx.x + (blockIdx.y*(blockDim.x*matrix_count)*gridDim.x) + (threadIdx.x*gridDim.x) + offset]);
 
 }
 

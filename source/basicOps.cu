@@ -1240,7 +1240,7 @@ void expand_partial_vocab_gradient(Matrix *grad, Matrix *vocab_idx, Matrix *voca
 	assert(vocab_grad->rows <= 1024);
 	dim3 grid(vocab_idx->rows,vocab_idx->cols,1);
 	//std::cout << matrix_idx << " offset " << (vocab_grad->rows)*matrix_idx << std::endl;
-	kExpandPartialVocabGradient<<<grid,vocab_grad->rows>>>(grad->data, vocab_idx->data, vocab_grad->data, (grad->rows)*matrix_idx);
+	kExpandPartialVocabGradient<<<grid,vocab_grad->rows>>>(grad->data, vocab_idx->data, vocab_grad->data, matrix_idx, matrix_count);
 }
 
 void expand_vocab_gradient_middle_word(Matrix *grad, Matrix *vocab_idx, Matrix *vocab_grad)

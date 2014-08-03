@@ -1,12 +1,13 @@
 #include <stdio.h>
 #include <mpi.h>
 #include <assert.h>
-//#include <basicOps.cuh>
 #include <math.h>
-#include <util.cuh>
-#include <clusterNet.h>
+#include <basicOps_test.cuh>
 
-int run_basicOps_test()
+using std::cout;
+using std::endl;
+
+int run_basicOps_test(ClusterNet gpus)
 {
 
   ClusterNet gpu = ClusterNet();
@@ -640,10 +641,10 @@ int run_basicOps_test()
 
 
 	//update vocab grad test
-	int vocab_vector_size = 4;
-	int batch_size = 1;
-	int window_size = 3;
-	int vocab_size = 10;
+	int vocab_vector_size = 360;
+	int batch_size = 127;
+	int window_size = 21;
+	int vocab_size = 73;
 	grad = gpu.rand(batch_size,window_size*vocab_vector_size);
 	Matrix *vocab_idx = gpu.rand_int(batch_size,window_size,0,vocab_size-1);
 	Matrix *vocab = zeros(vocab_vector_size,vocab_size);
@@ -668,16 +669,58 @@ int run_basicOps_test()
 
 	test_eq(sum(to_gpu(m2)),sum(vocab),"expand gradient test");
 
+
 	for(int row = 0; row < vocab_idx->rows; row++)
 		for(int col = 0; col < vocab_idx->cols; col++)
 		{
 			idx = (int)m1->data[col + (row*m1->cols)];
 			for(int i = 0; i < vocab_vector_size; i++)
-				assert(test_eq(m2->data[idx + (vocab->cols*i)], m4->data[idx + (vocab->cols*i)],"expand gradient test"));
+				ASSERT((m2->data[idx + (vocab->cols*i)] + 0.0001 > m4->data[idx + (vocab->cols*i)]) && //0.0001 error in float arithmetic on the GPU
+					   (m2->data[idx + (vocab->cols*i)] - 0.0001 < m4->data[idx + (vocab->cols*i)]) ,"expand gradient test");
 
 		}
 
 
+
+
+	Matrix **partial_vocab = gpus.zeros_stacked(vocab_vector_size/gpus.MPI_SIZE,vocab_size);
+	m2 = to_host(partial_vocab[gpus.MYRANK]);
+	expand_partial_vocab_gradient(grad,vocab_idx,partial_vocab[gpus.MYRANK],gpus.MYRANK,gpus.MPI_SIZE);
+	m1 = to_host(vocab_idx);
+	m4 = to_host(partial_vocab[gpus.MYRANK]);
+	m3 = to_host(grad);
+
+
+	idx = 0;
+	for(int row = 0; row < vocab_idx->rows; row++)
+		for(int col = 0; col < vocab_idx->cols; col++)
+		{
+			idx = (int)m1->data[col + (row*m1->cols)];
+			for(int i = 0; i < vocab_vector_size/gpus.MPI_SIZE; i++)
+				m2->data[idx + (vocab->cols*i)] += m3->data[(col*vocab_vector_size) + (row*grad->cols) + i + (gpus.MYRANK*partial_vocab[gpus.MYRANK]->rows)];
+
+
+		}
+
+
+	gpus.add_to_queue(partial_vocab);
+	while(gpus.get_queue_length() > 0) {gpus.pop_queue(); }
+	for(int i = 1; i < gpus.MPI_SIZE; i++)
+	{
+		add(partial_vocab[0],partial_vocab[i],partial_vocab[0]);
+	}
+
+	test_eq(sum(partial_vocab[0]),sum(vocab),"expand partial gradient test");
+
+	for(int row = 0; row < vocab_idx->rows; row++)
+		for(int col = 0; col < vocab_idx->cols; col++)
+		{
+			idx = (int)m1->data[col + (row*m1->cols)];
+			for(int i = 0; i < vocab_vector_size/gpus.MPI_SIZE; i++)
+				ASSERT((m2->data[idx + (vocab->cols*i)] + 0.0001 > m4->data[idx + (vocab->cols*i)]) && //0.0001 error in float arithmetic on the GPU
+					   (m2->data[idx + (vocab->cols*i)] - 0.0001 < m4->data[idx + (vocab->cols*i)]) ,"expand partial gradient test");
+
+		}
 
 
 

@@ -21,7 +21,7 @@ EXECTEST = build/testSuite.out
 all : $(EXECSRC) $(EXECTEST) 
 	
 $(EXECSRC) : $(SCR) 
-	$(CC) $^ -o $@ $(CFLAGS)
+	#$(CC) $^ -o $@ $(CFLAGS)
 
 $(EXECTEST): $(SCR) $(TESTS)    
 	$(CC) $(TESTS) $(LINK) -o $@ $(CFLAGS)

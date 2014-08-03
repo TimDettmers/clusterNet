@@ -10,7 +10,7 @@
 int main(int argc, char *argv[])
 {
   ClusterNet gpus = ClusterNet(argc,argv,132456);
-  run_basicOps_test();
+  run_basicOps_test(gpus);
   run_clusterNet_test(gpus);
   run_batchAllocator_test(gpus);
   run_miniMNIST_test(gpus);

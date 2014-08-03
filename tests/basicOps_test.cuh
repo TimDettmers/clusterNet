@@ -1,4 +1,6 @@
 #ifndef basicOps_test_H
 #define basicOps_test_H
-int run_basicOps_test();
+#include <util.cuh>
+#include <clusterNet.h>
+int run_basicOps_test(ClusterNet gpus);
 #endif
