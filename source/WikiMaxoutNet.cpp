@@ -10,7 +10,6 @@ WikiMaxoutNet::WikiMaxoutNet(ClusterNet gpus)
 	int nWordVectorDim = 120;
 	int nWindowSize = 11;
 	_layers.push_back(128);
-	_nMaxoutSize = 1;
 	_learningRate = 0.1;
 	_nCVErrorPeriodicity = 6000;
 	_nCVErrorLength = 6000;
@@ -18,11 +17,11 @@ WikiMaxoutNet::WikiMaxoutNet(ClusterNet gpus)
 	gpu = gpus;
 	_nCurrentDataSet = gpu.MYRANK;
 	_X = 0;
-	int cv_set_number = 63-gpu.MYRANK;
+	int cv_set_number = 63;
 	_CV_X = read_hdf5(("/home/tim/data/wiki/extracted2/AA/data100000/wiki_" + NumberToString(cv_set_number) + ".p").c_str());
 	_nNextBatchNumber = 0;
-	_nNextBatchNumber_CV = 0;
-	_nBatchSize = 128;
+	_nNextBatchNumber_CV = gpu.MYRANK*_nCVErrorLength;
+	_nBatchSize = 512;
 	_RMS_multiplier = 0.9f;
 
 
@@ -61,7 +60,6 @@ WikiMaxoutNet::WikiMaxoutNet(ClusterNet gpus)
 
 	useRMSProp = true;
 
-	cout << "_nMaxoutSize: " << _nMaxoutSize << endl;
 	cout << "_layers: " << _layers[0] << endl;
 	cout << "nWordVectorDim: " << nWordVectorDim << endl;
 	cout << "_nBatchSize: " << _nBatchSize << endl;
@@ -69,13 +67,21 @@ WikiMaxoutNet::WikiMaxoutNet(ClusterNet gpus)
     cout << "Use RMSProp: "  << useRMSProp << endl;
 
 	W.push_back(gpu.uniformSqrtWeight(nWordVectorDim*nWindowSize,_layers[0]));
-	W.push_back(gpu.uniformSqrtWeight(_layers[0]/_nMaxoutSize, 1));
+	W.push_back(gpu.uniformSqrtWeight(_layers[0], 1));
 	B.push_back(zeros(1,_layers[0]));
 	B.push_back(zeros(1,1));
 	M.push_back(zeros(nWordVectorDim*nWindowSize,_layers[0]));
-	M.push_back(zeros(_layers[0]/_nMaxoutSize, 1));
+	M.push_back(zeros(_layers[0], 1));
 	M_B.push_back(zeros(1,_layers[0]));
 	M_B.push_back(zeros(1,1));
+
+
+
+	for(int i = 0; i < W.size(); i++)
+	{
+		cout << sum(W[i]) << endl;
+		MPI_Barrier(MPI_COMM_WORLD);
+	}
 
 	CV_container = empty_cpu(10000,1);
 	for(int i = 0; i < CV_container->size; i++)
@@ -153,11 +159,11 @@ WikiMaxoutNet::WikiMaxoutNet(ClusterNet gpus)
 
 	d0 = zeros(_nBatchSize,nWordVectorDim*nWindowSize);
 	z1 = zeros(_nBatchSize, _layers[0]);
-	a1_Y = zeros(_nBatchSize, _layers[0]/_nMaxoutSize);
-	a1_idx_Y = zeros(_nBatchSize, _layers[0]/_nMaxoutSize);
-	a1_X = zeros(_nBatchSize, _layers[0]/_nMaxoutSize);
-	a1_idx_X = zeros(_nBatchSize, _layers[0]/_nMaxoutSize);
-	d1 = zeros(_nBatchSize, _layers[0]/_nMaxoutSize);
+	a1_Y = zeros(_nBatchSize, _layers[0]);
+	a1_idx_Y = zeros(_nBatchSize, _layers[0]);
+	a1_X = zeros(_nBatchSize, _layers[0]);
+	a1_idx_X = zeros(_nBatchSize, _layers[0]);
+	d1 = zeros(_nBatchSize, _layers[0]);
 	z2_X = zeros(_nBatchSize, 1);
 	z2_Y = zeros(_nBatchSize, 1);
 
@@ -166,7 +172,7 @@ WikiMaxoutNet::WikiMaxoutNet(ClusterNet gpus)
 	e1 = empty(_nBatchSize,1);
 	aB = ones(1,_nBatchSize);
 	e2_partial = zeros(_nBatchSize,W[1]->rows);
-	e2 = empty(_nBatchSize,e2_partial->cols*_nMaxoutSize);
+	e2 = empty(_nBatchSize,e2_partial->cols);
 
 
 	_batchX = zeros(_nBatchSize, nWordVectorDim*nWindowSize);
@@ -247,7 +253,6 @@ void WikiMaxoutNet::run()
 			backprop();
 			weightUpdates();
 		}
-
 		//cout << i << endl;
 		allocateNextBatch(false);
 		i+=gpu.MPI_SIZE;
@@ -309,7 +314,7 @@ void WikiMaxoutNet::allocateNextBatch(bool isCV)
 	}
 	else
 	{
-		if(_nNextBatchNumber_CV > 0)
+		if(_nNextBatchNumber_CV > gpu.MYRANK*_nCVErrorLength)
 		{
 			cudaStreamSynchronize(_streamNextBatch);
 			to_col_major(_nextBatchIdx, _currentBatchIdx_X[gpu.MYRANK]);
@@ -431,6 +436,9 @@ void WikiMaxoutNet::weightUpdates()
 		vStackN(arrGRAD[4],stackedVocabGrad_Y,gpu.MPI_SIZE);
 		expand_vocab_gradient(stackedVocabGrad_Y,stackedBatchIdx_Y,_Vocab_grad);
 
+
+
+
 		RMSprop_with_nesterov_weight_update(_MSVocab_grad_Y,_Vocab_grad,_Vocab,M_VocabY,_RMS_multiplier,_learningRate/(float)_nBatchSize,_nBatchSize*gpu.MPI_SIZE, MOMENTUM);
 		while(gpu.get_queue_length() > (8*(gpu.MPI_SIZE-1))){ gpu.pop_queue(); }
 		addGradientsN(arrGRAD[2],gpu.MYRANK,gpu.MPI_SIZE,1.0f/(float)gpu.MPI_SIZE);
@@ -441,6 +449,7 @@ void WikiMaxoutNet::weightUpdates()
 		vStackN(arrGRAD[5],stackedVocabGrad_X,gpu.MPI_SIZE);
 		expand_vocab_gradient(stackedVocabGrad_X,stackedBatchIdx_X,_Vocab_grad);
 		RMSprop_with_nesterov_weight_update(_MSVocab_grad,_Vocab_grad,_Vocab,M_VocabX,_RMS_multiplier,_learningRate/(float)_nBatchSize,_nBatchSize*gpu.MPI_SIZE, MOMENTUM);
+
 
 		while(gpu.get_queue_length() > (6*(gpu.MPI_SIZE-1))){ gpu.pop_queue(); }
 		addGradientsN(arrGRAD[3],gpu.MYRANK,gpu.MPI_SIZE,1.0f/(float)gpu.MPI_SIZE);
@@ -465,6 +474,20 @@ void WikiMaxoutNet::weightUpdates()
 		addGradientsN(arrGRAD_B[3],gpu.MYRANK,gpu.MPI_SIZE,1.0f/(float)gpu.MPI_SIZE);
 		RMSprop_with_nesterov_weight_update(MSBGRAD[3],arrGRAD_B[3][gpu.MYRANK],B[0],M_B[0],0.9f,_learningRate,_nBatchSize*gpu.MPI_SIZE, MOMENTUM);
 
+		/*
+
+		for(int i = 0; i < arrGRAD.size(); i++)
+		{
+			cout << "G: " << i << " " << sum(arrGRAD[i][gpu.MYRANK]) << endl;
+			MPI_Barrier(MPI_COMM_WORLD);
+		}
+
+		for(int i = 0; i < arrGRAD_B.size(); i++)
+		{
+			cout << "B: " << i << " " << sum(arrGRAD_B[i][gpu.MYRANK]) << endl;
+			MPI_Barrier(MPI_COMM_WORLD);
+		}
+		*/
 
 	}
 
@@ -566,7 +589,7 @@ double WikiMaxoutNet::calculateError()
 
 
 
-	_nNextBatchNumber_CV = 0;
+	_nNextBatchNumber_CV = gpu.MYRANK*_nCVErrorLength;
 
 	return error;
 }

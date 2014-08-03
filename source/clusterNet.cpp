@@ -86,9 +86,6 @@ void ClusterNet::init(int seed)
 
 	cudaGetDeviceCount(&GPU_COUNT);
 
-
-
-
 	for(int i = 0; i < GPU_COUNT; i++)
 	{
 		cudaSetDevice(i);
@@ -798,6 +795,13 @@ Matrix *ClusterNet::uniformSqrtWeight(int rows, int cols)
 	return out;
 }
 
+Matrix *ClusterNet::uniformSqrtWeight(int rows, int cols, int rows_stacked, int cols_stacked)
+{
+	Matrix * out = rand(rows, cols);
+	::uniformSqrtWeight(out, rows_stacked, cols_stacked);
+	return out;
+}
+
 Matrix *ClusterNet::uniformSqrtWeight_sameSeed(int rows, int cols)
 {
 	Matrix *out = empty(rows, cols);
@@ -1005,7 +1009,7 @@ void ClusterNet::add_to_queue(Matrix **gpuArray)
 		QUEUE_EMPTY = false;
 	}
 
-	pop_queue();
+	//pop_queue();
 }
 
 
@@ -1025,6 +1029,9 @@ bool ClusterNet::pop_queue()
 	{
 		//MPI_Waitall(2,m_request_queue,MPI_STATUSES_IGNORE);
 		MPI_Testall(2,m_request_queue,m_flag_queue,MPI_STATUSES_IGNORE);
+
+
+		usleep(10);
 
 		if(m_flag_queue[0] == 1)
 		{

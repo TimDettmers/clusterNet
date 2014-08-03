@@ -91,6 +91,7 @@ public:
 	 Matrix *distributed_zeros(int rows, int cols);
 	 Matrix *distributed_ones(int rows, int cols);
 	 Matrix *uniformSqrtWeight(int rows, int cols);
+	 Matrix *uniformSqrtWeight(int rows, int cols, int rows_stacked, int cols_stacked);
 	 Matrix *uniformSqrtWeight_sameSeed(int rows, int cols);
 	 Matrix *sparseInitWeight(int rows, int cols);
 	 Matrix *sparseInitWeight(int rows, int cols, int connections);

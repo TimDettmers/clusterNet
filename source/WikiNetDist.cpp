@@ -10,7 +10,7 @@ WikiNetDist::WikiNetDist(ClusterNet gpus)
 	int nWordVectorDim = 120;
 	int nWindowSize = 11;
 	_layers.push_back(128);
-	_learningRate = 0.01;
+	_learningRate = 0.001;
 	_nCVErrorPeriodicity = 6000;
 	_nCVErrorLength = 6000;
 	MOMENTUM = 0.9;
@@ -21,7 +21,7 @@ WikiNetDist::WikiNetDist(ClusterNet gpus)
 	_CV_X = read_hdf5(("/home/tim/data/wiki/extracted2/AA/data100000/wiki_" + NumberToString(cv_set_number) + ".p").c_str());
 	_nNextBatchNumber = 0;
 	_nNextBatchNumber_CV = 0;
-	_nBatchSize = 128;
+	_nBatchSize = 256;
 	_RMS_multiplier = 0.9f;
 
 
@@ -45,6 +45,7 @@ WikiNetDist::WikiNetDist(ClusterNet gpus)
 	M.push_back(gpu.distributed_zeros(_layers[0], 1));
 	M_B.push_back(zeros(1,_layers[0]));
 	M_B.push_back(zeros(1,1));
+
 
 	CV_container = empty_cpu(10000,1);
 	for(int i = 0; i < CV_container->size; i++)
@@ -125,9 +126,9 @@ WikiNetDist::WikiNetDist(ClusterNet gpus)
 	*/
 
 
-	//_Vocab = gpu.uniformSqrtWeight(nWordVectorDim/gpu.MPI_SIZE,vocabSize);
+	_Vocab = gpu.uniformSqrtWeight(nWordVectorDim/gpu.MPI_SIZE,vocabSize,nWordVectorDim,vocabSize);
 	//_Vocab = gpu.sparseInitWeight(nWordVectorDim,vocabSize);
-	_Vocab = gpu.rand(nWordVectorDim/gpu.MPI_SIZE,vocabSize);
+	//_Vocab = gpu.rand(nWordVectorDim/gpu.MPI_SIZE,vocabSize);
 	//scalarMul(_Vocab,0.01f,_Vocab);
 	//scalarAdd(_Vocab,-0.5f,_Vocab);
 	cout << sum(_Vocab) << endl;
@@ -406,38 +407,25 @@ void WikiNetDist::weightUpdates()
 		fill_matrix(_Vocab_grad,0.0f);
 		expand_partial_vocab_gradient(arrGRAD[4][gpu.MYRANK],_currentBatchIdx_Y[gpu.MYRANK],_Vocab_grad,gpu.MYRANK,gpu.MPI_SIZE);
 
-
-		fill_matrix(_Vocab_grad_full,0.0f);
-		expand_vocab_gradient(arrGRAD[4][gpu.MYRANK],_currentBatchIdx_Y[gpu.MYRANK],_Vocab_grad_full);
-
-		square(_Vocab_grad,_Vocab_grad);
-		square(_Vocab_grad_full,_Vocab_grad_full);
-		MPI_Barrier(MPI_COMM_WORLD);
-		cout << "begin" << endl;
-		cout << sum(_Vocab_grad_full) << endl;
-		MPI_Barrier(MPI_COMM_WORLD);
-		cout << sum(_Vocab_grad) << endl;
-		MPI_Barrier(MPI_COMM_WORLD);
-
-		RMSprop_with_weight_update(_MSVocab_grad_Y,_Vocab_grad,_Vocab,M_VocabY,_RMS_multiplier,_learningRate/(float)_nBatchSize,_nBatchSize, MOMENTUM);
+		RMSprop_with_nesterov_weight_update(_MSVocab_grad_Y,_Vocab_grad,_Vocab,M_VocabY,_RMS_multiplier,_learningRate/(float)_nBatchSize,_nBatchSize, MOMENTUM);
 
 		fill_matrix(_Vocab_grad,0.0f);
 		expand_partial_vocab_gradient(arrGRAD[5][gpu.MYRANK],_currentBatchIdx_X[gpu.MYRANK],_Vocab_grad, gpu.MYRANK,gpu.MPI_SIZE);
-		RMSprop_with_weight_update(_MSVocab_grad,_Vocab_grad,_Vocab,M_VocabX,_RMS_multiplier,_learningRate/(float)_nBatchSize,_nBatchSize*gpu.MPI_SIZE, MOMENTUM);
+		RMSprop_with_nesterov_weight_update(_MSVocab_grad,_Vocab_grad,_Vocab,M_VocabX,_RMS_multiplier,_learningRate/(float)_nBatchSize,_nBatchSize*gpu.MPI_SIZE, MOMENTUM);
 
 
 
-		RMSprop_with_weight_update(MSGRAD[2],arrGRAD[2][gpu.MYRANK],W[0],M[0],0.9f,_learningRate/(float)arrGRAD[2][gpu.MYRANK]->rows,_nBatchSize*gpu.MPI_SIZE, MOMENTUM);
+		RMSprop_with_nesterov_weight_update(MSGRAD[2],arrGRAD[2][gpu.MYRANK],W[0],M[0],0.9f,_learningRate/(float)arrGRAD[2][gpu.MYRANK]->rows,_nBatchSize*gpu.MPI_SIZE, MOMENTUM);
 
 
-		RMSprop_with_weight_update(MSGRAD[3],arrGRAD[3][gpu.MYRANK],W[0],M[0],0.9f,_learningRate/(float)arrGRAD[3][gpu.MYRANK]->rows,_nBatchSize*gpu.MPI_SIZE, MOMENTUM);
+		RMSprop_with_nesterov_weight_update(MSGRAD[3],arrGRAD[3][gpu.MYRANK],W[0],M[0],0.9f,_learningRate/(float)arrGRAD[3][gpu.MYRANK]->rows,_nBatchSize*gpu.MPI_SIZE, MOMENTUM);
 
-		RMSprop_with_weight_update(MSGRAD[0],arrGRAD[0][gpu.MYRANK],W[1],M[1],0.9f,_learningRate/(float)arrGRAD[0][gpu.MYRANK]->rows,_nBatchSize*gpu.MPI_SIZE, MOMENTUM);
-		RMSprop_with_weight_update(MSGRAD[1],arrGRAD[1][gpu.MYRANK],W[1],M[1],0.9f,_learningRate/(float)arrGRAD[1][gpu.MYRANK]->rows,_nBatchSize*gpu.MPI_SIZE, MOMENTUM);
-		RMSprop_with_weight_update(MSBGRAD[2],arrGRAD_B[2][gpu.MYRANK],B[0],M_B[0],0.9f,_learningRate,_nBatchSize*gpu.MPI_SIZE, MOMENTUM);
-		RMSprop_with_weight_update(MSBGRAD[0],arrGRAD_B[0][gpu.MYRANK],B[1],M_B[1],0.9f,_learningRate,_nBatchSize*gpu.MPI_SIZE, MOMENTUM);
-		RMSprop_with_weight_update(MSBGRAD[1],arrGRAD_B[1][gpu.MYRANK],B[1],M_B[1],0.9f,_learningRate,_nBatchSize*gpu.MPI_SIZE, MOMENTUM);
-		RMSprop_with_weight_update(MSBGRAD[3],arrGRAD_B[3][gpu.MYRANK],B[0],M_B[0],0.9f,_learningRate,_nBatchSize*gpu.MPI_SIZE, MOMENTUM);
+		RMSprop_with_nesterov_weight_update(MSGRAD[0],arrGRAD[0][gpu.MYRANK],W[1],M[1],0.9f,_learningRate/(float)arrGRAD[0][gpu.MYRANK]->rows,_nBatchSize*gpu.MPI_SIZE, MOMENTUM);
+		RMSprop_with_nesterov_weight_update(MSGRAD[1],arrGRAD[1][gpu.MYRANK],W[1],M[1],0.9f,_learningRate/(float)arrGRAD[1][gpu.MYRANK]->rows,_nBatchSize*gpu.MPI_SIZE, MOMENTUM);
+		RMSprop_with_nesterov_weight_update(MSBGRAD[2],arrGRAD_B[2][gpu.MYRANK],B[0],M_B[0],0.9f,_learningRate,_nBatchSize*gpu.MPI_SIZE, MOMENTUM);
+		RMSprop_with_nesterov_weight_update(MSBGRAD[0],arrGRAD_B[0][gpu.MYRANK],B[1],M_B[1],0.9f,_learningRate,_nBatchSize*gpu.MPI_SIZE, MOMENTUM);
+		RMSprop_with_nesterov_weight_update(MSBGRAD[1],arrGRAD_B[1][gpu.MYRANK],B[1],M_B[1],0.9f,_learningRate,_nBatchSize*gpu.MPI_SIZE, MOMENTUM);
+		RMSprop_with_nesterov_weight_update(MSBGRAD[3],arrGRAD_B[3][gpu.MYRANK],B[0],M_B[0],0.9f,_learningRate,_nBatchSize*gpu.MPI_SIZE, MOMENTUM);
 
 
 

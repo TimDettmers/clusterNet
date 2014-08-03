@@ -180,7 +180,7 @@ __global__ void AddGradientsN(float **arrA, int size, int myrank, int matrix_cou
 	const unsigned int numThreads = blockDim.x * gridDim.x;
 	const int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
 
-	for(int matrix_idx = 0; matrix_idx < matrix_count-1; matrix_idx++)
+	for(int matrix_idx = 0; matrix_idx < matrix_count; matrix_idx++)
 	{
 		if(matrix_idx == myrank){ continue; }
 

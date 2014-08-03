@@ -21,10 +21,10 @@ EXECTEST = build/testSuite.out
 all : $(EXECSRC) $(EXECTEST) 
 	
 $(EXECSRC) : $(SCR) 
-	#$(CC) $^ -o $@ $(CFLAGS)
+	$(CC) $^ -o $@ $(CFLAGS)
 
 $(EXECTEST): $(SCR) $(TESTS)    
-	$(CC) $(TESTS) $(LINK) -o $@ $(CFLAGS)
+	#$(CC) $(TESTS) $(LINK) -o $@ $(CFLAGS)
 
 test:
 	#scp $(TOP)$(EXECTEST) $(NODES):$(TOP)build/;	
@@ -33,4 +33,3 @@ test:
 run:
 	#scp $(TOP)$(EXECSRC) $(NODES):$(TOP)build/;
 	$(MPI_DIR)/bin/mpirun -x LD_LIBRARY_PATH -np 3 -hostfile $(HOSTFILE) $(TOP)$(EXECSRC)
-	#/home/tim/git/clusterNet/build/clusterNet.out
