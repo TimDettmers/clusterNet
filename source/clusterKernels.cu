@@ -1101,15 +1101,13 @@ __global__ void concat_batches(float **batch_X, float **batch_Y, float *out_X, f
 
 	int full_vocab_size = gridDim.z*blockDim.x;
 	int cols = gridDim.x*full_vocab_size;
-	int partial_cols = full_vocab_size/gridDim.z;
+	int partial_cols = blockDim.x*gridDim.x;
 
 	//full_size times current row = current row idx
 	//current window position times partial_threads times current matrix = current word idx
 	//threadIdx.x current parameter within a word
 	out_X[(blockIdx.y *cols) + (blockIdx.x*full_vocab_size) + (blockIdx.z*blockDim.x)  +threadIdx.x] = batch_X[blockIdx.z][(blockIdx.y *partial_cols) + (blockIdx.x*blockDim.x)  + threadIdx.x];
 	out_Y[(blockIdx.y *cols) + (blockIdx.x*full_vocab_size) + (blockIdx.z*blockDim.x)  +threadIdx.x] = batch_Y[blockIdx.z][(blockIdx.y *partial_cols) + (blockIdx.x*blockDim.x)  + threadIdx.x];
-
-
 
 }
 
@@ -1250,7 +1248,7 @@ __global__ void kExpandPartialVocabGradient(float *grad, float *vocab_idx, float
 
 	int myIdx = (int)vocab_idx[blockIdx.x+(blockIdx.y*gridDim.x)];
 	int myVocabIdx = blockDim.x*myIdx;
-	atomicAdd(&vocab_grad[myVocabIdx + threadIdx.x],grad[blockIdx.x + offset + (blockIdx.y*blockDim.x*gridDim.x) + (threadIdx.x*gridDim.x)]);
+	atomicAdd(&vocab_grad[myVocabIdx + threadIdx.x],grad[blockIdx.x + (offset*gridDim.x) + (blockIdx.y*blockDim.x*gridDim.x) + (threadIdx.x*gridDim.x)]);
 
 }
 

@@ -35,6 +35,7 @@ private:
 	Matrix *_CV_X;
 	Matrix *_Vocab;
 	Matrix *_Vocab_grad;
+	Matrix *_Vocab_grad_full;
 	Matrix *_MSVocab_grad;
 	Matrix *_MSVocab_grad_Y;
 	Matrix *M_VocabX;

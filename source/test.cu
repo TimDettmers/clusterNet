@@ -1419,17 +1419,20 @@ int main(int argc, char *argv[])
 
 
 
-	ClusterNet *gpus = new ClusterNet(argc,argv,123635, true);
-	WikiNetDist net = WikiNetDist(gpus[0]);
+
+	ClusterNet gpus = ClusterNet(argc,argv,123635, false);
+	WikiNetDist net = WikiNetDist(gpus);
 	net.run();
+
 
 
 
 	/*
-	ClusterNet *gpus = new ClusterNet(argc, argv, 123635, true);
-	WikiMaxoutNet net = WikiMaxoutNet(gpus[0]);
+	ClusterNet gpus = ClusterNet(argc, argv, 123635, true);
+	WikiMaxoutNet net = WikiMaxoutNet(gpus);
 	net.run();
 	*/
+
 
 	//cudaSetDevice(1);
 	//ClusterNet *gpus = new ClusterNet(123635);

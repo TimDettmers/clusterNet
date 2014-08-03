@@ -10,7 +10,7 @@ using std::endl;
 
 ClusterNet::ClusterNet()
 {
-	init((int) (time(0) % 10000));
+	init((int) (time(0) + (10000*MYRANK+12345) % 10000));
 }
 ClusterNet::ClusterNet(int seed)
 {
@@ -32,7 +32,7 @@ ClusterNet::ClusterNet(int argc, char* argv[], int seed, bool useSameSeed)
 ClusterNet::ClusterNet(int argc, char* argv[])
 {
 	init_MPI(argc, argv);
-	init((int) (time(0) % (10000*MYRANK+12345)));
+	init((int) (time(0) + (10000*MYRANK+12345) % 10000));
 }
 
 int ClusterNet::get_queue_length(){ return m_send_queue.size(); }
@@ -51,7 +51,7 @@ void ClusterNet::init(int seed)
 	 *
 	 *
 	 * */
-
+	//cout << "seed: " << seed << endl;
 
 	curandCreateGenerator(&m_generator, CURAND_RNG_PSEUDO_DEFAULT);
 	curandSetPseudoRandomGeneratorSeed(m_generator, seed);
@@ -798,6 +798,14 @@ Matrix *ClusterNet::uniformSqrtWeight(int rows, int cols)
 	return out;
 }
 
+Matrix *ClusterNet::uniformSqrtWeight_sameSeed(int rows, int cols)
+{
+	Matrix *out = empty(rows, cols);
+	rand(rows, cols,true,out);
+	::uniformSqrtWeight(out);
+	return out;
+}
+
 Matrix *ClusterNet::sparseInitWeight(int rows, int cols)
 {
 	return sparseInitWeight(rows, cols, 15);
@@ -824,7 +832,7 @@ Matrix *ClusterNet::distributed_uniformSqrtWeight(int rows, int cols)
 	if(cols == 1)
 	{
 		cout << "Warning: Columns size 1, cannot split by column! Create normal uniformSqrtWeight( instead!" << endl;
-		return uniformSqrtWeight(rows, cols);
+		return uniformSqrtWeight_sameSeed(rows, cols);
 	}
 
 	Matrix *W;
@@ -967,8 +975,10 @@ Matrix *ClusterNet::sparse_to_dense(Matrix *A)
 void ClusterNet::construct_vocab_matrix(Matrix *vocab_idx, Matrix *vocab_idx_y, Matrix *batch_X, Matrix *batch_y, Matrix *vocab)
 {
 	Matrix *rdm_idx = empty(batch_X->rows, 1);
+
 	rand(batch_X->rows, 1, true, rdm_idx);
 	::rand_int(rdm_idx, 0, vocab->cols-1);
+	//cout << "MYRANK: " << MYRANK << " rdm 2: " << sum(rdm_idx) << endl;
 	::construct_vocab_matrix(vocab_idx,vocab_idx_y,batch_X,batch_y,vocab,rdm_idx);
 	cudaFree(rdm_idx->data);
 	free(rdm_idx);

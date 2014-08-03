@@ -1204,7 +1204,7 @@ void concatVocabBatchesN(Matrix** arrBatch_X, Matrix **arrBatch_Y, Matrix *out_X
 	cudaMemcpy(d_arrBatch_Y, h_arrBatch_Y, sizeof(float*) * matrices_count,cudaMemcpyDefault);
 
 	dim3 griddims(window_size,arrBatch_X[0]->rows,matrices_count);
-	concat_batches<<<griddims,matrices_count*arrBatch_X[0]->cols/window_size>>>(d_arrBatch_X,d_arrBatch_Y, out_X->data, out_Y->data);
+	concat_batches<<<griddims,arrBatch_X[0]->cols/window_size>>>(d_arrBatch_X,d_arrBatch_Y, out_X->data, out_Y->data);
 
 	free(h_arrBatch_X);
 	cudaFree(d_arrBatch_X);
@@ -1235,11 +1235,12 @@ void expand_vocab_gradient(Matrix *grad, Matrix *vocab_idx, Matrix *vocab_grad)
 	kExpandVocabGradient<<<grid,vocab_grad->rows>>>(grad->data, vocab_idx->data, vocab_grad->data);
 }
 
-void expand_partial_vocab_gradient(Matrix *grad, Matrix *vocab_idx, Matrix *vocab_grad, int matrix_idx)
+void expand_partial_vocab_gradient(Matrix *grad, Matrix *vocab_idx, Matrix *vocab_grad, int matrix_idx, int matrix_count)
 {
 	assert(vocab_grad->rows <= 1024);
 	dim3 grid(vocab_idx->rows,vocab_idx->cols,1);
-	kExpandPartialVocabGradient<<<grid,vocab_grad->rows>>>(grad->data, vocab_idx->data, vocab_grad->data, vocab_grad->rows*matrix_idx);
+	//std::cout << matrix_idx << " offset " << (vocab_grad->rows)*matrix_idx << std::endl;
+	kExpandPartialVocabGradient<<<grid,vocab_grad->rows>>>(grad->data, vocab_idx->data, vocab_grad->data, (grad->rows)*matrix_idx);
 }
 
 void expand_vocab_gradient_middle_word(Matrix *grad, Matrix *vocab_idx, Matrix *vocab_grad)

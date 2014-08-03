@@ -7,9 +7,9 @@ WikiMaxoutNet::WikiMaxoutNet(ClusterNet gpus)
 {
 
 	int vocabSize = 100002;
-	int nWordVectorDim = 128;
+	int nWordVectorDim = 120;
 	int nWindowSize = 11;
-	_layers.push_back(256);
+	_layers.push_back(128);
 	_nMaxoutSize = 1;
 	_learningRate = 0.1;
 	_nCVErrorPeriodicity = 6000;
@@ -204,7 +204,7 @@ void WikiMaxoutNet::run()
 	{
 		if(i > 0 && i % _nCVErrorPeriodicity == 0)
 		{
-			if( i > 0 && i % 120000 == 0)
+			if( i > 0 && i % 12000 == 0)
 			{
 				cout << "Saving vocabulary matrix to disk..." << endl;
 				Matrix *host = to_host(_Vocab);
