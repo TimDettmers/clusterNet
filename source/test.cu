@@ -1430,11 +1430,52 @@ int main(int argc, char *argv[])
 
 
 
+	//y = to_host(create_t_matrix(to_gpu(y), 10));
+	//Matrix *t = to_host(create_t_matrix(to_gpu(y),10));
 
 
-	ClusterNet gpus = ClusterNet(argc, argv, 123635, true);
-	WikiMaxoutNet net = WikiMaxoutNet(gpus);
-	net.run();
+
+	/*
+	Matrix *rdm = gpu.randn(200,6);
+	Matrix *out = gpu.randn(200,6);
+
+	scalarMul(rdm,1.0e-4f,rdm);
+    compression_8bit(tbl,rdm,1.0e-3f,out);
+
+    for(int i = 0 ; i < 200; i++)
+    {
+
+     printmat(rdm,i,i+1,0,6);
+     printmat(out,i,i+1,0,6);
+     cout << "------------------------" << endl;
+    }
+
+    */
+
+
+
+
+
+
+	cudaSetDevice(1);
+	Matrix *X = read_hdf5("/home/tim/data/mnist/X.hdf5");
+	Matrix *y = read_hdf5("/home/tim/data/mnist/y.hdf5");
+
+	ClusterNet gpu = ClusterNet(1235);
+
+	BatchAllocator b = BatchAllocator();
+
+	std::vector<int> layers;
+	layers.push_back(1200);
+	layers.push_back(1200);
+	BatchAllocator allocator = BatchAllocator();
+	allocator.init(X,y,(1.0-0.8571429),128,256,gpu, Single_GPU);
+	DeepNeuralNetwork net = DeepNeuralNetwork(layers,Classification, gpu, allocator, 10);
+	net.EPOCHS = 250;
+	net.TRANSITION_EPOCH = 100;
+	net.LEARNING_RATE = 0.003;
+	net.UPDATE_TYPE = RMSProp;
+	net.train();
 
 
 

@@ -15,17 +15,22 @@ DeepNeuralNetwork::DeepNeuralNetwork(std::vector<int> lLayerSizes, Networktype_t
 {
 	m_gpus = gpus;
 	m_BA = allocator;
+	int device = 0;
+	cudaGetDevice(&device);
+	cout << "Active device: GPU" << device << endl;
 
 	EPOCHS = 250;
-	TRANSITION_EPOCH = 99999;
+	TRANSITION_EPOCH = 250;
 	LEARNING_RATE = 0.01;
-	MOMENTUM = 0.9;
+	LEARNING_RATE_DECAY = 0.99;
+	MOMENTUM = 0.7;
 	OUTPUT_IS_PROBABILITY = false;
-	MAXOUT_LEVEL = 8;
 	PRINT_MISSCLASSIFICATION = net_type == Classification ? true : false;
+	MAIN_UNIT = Logistic;
 	m_output_dim = categories;
 	m_net_type = net_type;
-	m_update_type = RMSProp;
+	UPDATE_TYPE = NesterovRMSProp;
+	tbl = to_gpu(read_hdf5("/home/tim/data/8bit_tbl.hdf5"));
 
 	init_network_layout(lLayerSizes);
 	init_weights();
@@ -41,7 +46,7 @@ void DeepNeuralNetwork::init_network_layout(std::vector<int> lLayerSizes)
 	lDropout.push_back(0.2f);
 	for(int i = 0;i < m_lLayers.size(); i++)
 	{
-		if(m_net_type == Classification){ lUnits.push_back(Logistic); }
+		if(m_net_type == Classification){ lUnits.push_back(MAIN_UNIT); }
 		if(m_net_type == Regression){ lUnits.push_back(Rectified_Linear); }
 		lDropout.push_back(0.5f);
 	}
@@ -57,6 +62,7 @@ void DeepNeuralNetwork::init_weights()
 
 	if(m_BA.BATCH_METHOD == Distributed_weights || m_BA.BATCH_METHOD == Distributed_weights_sparse)
 	{
+		max_values.push_back(0.1f);
 		W.push_back(m_gpus.distributed_uniformSqrtWeight(m_BA.CURRENT_BATCH->cols,m_lLayers[0]));
 		B.push_back(zeros(1,m_lLayers[0]));
 		M.push_back(m_gpus.distributed_zeros(m_BA.CURRENT_BATCH->cols,m_lLayers[0]));
@@ -64,9 +70,11 @@ void DeepNeuralNetwork::init_weights()
 		MS.push_back(m_gpus.distributed_zeros(m_BA.CURRENT_BATCH->cols,m_lLayers[0]));
 		B_MS.push_back(zeros(1,m_lLayers[0]));
 		GRAD.push_back(m_gpus.distributed_zeros(m_BA.CURRENT_BATCH->cols,m_lLayers[0]));
+		GRAD_approx.push_back(m_gpus.distributed_zeros(m_BA.CURRENT_BATCH->cols,m_lLayers[0]));
 		B_GRAD.push_back(zeros(1,m_lLayers[0]));
 		for(int i = 0;i < (m_lLayers.size()-1); i++)
 		{
+			max_values.push_back(0.1f);
 			W.push_back(m_gpus.distributed_uniformSqrtWeight(m_lLayers[i],m_lLayers[i+1]));
 			B.push_back(zeros(1,m_lLayers[i+1]));
 			M.push_back(m_gpus.distributed_zeros(m_lLayers[i],m_lLayers[i+1]));
@@ -74,8 +82,10 @@ void DeepNeuralNetwork::init_weights()
 			MS.push_back(m_gpus.distributed_zeros(m_lLayers[i],m_lLayers[i+1]));
 			B_MS.push_back(zeros(1,m_lLayers[i+1]));
 			GRAD.push_back(m_gpus.distributed_zeros(m_lLayers[i],m_lLayers[i+1]));
+			GRAD_approx.push_back(m_gpus.distributed_zeros(m_lLayers[i],m_lLayers[i+1]));
 			B_GRAD.push_back(zeros(1,m_lLayers[i+1]));
 		}
+		max_values.push_back(0.1f);
 		W.push_back(m_gpus.distributed_uniformSqrtWeight(m_lLayers.back(), output_size));
 		B.push_back(zeros(1, output_size));
 		M.push_back(m_gpus.distributed_zeros(m_lLayers.back(),output_size));
@@ -83,20 +93,25 @@ void DeepNeuralNetwork::init_weights()
 		MS.push_back(m_gpus.distributed_zeros(m_lLayers.back(),output_size));
 		B_MS.push_back(zeros(1, output_size));
 		GRAD.push_back(m_gpus.distributed_zeros(m_lLayers.back(),output_size));
+		GRAD_approx.push_back(m_gpus.distributed_zeros(m_lLayers.back(),output_size));
 		B_GRAD.push_back(zeros(1, output_size));
 	}
 	else
 	{
-		W.push_back(m_gpus.uniformSqrtWeight(m_BA.CURRENT_BATCH->cols,m_lLayers[0]/MAXOUT_LEVEL));
-		B.push_back(zeros(1,m_lLayers[0]/MAXOUT_LEVEL));
-		M.push_back(zeros(m_BA.CURRENT_BATCH->cols,m_lLayers[0]/MAXOUT_LEVEL));
-		B_M.push_back(zeros(1,m_lLayers[0]/MAXOUT_LEVEL));
-		MS.push_back(zeros(m_BA.CURRENT_BATCH->cols,m_lLayers[0]/MAXOUT_LEVEL));
-		B_MS.push_back(zeros(1,m_lLayers[0]/MAXOUT_LEVEL));
-		GRAD.push_back(zeros(m_BA.CURRENT_BATCH->cols,m_lLayers[0]/MAXOUT_LEVEL));
-		B_GRAD.push_back(zeros(1,m_lLayers[0]/MAXOUT_LEVEL));
+		max_values.push_back(0.1f);
+		W.push_back(m_gpus.uniformSqrtWeight(m_BA.CURRENT_BATCH->cols,m_lLayers[0]));
+		B.push_back(zeros(1,m_lLayers[0]));
+		M.push_back(zeros(m_BA.CURRENT_BATCH->cols,m_lLayers[0]));
+		B_M.push_back(zeros(1,m_lLayers[0]));
+		MS.push_back(zeros(m_BA.CURRENT_BATCH->cols,m_lLayers[0]));
+		B_MS.push_back(zeros(1,m_lLayers[0]));
+		GRAD.push_back(zeros(m_BA.CURRENT_BATCH->cols,m_lLayers[0]));
+		GRAD8bit.push_back(empty_char(m_BA.CURRENT_BATCH->cols,m_lLayers[0]));
+		GRAD_approx.push_back(zeros(m_BA.CURRENT_BATCH->cols,m_lLayers[0]));
+		B_GRAD.push_back(zeros(1,m_lLayers[0]));
 		for(int i = 0;i < (m_lLayers.size()-1); i++)
 		{
+			max_values.push_back(0.1f);
 			W.push_back(m_gpus.uniformSqrtWeight(m_lLayers[i],m_lLayers[i+1]));
 			B.push_back(zeros(1,m_lLayers[i+1]));
 			M.push_back(zeros(m_lLayers[i],m_lLayers[i+1]));
@@ -104,8 +119,11 @@ void DeepNeuralNetwork::init_weights()
 			MS.push_back(zeros(m_lLayers[i],m_lLayers[i+1]));
 			B_MS.push_back(zeros(1,m_lLayers[i+1]));
 			GRAD.push_back(zeros(m_lLayers[i],m_lLayers[i+1]));
+			GRAD8bit.push_back(empty_char(m_lLayers[i],m_lLayers[i+1]));
+			GRAD_approx.push_back(zeros(m_lLayers[i],m_lLayers[i+1]));
 			B_GRAD.push_back(zeros(1,m_lLayers[i+1]));
 		}
+		max_values.push_back(0.1f);
 		W.push_back(m_gpus.uniformSqrtWeight(m_lLayers.back(),output_size));
 		B.push_back(zeros(1,output_size));
 		M.push_back(zeros(m_lLayers.back(),output_size));
@@ -113,8 +131,13 @@ void DeepNeuralNetwork::init_weights()
 		MS.push_back(zeros(m_lLayers.back(),output_size));
 		B_MS.push_back(zeros(1,output_size));
 		GRAD.push_back(zeros(m_lLayers.back(),output_size));
+		GRAD8bit.push_back(empty_char(m_lLayers.back(),output_size));
+		GRAD_approx.push_back(zeros(m_lLayers.back(),output_size));
 		B_GRAD.push_back(zeros(1,output_size));
 	}
+
+	for(int i = 0; i < W.size(); i++)
+		cout << W[i]->rows << 'x' << W[i]->cols << endl;
 
 }
 
@@ -133,15 +156,17 @@ void DeepNeuralNetwork::train()
 		if(MOMENTUM > 0.95) MOMENTUM = 0.95;
 
 		if(EPOCH > TRANSITION_EPOCH)
-			LEARNING_RATE = original_learning_rate / (EPOCH - TRANSITION_EPOCH);
+			LEARNING_RATE *= 0.85;
 
-		if(EPOCH == TRANSITION_EPOCH)
+
+		if(EPOCH == TRANSITION_EPOCH-1)
 		{
 			cout << "Transition point reached: Halving dropout!" << endl;
-			m_update_type = NoMomentum;
+			//m_update_type = NoMomentum;
 			for(int i = 0; i < lDropout.size(); i++)
 				lDropout[i] = lDropout[i] / 2.0;
 		}
+
 
 
 		for(int i = 0; i < m_BA.TOTAL_BATCHES; i++)
@@ -163,6 +188,16 @@ void DeepNeuralNetwork::train()
 		}
 		train_error();
 		cross_validation_error();
+
+
+		for(int i = 0; i < W.size(); i++)
+		{
+			abs(GRAD[i],GRAD[i]);
+			max_values[i] = max(GRAD[i]);
+		}
+
+
+		LEARNING_RATE*=LEARNING_RATE_DECAY;
 	}
 
 	m_BA.finish_batch_allocator();
@@ -184,22 +219,10 @@ void DeepNeuralNetwork::backprop()
 	  for(int i = W.size()-1; i > 0; i--)
 	  {
 		  Matrix *bias_activation = ones(1,E.back()->rows);
-		  if(lUnits[i-1] == Maxout)
-		  {
-			  Matrix *e2_full = zeros(E.back()->rows,E.back()->cols*MAXOUT_LEVEL);
-
-
-			  expand_to_maxout_grad(E.back(), maxout1[1],e2_full);
-
-			  cudaFree(E.back()->data);
-			  E.back()->data = e2_full->data;
-			  cudaFree(maxout1[1]->data);
-		  }
 		  m_gpus.Tdot(Z[i],E.back(),GRAD[i]);
 		  m_gpus.dot(bias_activation,E.back(),B_GRAD[i]);
 		  cudaFree(bias_activation->data);
-		  if(lUnits[i-1] != Maxout)
-			  derivative_function(i, Z[i]);
+		  derivative_function(i, Z[i]);
 		  E.push_back(m_gpus.dotT(E.back(), W[i]));
 		  mul(E.back(),Z[i],E.back());
 	  }
@@ -250,15 +273,55 @@ void DeepNeuralNetwork::weight_updates()
 {
 	  for(int i = 0;i < GRAD.size(); i++)
 	  {
-		  if(m_update_type == RMSProp)
+		  if(UPDATE_TYPE == NesterovRMSProp)
 		  {
+
+
+
+
 			  RMSprop_with_nesterov_weight_update(MS[i],GRAD[i],W[i],M[i],0.9f,LEARNING_RATE,m_BA.CURRENT_BATCH->rows, MOMENTUM);
 			  RMSprop_with_nesterov_weight_update(B_MS[i],B_GRAD[i],B[i],B_M[i],0.9f,LEARNING_RATE,m_BA.CURRENT_BATCH->rows, MOMENTUM);
+
+
+
 		  }
-		  else if(m_update_type == NoMomentum)
+		  else if(UPDATE_TYPE == NesterovMomentum)
+		  {
+			  Nesterov_weight_update(MS[i],GRAD[i],W[i],M[i],0.9f,LEARNING_RATE,m_BA.CURRENT_BATCH->rows, MOMENTUM);
+			  Nesterov_weight_update(B_MS[i],B_GRAD[i],B[i],B_M[i],0.9f,LEARNING_RATE,m_BA.CURRENT_BATCH->rows, MOMENTUM);
+	  	  }
+		  else if(UPDATE_TYPE == RMSProp)
+		  {
+
+
+
+			  /*
+			  RMSprop_with_weight_update(MS[i],GRAD[i],W[i],M[i],0.9f,LEARNING_RATE,m_BA.CURRENT_BATCH->rows, MOMENTUM);
+			  RMSprop_with_weight_update(B_MS[i],B_GRAD[i],B[i],B_M[i],0.9f,LEARNING_RATE,m_BA.CURRENT_BATCH->rows, MOMENTUM);
+			  */
+
+
+
+
+			  RMSprop_with_weight_update_8bit(MS[i],GRAD[i],W[i],M[i],0.9f,LEARNING_RATE,m_BA.CURRENT_BATCH->rows, MOMENTUM);
+			  RMSprop_with_weight_update(B_MS[i],B_GRAD[i],B[i],B_M[i],0.9f,LEARNING_RATE,m_BA.CURRENT_BATCH->rows, MOMENTUM);
+			  m_gpus.compression_8bit(GRAD[i],max_values[i],GRAD8bit[i]);
+			  m_gpus.decompression_8bit(GRAD8bit[i],max_values[i],GRAD_approx[i]);
+			  sub(W[i],GRAD_approx[i],W[i]);
+
+
+
+			  //squared_error(GRAD[i],GRAD_approx[i],GRAD_approx[i]);
+			  //cout << "ERROR: " << sum(GRAD_approx[i]) << endl;
+
+
+		  }
+		  else if(UPDATE_TYPE == NoMomentum)
 		  {
 			 scalarMul(GRAD[i],LEARNING_RATE/(float)m_BA.CURRENT_BATCH->rows,GRAD[i]);
 			 sub(W[i],GRAD[i],W[i]);
+			 scalarMul(B_GRAD[i],LEARNING_RATE/(float)m_BA.CURRENT_BATCH->rows,GRAD[i]);
+			 sub(B[i],B_GRAD[i],B[i]);
 		  }
 	  }
 }
@@ -276,16 +339,7 @@ void DeepNeuralNetwork::feedforward(FeedForward_t ff)
 		  D.push_back(m_gpus.dropout(Z.back(),lDropout[i]));
 		  Z.push_back(m_gpus.dot(D.back(), W[i]));
 		  addMatrixVector(Z.back(),B[i],Z.back());
-		  if(lUnits[i] == Maxout)
-		  {
-			  maxout1 = maxout(Z.back(),MAXOUT_LEVEL);
-
-			  cudaFree(Z.back()->data);
-
-			  Z.back() = maxout1[0];
-		  }
-		  else
-			  activation_function(i, Z.back());
+		  activation_function(i, Z.back());
 		}
 	}
 	else
@@ -298,16 +352,6 @@ void DeepNeuralNetwork::feedforward(FeedForward_t ff)
 		{
 			Z.push_back(m_gpus.dot(Z.back(), W[i]));
 			addMatrixVector(Z.back(),B[i],Z.back());
-			if(lUnits[i] == Maxout)
-			  {
-				  maxout1 = maxout(Z.back(),MAXOUT_LEVEL);
-
-				  cudaFree(Z.back()->data);
-
-				  Z.back() = maxout1[0];
-				  cudaFree(maxout1[1]->data);
-			  }
-			  else
 			activation_function(i, Z.back());
 			if(i < W.size() -1)
 				scalarMul(Z.back(), 1.0f-lDropout[i+1], Z.back());

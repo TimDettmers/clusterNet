@@ -221,6 +221,31 @@ Matrix *empty(int rows, int cols)
   return out;
 }
 
+Matrix *empty_char(int rows, int cols)
+{
+  unsigned char *gpu_data;
+  int size = rows*cols;
+  size_t bytes = rows*cols*sizeof(unsigned char);
+  cudaMalloc((void**)&gpu_data, bytes);
+
+  Matrix *out = (Matrix*)malloc(sizeof(Matrix));
+  out->rows = rows;
+  out->cols = cols;
+  out->bytes = bytes;
+  out->size = size;
+  out->char_data = gpu_data;
+  out->isDistributed = 0;
+  out->cols_distributed = 0;
+  out->isSparse = 0;
+  out->idx_bytes = 0;
+  out->idx_cols = 0;
+  out->ptr_bytes = 0;
+  out->ptr_rows = 0;
+
+
+  return out;
+}
+
 Matrix *empty_sparse(int rows, int cols, float max_sparsity, float sparsity_buffer)
 { return empty_sparse(rows, cols, ceil(rows*cols*(max_sparsity + sparsity_buffer)) + 1); }
 Matrix *empty_sparse(int rows, int cols, int nonzeros)
@@ -408,6 +433,13 @@ void add(Matrix *A, Matrix *B, Matrix *out)
   checkMatrixOperation(A, B, out, CUBLAS_OP_N, CUBLAS_OP_N, 0);
   int block_size = (A->size/THREADS_PER_BLOCKS) + 1;
   kAdd<<<block_size,THREADS_PER_BLOCKS>>>(A->data, B->data, out->data, A->size);
+}
+
+void add_to_z(Matrix *z, Matrix *z1, Matrix *y, int classes, Matrix *out)
+{
+	Matrix *y_count = zeros(classes,1);
+	kAdd_to_z<<<z1->rows,THREADS_PER_BLOCKS>>>(z->data, z1->data, y->data,y_count->data, z1->rows, z1->cols, out->data);
+	cudaFree(y_count->data);
 }
 
 Matrix *sub(Matrix *A, Matrix *B)
@@ -740,6 +772,20 @@ void square(Matrix *A, Matrix *out)
   kSquare<<<block_size,THREADS_PER_BLOCKS>>>(A->data, out->data, A->size);
 }
 
+Matrix *abs(Matrix *A)
+{
+  Matrix *out = empty(A->rows,A->cols);
+  abs(A, out);
+
+  return out;
+}
+
+void abs(Matrix *A, Matrix *out)
+{
+  int block_size = (A->size/THREADS_PER_BLOCKS) + 1;
+  kAbs<<<block_size,THREADS_PER_BLOCKS>>>(A->data, out->data, A->size);
+}
+
 int blnFaultySizes(Matrix *A, Matrix *B, Matrix *C)
 {
   if((A->rows == B->rows) &&
@@ -955,6 +1001,16 @@ float sum(Matrix *A)
 	return thrust::reduce(ptr, ptr+A->size);
 }
 
+float max(Matrix *A)
+{
+	thrust::device_ptr<float> ptr(A->data);
+	float res = -1.0f;
+	return thrust::reduce(ptr, ptr+A->size,res, thrust::maximum<float>());
+}
+
+
+
+
 int getNonZeroElements(Matrix *A)
 {
 	Matrix *out = zeros(1,1);
@@ -1010,6 +1066,36 @@ void RMSprop_with_momentum_weight_update(Matrix *RMS, Matrix *grad, Matrix *w, M
 	kRMSprop_with_momentum_weight_update<<<blocks,THREADS_PER_BLOCKS>>>(RMS->data, grad->data, w->data, m->data, RMS_multiplier, learning_rate, batch_size, RMS->size, momentum);
 }
 
+/*
+void LocalGrad(Matrix *z, Matrix *w, Matrix *y, float learning_rate, int batch_size, float momentum)
+{
+
+	int blocks = (RMS->size/THREADS_PER_BLOCKS) + 1;
+	kLocalGrad<<<blocks,THREADS_PER_BLOCKS>>>(z->data, grad->data, y->data, learning_rate, batch_size,  momentum);
+}
+*/
+
+
+void compression_8bit_test(Matrix *tbl, Matrix *A, float precision,  Matrix *out)
+{
+	int blocks = (A->size/THREADS_PER_BLOCKS) + 1;
+	kCompression_8bit_test<<<blocks,THREADS_PER_BLOCKS>>>(tbl->data, A->data, precision, A->size, out->data);
+}
+
+void compression_8bit(Matrix *tbl_flt, Matrix *A, float precision,  Matrix *out)
+{
+	int blocks = (A->size/THREADS_PER_BLOCKS) + 1;
+	kCompression_8bit<<<blocks,THREADS_PER_BLOCKS>>>(tbl_flt->data, A->data, precision, A->size, out->char_data);
+}
+
+
+
+void decompression_8bit(Matrix *tbl_flt, Matrix *A, float precision,  Matrix *out)
+{
+	int blocks = (A->size/THREADS_PER_BLOCKS) + 1;
+	kDecompression_8bit<<<blocks,THREADS_PER_BLOCKS>>>(tbl_flt->data,  A->char_data, precision, A->size, out->data);
+}
+
 void RMSprop_with_nesterov_weight_update(Matrix *RMS, Matrix *grad, Matrix *w, Matrix *m, float RMS_multiplier, float learning_rate, int batch_size, float momentum)
 {
 
@@ -1017,11 +1103,25 @@ void RMSprop_with_nesterov_weight_update(Matrix *RMS, Matrix *grad, Matrix *w, M
 	kRMSprop_with_nesterov_weight_update<<<blocks,THREADS_PER_BLOCKS>>>(RMS->data, grad->data, w->data, m->data, RMS_multiplier, learning_rate, batch_size, RMS->size, momentum);
 }
 
+void Nesterov_weight_update(Matrix *RMS, Matrix *grad, Matrix *w, Matrix *m, float RMS_multiplier, float learning_rate, int batch_size, float momentum)
+{
+
+	int blocks = (RMS->size/THREADS_PER_BLOCKS) + 1;
+	kNesterov_weight_update<<<blocks,THREADS_PER_BLOCKS>>>(RMS->data, grad->data, w->data, m->data, RMS_multiplier, learning_rate, batch_size, RMS->size, momentum);
+}
+
 void RMSprop_with_weight_update(Matrix *RMS, Matrix *grad, Matrix *w, Matrix *m, float RMS_multiplier, float learning_rate, int batch_size, float momentum)
 {
 
 	int blocks = (RMS->size/THREADS_PER_BLOCKS) + 1;
 	kRMSprop_with_weight_update<<<blocks,THREADS_PER_BLOCKS>>>(RMS->data, grad->data, w->data, m->data, RMS_multiplier, learning_rate, batch_size, RMS->size, momentum);
+}
+
+void RMSprop_with_weight_update_8bit(Matrix *RMS, Matrix *grad, Matrix *w, Matrix *m, float RMS_multiplier, float learning_rate, int batch_size, float momentum)
+{
+
+	int blocks = (RMS->size/THREADS_PER_BLOCKS) + 1;
+	kRMSprop_with_weight_update_8bit<<<blocks,THREADS_PER_BLOCKS>>>(RMS->data, grad->data, w->data, m->data, RMS_multiplier, learning_rate, batch_size, RMS->size, momentum);
 }
 
 Matrix *rectified_linear(Matrix *A)

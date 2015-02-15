@@ -724,6 +724,53 @@ int run_basicOps_test(ClusterNet gpus)
 
 
 
+	Matrix *z1 = gpu.rand(10,5);
+	Matrix *z2 = gpu.rand(10,5);
+	Matrix *z = zeros(10,5);
+	Matrix *y1 = gpu.rand_int(10,1,0,9);
+	Matrix *y2 = gpu.rand_int(10,1,0,9);
+
+	printmat(y1);
+	printmat(y2);
+	printmat(z1);
+
+
+	add_to_z(z,z1,y1,10,z);
+	add_to_z(z,z2,y2,10,z);
+
+	z1 = to_host(z1);
+	z2 = to_host(z2);
+	Matrix *t = to_host(z);
+	y1 = to_host(y1);
+	y2 = to_host(y2);
+	printhostmat(y1);
+	printhostmat(y2);
+
+	z = zeros(10,5);
+	z = to_host(z);
+
+	for(int row = 0; row < 10; row++)
+		for(int col = 0; col < 5; col++)
+		{
+			int cls = (int)y1->data[row];
+			z->data[(cls*z1->cols) + col] += z1->data[col + (row*z1->cols)];
+			cls = (int)y2->data[row];
+			z->data[(cls*z2->cols) + col] += z2->data[col + (row*z2->cols)];
+
+		}
+
+
+	printhostmat(z);
+	printhostmat(t);
+	/*
+	for(int i = 0; i < 10; i++)
+	{
+		ASSERT((t->data[i]+ 0.0001 > z->data[i]) && //0.0001 error in float arithmetic on the GPU
+				(t->data[i]- 0.0001 < z->data[i]) ,"expand partial gradient test");
+	}
+	*/
+
+
 
 
 

@@ -3,11 +3,15 @@
 
 #include "curand.h"
 #include "curand_kernel.h"
+__global__ void kCompression_8bit_test(float *tbl, float *A, float precision, int size, float *out);
+__global__ void kCompression_8bit(float *flt_tbl, float *A, float precision, int size, unsigned char *out);
+__global__ void kDecompression_8bit(float *flt_tbl, unsigned char *A, float precision, int size, float *out);
 __global__ void kGetNonZeroColumns(float *A, float *out, int rows, int cols);
 __global__ void kGetNonZeroElements(float *A, float *out, int size);
 __global__ void kFill_with(float *m, float fill_value, int size);
 __global__ void kFill_with(int *m, int fill_value, int size);
 __global__ void kAdd(float *A,float *B, float *out, int size);
+__global__ void kAdd_to_z(float *z, float *z1, float *y, float *y_count, int batch_size, int units, float *out);
 __global__ void kSub(float *A,float *B, float *out, int size);
 __global__ void kSub_Sparse(float *A, float *data, int *ptr_rows, int *idx_cols, float *out, int rows, int cols, int size);
 __global__ void kMul(float *A,float *B, float *out, int size);
@@ -16,6 +20,7 @@ __global__ void kExp(float *A, float *out, int size);
 __global__ void kLog(float *A, float *out, int size);
 __global__ void kSqrt(float *A, float *out, int size);
 __global__ void kSquare(float *A, float *out, int size);
+__global__ void kAbs(float *A, float *out, int size);
 __global__ void kScalarMul(float *A, float scalar, float *out, int size);
 __global__ void kScalarAdd(float *A, float scalar, float *out, int size);
 __global__ void kTranspose(float *A, float *out, int width, int height); 
@@ -46,8 +51,11 @@ __global__ void kDropout(float *A, float *rdm, float dropout, int size);
 __global__ void kRMSprop(float *RMS, float *grad, float RMS_multiplier, float learning_rate, int batch_size, int size);
 __global__ void kRMSprop_with_momentum_update(float *RMS, float *grad, float *w, float *m, float RMS_multiplier, float learning_rate, int batch_size, int size, float momentum);
 __global__ void kRMSprop_with_momentum_weight_update(float *RMS, float *grad, float *w, float *m, float RMS_multiplier, float learning_rate, int batch_size, int size, float momentum);
+__global__ void kLocalGrad (float *z, float *w, float *y, float *m, float learning_rate, int batch_size, int size, float momentum);
 __global__ void kRMSprop_with_nesterov_weight_update(float *RMS, float *grad, float *w, float *m, float RMS_multiplier, float learning_rate, int batch_size, int size, float momentum);
+__global__ void kNesterov_weight_update(float *RMS, float *grad, float *w, float *m, float RMS_multiplier, float learning_rate, int batch_size, int size, float momentum);
 __global__ void kRMSprop_with_weight_update(float *RMS, float *grad, float *w, float *m, float RMS_multiplier, float learning_rate, int batch_size, int size, float momentum);
+__global__ void kRMSprop_with_weight_update_8bit(float *RMS, float *grad, float *w, float *m, float RMS_multiplier, float learning_rate, int batch_size, int size, float momentum);
 __global__ void kCreateRdmSqrtWeight_Logistic(float *A, int in, int out, int size);
 __global__ void kRandInt(float *A, int lower_limit, int upper_limit, int size);
 __global__ void kCreateSparseRdmWeight(float *rdm, float* indicies, float *out, int rows, int cols, int connections);

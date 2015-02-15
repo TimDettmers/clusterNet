@@ -79,6 +79,13 @@ public:
 	 void dropout(Matrix *A, Matrix *out, float dropout_rate);
 	 Matrix *rand_int(int rows, int cols, int low, int high);
 
+	 Matrix *compression_8bit(Matrix *A, float precision);
+	 void compression_8bit(Matrix *A, float precision, Matrix *out);
+	 Matrix *decompression_8bit(Matrix *A, float precision);
+	 void decompression_8bit(Matrix *A, float precision, Matrix *out);
+	 Matrix *compression_8bit_test(Matrix *A, float precision);
+	 void compression_8bit_test(Matrix *A, float precision, Matrix *out);
+
 	 void tick(std::string name);
 	 void tick();
 	 void tock(std::string name);
@@ -159,6 +166,8 @@ private:
 	 std::map<std::string,int> m_matrixCacheUsage;
 	 int m_gpucount;
 	 pthread_t *m_threads;
+
+	 Matrix *flt_tbl;
 
 	 bool m_hasMPI;
 	 bool m_cublasInitialized;

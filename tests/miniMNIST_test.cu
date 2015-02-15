@@ -21,8 +21,12 @@ void run_miniMNIST_test(ClusterNet gpus)
 	std::string path = std::string(buff);
 	replace(path,"/build/testSuite.out","/tests/");
 
-	Matrix *X = read_hdf5((path + "/mnist_mini_X.hdf5").c_str());
-	Matrix *y = read_hdf5((path + "/mnist_mini_y.hdf5").c_str());
+	//Matrix *X = read_hdf5((path + "/mnist_mini_X.hdf5").c_str());
+	//Matrix *y = read_hdf5((path + "/mnist_mini_y.hdf5").c_str());
+
+	Matrix *X = read_hdf5("/home/tim/data/mnist/X.hdf5");
+	Matrix *y = read_hdf5("/home/tim/data/mnist/y.hdf5");
+
 
 	Matrix *w1 = gpus.uniformSqrtWeight(784,1000);
 	Matrix *w2 = gpus.uniformSqrtWeight(1000,10);
@@ -37,15 +41,18 @@ void run_miniMNIST_test(ClusterNet gpus)
 	float cv_error = 0.0f;
 	float train_error = 0.0f;
 
+	Matrix *z = zeros(10,1000);
+
 	BatchAllocator b = BatchAllocator();
-	b.init(X, y, 0.2, 32, 64);
+	b.init(X, y, 0.2, 128, 64);
 	int epochs  = 20;
-	float learning_rate = 0.03;
+	float learning_rate = 0.003;
 	float momentum = 0.5;
 	for(int EPOCH = 1; EPOCH < epochs; EPOCH++)
 	{
 	  momentum += 0.01;
 	  if(momentum > 0.95) momentum = 0.95;
+
 	  for(int i = 0; i < b.TOTAL_BATCHES; i++)
 	  {
 		  b.broadcast_batch_to_processes();
@@ -61,7 +68,38 @@ void run_miniMNIST_test(ClusterNet gpus)
 		  Matrix *d0 = gpus.dropout(b.CURRENT_BATCH,0.2);
 		  //print_gpus_matrix(w1);
 		  Matrix *z1 = gpus.dot(d0, w1);
-		  logistic(z1, z1);
+		  //logistic(z1, z1);
+		  rectified_linear(z1,z1);
+
+		  add_to_z(z,z1,y,10,z);
+
+		  b.allocate_next_batch_async();
+
+		  b.replace_current_batch_with_next();
+
+	  }
+
+	  scalarMul(z,1.0/(b.TOTAL_BATCHES));
+
+
+
+	  for(int i = 0; i < b.TOTAL_BATCHES; i++)
+	  {
+		  b.broadcast_batch_to_processes();
+
+
+		  //nesterov updates
+		  scalarMul(m1,momentum,m1);
+		  scalarMul(m2,momentum,m2);
+		  add(w1,m1,w1);
+		  add(w2,m2,w2);
+
+		  //feedforward
+		  Matrix *d0 = gpus.dropout(b.CURRENT_BATCH,0.2);
+		  //print_gpus_matrix(w1);
+		  Matrix *z1 = gpus.dot(d0, w1);
+		  //logistic(z1, z1);
+		  rectified_linear(z1,z1);
 		  Matrix *d1 = gpus.dropout(z1,0.5);
 		  Matrix *a2 = gpus.dot(d1,w2);
 		  Matrix *out = softmax(a2);
@@ -73,8 +111,7 @@ void run_miniMNIST_test(ClusterNet gpus)
 		  Matrix *e1 = sub(out, t);
 		  Matrix *e2 = gpus.dotT(e1, w2);
 		  gpus.Tdot(z1,e1,grad_w2);
-		  logisticGrad(z1,z1);
-		  mul(e2,z1,e2);
+
 		  gpus.Tdot(b.CURRENT_BATCH,e2,grad_w1);
 
 		  //weight updates
@@ -125,7 +162,7 @@ void run_miniMNIST_test(ClusterNet gpus)
 		  b.replace_current_batch_with_next();
 	  }
 
-	  //std::cout << "Train error: " << train_error << std::endl;
+	  std::cout << "Train error: " << train_error << std::endl;
 
 	  cv_error = 0;
 	  for(int i = 0; i < b.TOTAL_BATCHES_CV; i++)
@@ -155,10 +192,10 @@ void run_miniMNIST_test(ClusterNet gpus)
 		  b.replace_current_cv_batch_with_next();
 	  }
 
-	  //std::cout << "Cross validation error: " << cv_error << std::endl;
+	  std::cout << "Cross validation error: " << cv_error << std::endl;
 
 	}
-
+	/*
 	ASSERT(train_error < 0.03f,"mini-MNIST train error 17 epochs < 0.03.");
 	ASSERT(cv_error < 0.22f, "mini-MNIST train error 17 epochs < 0.22.");
 
@@ -464,15 +501,18 @@ void run_miniMNIST_test(ClusterNet gpus)
 
 	ASSERT(train_error < 0.02f,"mini-MNIST train error 17 epochs < 0.02.");
 	ASSERT(cv_error < 0.22f, "mini-MNIST train error 17 epochs < 0.22.");
-
+	*/
 	std::vector<int> layers;
-	layers.push_back(500);
+	layers.push_back(768);
+	layers.push_back(512);
 
 
 	BatchAllocator allocator = BatchAllocator();
-	allocator.init(X,y,0.2,64,64,gpus, Distributed_weights);
+	allocator.init(X,y,0.2,128,256,gpus, Distributed_weights);
 	DeepNeuralNetwork net = DeepNeuralNetwork(layers,Classification, gpus, allocator, 10);
-	net.EPOCHS = 10;
+	net.EPOCHS = 1000;
+	//net.LEARNING_RATE = 0.001;
+	net.LEARNING_RATE = 0.001;
 	net.train();
 
 	if(gpus.MYRANK == 0)
@@ -484,12 +524,12 @@ void run_miniMNIST_test(ClusterNet gpus)
 
 	allocator = BatchAllocator();
 	Matrix *t = to_host(create_t_matrix(to_gpu(y),10));
-	allocator.init(X,t,0.2,64,64,gpus, Distributed_weights);
+	allocator.init(X,t,0.2,128,256,gpus, Distributed_weights);
 	net = DeepNeuralNetwork(layers,Regression, gpus, allocator, 10);
-	net.EPOCHS = 10;
+	net.EPOCHS = 100;
 	net.PRINT_MISSCLASSIFICATION = true;
 	net.OUTPUT_IS_PROBABILITY = true;
-	net.LEARNING_RATE = 0.01;
+	net.LEARNING_RATE = 0.0003;
 	net.train();
 
 	if(gpus.MYRANK == 0)

@@ -32,6 +32,8 @@ typedef struct Matrix
   int isDistributed;
   int cols_distributed;
 
+  unsigned char *char_data;
+
   int isSparse;
   size_t ptr_bytes;
   size_t idx_bytes;
@@ -47,6 +49,7 @@ void fill_sparse_with_zeros(Matrix *A);
 Matrix *ones(int rows, int cols);
 Matrix *zeros(int rows, int cols);
 Matrix *empty(int rows, int cols);
+Matrix *empty_char(int rows, int cols);
 Matrix *empty_pinned(int rows, int cols);
 Matrix *empty_cpu(int rows, int cols);
 Matrix *empty_pinned_sparse(int rows, int cols, float max_sparsity, float sparsity_buffer);
@@ -61,6 +64,8 @@ void uniformSqrtWeight(Matrix * uniform_rdm, int in, int out);
 void sparseRdmWeight(Matrix *rdm, Matrix *idx, Matrix *out, int connections);
 void rand_int(Matrix *int_values,int low, int high);
 
+void add_to_z(Matrix *z, Matrix *z1, Matrix *y, int classes, Matrix *out);
+
 Matrix *add(Matrix *A, Matrix *B);
 void add(Matrix *A, Matrix *B, Matrix *out);
 Matrix *sub(Matrix *A, Matrix *B);
@@ -70,6 +75,7 @@ void mul(Matrix *A, Matrix *B, Matrix *out);
 Matrix *div(Matrix *A, Matrix *B);
 void div(Matrix *A, Matrix *B, Matrix *out);
 float sum(Matrix *A);
+float max(Matrix *A);
 int getNonZeroElements(Matrix *A);
 int getNonZeroColumns(Matrix *A);
 
@@ -92,9 +98,20 @@ void RMSprop_with_momentum_update(Matrix *RMS, Matrix *grad, Matrix *w, Matrix *
 void RMSprop_with_momentum_weight_update(Matrix *RMS, Matrix *grad, Matrix *w, Matrix *m, float RMS_multiplier, float learning_rate, int batch_size, float momentum);
 void RMSprop_with_nesterov_weight_update(Matrix *RMS, Matrix *grad, Matrix *w, Matrix *m, float RMS_multiplier, float learning_rate, int batch_size, float momentum);
 void RMSprop_with_weight_update(Matrix *RMS, Matrix *grad, Matrix *w, Matrix *m, float RMS_multiplier, float learning_rate, int batch_size, float momentum);
+void RMSprop_with_weight_update_8bit(Matrix *RMS, Matrix *grad, Matrix *w, Matrix *m, float RMS_multiplier, float learning_rate, int batch_size, float momentum);
+void Nesterov_weight_update(Matrix *RMS, Matrix *grad, Matrix *w, Matrix *m, float RMS_multiplier, float learning_rate, int batch_size, float momentum);
+
+void LocalGrad(Matrix *z, Matrix *w, Matrix *y, float learning_rate, int batch_size, float momentum);
+void compression_8bit(Matrix *tbl_flt, Matrix *A, float precision,  Matrix *out);
+void compression_8bit_test(Matrix *tbl, Matrix *A, float precision,  Matrix *out);
+
+void decompression_8bit(Matrix *tbl_flt, Matrix *A, float precision,  Matrix *out);
+
 
 Matrix *square(Matrix *A);
 void square(Matrix *A, Matrix *out);
+Matrix *abs(Matrix *A);
+void abs(Matrix *A, Matrix *out);
 Matrix *gpuExp(Matrix *A);
 void gpuExp(Matrix *A, Matrix *out);
 Matrix *logistic(Matrix *A);

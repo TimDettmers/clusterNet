@@ -33,6 +33,8 @@ __global__ void kGetNonZeroColumns(float *A, float *out, int rows, int cols)
 
 
 
+
+
 __global__ void kFill_with(float *m, float fill_value, int size)
 {
   const unsigned int numThreads = blockDim.x * gridDim.x;
@@ -208,6 +210,35 @@ __global__ void hStackN(Matrix **arrA, int general_size, float *out, int size_ou
 
 }
 
+__global__ void kAdd_to_z(float *z, float *z1, float *y, float *y_count, int rows, int cols, float *out)
+{
+	float value = 0;
+	for(int row = blockIdx.x; row < rows; row +=gridDim.x)
+	{
+		int cls = (int)y[row];
+		if(threadIdx.x == 0)
+			atomicAdd(&y_count[cls],1.0f);
+		for (unsigned int col = threadIdx.x; col < cols; col += blockDim.x)
+		{
+			value = z1[row + (col*rows)];
+			atomicAdd(&out[cls+(col*rows)],value);
+		}
+	}
+
+	__syncthreads();
+
+	for(int row = blockIdx.x; row < rows; row +=gridDim.x)
+	{
+		int cls = (int)y[row];
+		for (unsigned int col = threadIdx.x; col < cols; col += blockDim.x)
+		{
+			if(y_count[cls] > 0)
+				out[cls+(col*rows)] /= y_count[cls];
+		}
+	}
+
+}
+
 
 __global__ void kAdd(float *A, float *B, float *out, int size)
 {
@@ -323,6 +354,15 @@ __global__ void kSquare(float *A, float *out, int size)
 
   for (unsigned int i = idx;i < size; i += numThreads)
        out[i] = powf(A[i], 2.0f);
+}
+
+__global__ void kAbs(float *A, float *out, int size)
+{
+  const unsigned int numThreads = blockDim.x * gridDim.x;
+  const int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
+
+  for (unsigned int i = idx;i < size; i += numThreads)
+       out[i] = fabsf(A[i]);
 }
 
 __global__ void kScalarMul(float *A, float scalar, float *out, int size)
@@ -837,6 +877,14 @@ __global__ void kRMSprop_with_momentum_update (float *RMS, float *grad, float *w
 	  }
 }
 
+
+
+
+__global__ void kLocalGrad (float *z, float *w, float *y, float *m, float learning_rate, int batch_size, int size, float momentum)
+{
+
+}
+
 __global__ void kRMSprop_with_momentum_weight_update (float *RMS, float *grad, float *w, float *m, float RMS_multiplier, float learning_rate, int batch_size, int size, float momentum)
 {
 	  const unsigned int numThreads = blockDim.x * gridDim.x;
@@ -869,13 +917,186 @@ __global__ void kRMSprop_with_nesterov_weight_update (float *RMS, float *grad, f
 
 	  for (unsigned int i = idx;i < size; i += numThreads)
 	  {
+
 		  grad_value = fdividef(grad[i],(float)batch_size);
 		  m[i] = (momentum*m[i]) - (learning_rate*grad_value);
+
 		  RMS_value = (RMS_multiplier*RMS[i]) + (powf(grad_value,2.0f)*rms_reciprocal);
 		  grad_value = learning_rate*fdividef(grad_value,(sqrtf(RMS_value)+1.0e-08f));
 
 		  RMS[i] = RMS_value;
 		  w[i] -= grad_value;
+
+		  /*
+		  grad_value = learning_rate*fdividef(grad[i],(float)batch_size);
+		  m[i] = (momentum*m[i]) - grad_value;
+		  w[i] -= grad_value;
+			*/
+	  }
+}
+
+__global__ void kNesterov_weight_update (float *RMS, float *grad, float *w, float *m, float RMS_multiplier, float learning_rate, int batch_size, int size, float momentum)
+{
+	  const unsigned int numThreads = blockDim.x * gridDim.x;
+	  const int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
+	  float grad_value = 0.0f;
+
+	  for (unsigned int i = idx;i < size; i += numThreads)
+	  {
+		  grad_value = learning_rate*fdividef(grad[i],(float)batch_size);
+		  m[i] = (momentum*m[i]) - grad_value;
+		  w[i] -= grad_value;
+
+	  }
+}
+
+
+__global__ void kCompression_8bit_test(float *tbl, float *A, float precision, int size, float *out)
+{
+	const unsigned int numThreads = blockDim.x * gridDim.x;
+	const int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
+
+	float absnumber = 0.0;
+	float multiplier = 0.1f/precision;
+	float threshold = precision/1.e6f;
+
+	__shared__ float tbl_values[128];
+	if(threadIdx.x < 126)
+		tbl_values[threadIdx.x] = tbl[threadIdx.x];
+
+	__syncthreads();
+
+	  for (int i = idx;i < size; i += numThreads)
+	  {
+		  int isNegative = 0;
+		  int pivot = 63;
+		  int upper_pivot = 125;
+		  int lower_pivot = 0;
+		  absnumber = A[i]*multiplier;
+		  if(absnumber < 0.0f){isNegative = 1; absnumber=-absnumber; }
+		  if(absnumber < threshold){ out[i] = 0.0f; continue; }
+		  for(int j = 32; j > 0; j>>=1)
+		  {
+			  if(absnumber > tbl_values[pivot])
+			  {
+				  lower_pivot = pivot;
+				  pivot+=j;
+			  }
+			  else
+			  {
+				  upper_pivot = pivot;
+				  pivot-=j;
+			  }
+
+		  }
+
+		  if(lower_pivot == pivot)
+			  if(fabsf(tbl_values[pivot]-absnumber) < (tbl_values[upper_pivot]-absnumber))
+				  out[i] = tbl_values[pivot]/(isNegative == 1 ? -multiplier : multiplier);
+			  else
+				  out[i] = tbl_values[upper_pivot]/(isNegative == 1 ? -multiplier : multiplier);
+		  else
+			  if((tbl_values[pivot]-absnumber) < fabsf(tbl_values[lower_pivot]-absnumber))
+				  out[i] = tbl_values[pivot]/(isNegative == 1 ? -multiplier : multiplier);
+			  else
+				  out[i] = tbl_values[lower_pivot]/(isNegative == 1 ? -multiplier : multiplier);
+
+
+
+	  }
+}
+
+__global__ void kDecompression_8bit(float *flt_tbl, unsigned char *A, float precision, int size, float *out)
+{
+
+	const unsigned int numThreads = blockDim.x * gridDim.x;
+	const int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
+	unsigned char value = 0;
+	float divisor = 0.1f/precision;
+
+	__shared__ float tbl_floats[256];
+	if(threadIdx.x < 126)
+	{
+		tbl_floats[threadIdx.x] = fdividef(flt_tbl[threadIdx.x],divisor);
+		tbl_floats[threadIdx.x+128] = -tbl_floats[threadIdx.x];
+	}
+
+	__syncthreads();
+
+	for (int i = idx;i < size; i += numThreads)
+	{
+		value =A[i];
+		out[i] = value == 127 ? 0.0f : tbl_floats[value];
+	}
+}
+
+
+__global__ void kCompression_8bit(float *flt_tbl, float *A, float precision, int size, unsigned char *out)
+{
+	const unsigned int numThreads = blockDim.x * gridDim.x;
+	const int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
+
+	float absnumber = 0.0f;
+	float multiplier = 0.1f/precision;
+	float threshold = precision/1.e6f;
+	int isNegative = 0;
+	int pivot = 63;
+	int upper_pivot = 125;
+	int lower_pivot = 0;
+
+	__shared__ float tbl_floats[128];
+	if(threadIdx.x < 126)
+		tbl_floats[threadIdx.x] = flt_tbl[threadIdx.x];
+
+
+	__syncthreads();
+
+	  for (int i = idx;i < size; i += numThreads)
+	  {
+		  isNegative = 0;
+		  pivot = 63;
+		  upper_pivot = 125;
+		  lower_pivot = 0;
+		  absnumber = A[i]*multiplier;
+		  if(absnumber < 0.0f){isNegative = 1; absnumber=-absnumber; }
+		  if(absnumber < threshold){ out[i] = (unsigned char)127; continue; }
+		  for(int j = 32; j > 0; j>>=1)
+		  {
+			  if(absnumber > tbl_floats[pivot])
+			  {
+				  lower_pivot = pivot;
+				  pivot+=j;
+			  }
+			  else
+			  {
+				  upper_pivot = pivot;
+				  pivot-=j;
+			  }
+
+		  }
+
+		  if(lower_pivot == pivot)
+			  if(fabsf(tbl_floats[pivot]-absnumber) < (tbl_floats[upper_pivot]-absnumber))
+				  if(isNegative == 1)
+					  out[i] =  pivot | 1 << 7;
+				  else
+					  out[i] =  pivot;
+			  else
+				  if(isNegative == 1)
+					  out[i] =  upper_pivot | 1 << 7;
+				  else
+					  out[i] =  upper_pivot;
+		  else
+			  if((tbl_floats[pivot]-absnumber) < fabsf(tbl_floats[lower_pivot]-absnumber))
+				  if(isNegative == 1)
+					  out[i] =  (pivot | 1 << 7);
+				  else
+					  out[i] =  pivot;
+			  else
+		  	  	  if(isNegative == 1)
+		  	  		  out[i] =  lower_pivot | 1 << 7;
+		  		  else
+		  			  out[i] =  lower_pivot;
 
 	  }
 }
@@ -899,6 +1120,25 @@ __global__ void kRMSprop_with_weight_update (float *RMS, float *grad, float *w, 
 		  w[i] -= grad_value;
 
 	  }
+}
+
+__global__ void kRMSprop_with_weight_update_8bit(float *RMS, float *grad, float *w, float *m, float RMS_multiplier, float learning_rate, int batch_size, int size, float momentum)
+{
+	const unsigned int numThreads = blockDim.x * gridDim.x;
+	const int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
+	float grad_value = 0.0f;
+	float RMS_value = 0.0f;
+	float rms_reciprocal = 1.0f - RMS_multiplier;
+
+	for (unsigned int i = idx;i < size; i += numThreads)
+	{
+	  grad_value = fdividef(grad[i],(float)batch_size);
+	  RMS_value = (RMS_multiplier*RMS[i]) + (powf(grad_value,2.0f)*rms_reciprocal);
+	  grad[i] = learning_rate*fdividef(grad_value,(sqrtf(RMS_value)+1.0e-08f));
+
+	  RMS[i] = RMS_value;
+
+	}
 }
 
 __global__ void kSparseDot(int m, int n, int k, float *data, int* indptr, int* indices, float *dense_data, float* target, float beta, float alpha)

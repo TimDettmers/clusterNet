@@ -64,6 +64,12 @@ void ClusterNet::init(int seed)
 
 
 
+	char buff[4096];
+	ssize_t len = ::readlink("/proc/self/exe", buff, sizeof(buff)-1);
+	std::string path = std::string(buff);
+	replace(path,"/build/clusterNet.out","/source/");
+	flt_tbl = to_gpu(read_hdf5((path+"8bit_floats.hdf5").c_str()));
+
 	int current_device = 0;
 	cudaGetDevice(&current_device);
 	/*
@@ -1286,6 +1292,43 @@ bool ClusterNet::pop_queue_PCIe()
 
 	return QUEUE_EMPTY;
 }
+
+void ClusterNet::compression_8bit_test(Matrix *A, float precision,  Matrix *out)
+{
+	::compression_8bit_test(flt_tbl, A, precision, out);
+}
+
+Matrix *ClusterNet::compression_8bit_test(Matrix *A, float precision)
+{
+	Matrix *out = empty(A->rows,A->cols);
+	::compression_8bit_test(flt_tbl, A, precision, out);
+	return out;
+}
+
+void ClusterNet::compression_8bit(Matrix *A, float precision,  Matrix *out)
+{
+	::compression_8bit(flt_tbl, A, precision, out);
+}
+
+Matrix *ClusterNet::compression_8bit(Matrix *A, float precision)
+{
+	Matrix *out = empty_char(A->rows,A->cols);
+	::compression_8bit(flt_tbl, A, precision, out);
+	return out;
+}
+
+void ClusterNet::decompression_8bit(Matrix *A, float precision,  Matrix *out)
+{
+	::decompression_8bit(flt_tbl, A, precision, out);
+}
+
+Matrix *ClusterNet::decompression_8bit(Matrix *A, float precision)
+{
+	Matrix *out = empty(A->rows,A->cols);
+	::decompression_8bit(flt_tbl, A, precision, out);
+	return out;
+}
+
 
 
 void ClusterNet::addGradients_PCIe(Matrix **grad)
