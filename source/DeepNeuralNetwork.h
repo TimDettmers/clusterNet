@@ -20,36 +20,15 @@ typedef enum Batchtype_t
 	CV = 1
 } Batchtype_t;
 
-typedef enum Unittype_t
-{
-	Logistic = 0,
-	Rectified_Linear = 1,
-	Softmax = 2,
-	Linear = 4,
-	Double_Rectified_Linear = 8
-} Unittype_t;
-
 typedef enum Networktype_t
 {
 	Classification = 0,
 	Regression = 1
 } Networktype_t;
 
-typedef enum Costfunction_t
-{
-	Cross_Entropy = 0,
-	Squared_Error = 1,
-	Root_Squared_Error = 2
-} Costfunction_t;
 
-typedef enum WeightUpdateType_t
-{
-	NesterovRMSProp = 0,
-	NesterovMomentum = 1,
-	RMSProp = 2,
-	Momentum = 4,
-	NoMomentum = 8
-} WeightUpdateType_t;
+
+
 
 class DeepNeuralNetwork
 {
@@ -61,11 +40,13 @@ public:
 	float LEARNING_RATE;
 	float LEARNING_RATE_DECAY;
 	float MOMENTUM;
+	float RMSPROP_MOMENTUM;
 	int EPOCHS;
 	bool OUTPUT_IS_PROBABILITY;
 	int TRANSITION_EPOCH;
     bool PRINT_MISSCLASSIFICATION;
     Unittype_t MAIN_UNIT;
+	std::vector<float> DROPOUT;
 
 	WeightUpdateType_t UPDATE_TYPE;
 
@@ -76,7 +57,6 @@ private:
 	std::vector<Matrix*> Z;
 	std::vector<Matrix*> Z_B;
 	std::vector<Matrix*> E;
-	std::vector<float> lDropout;
 	std::vector<Unittype_t> lUnits;
 	BatchAllocator m_BA;
 	std::vector<Matrix*> W;
@@ -92,8 +72,9 @@ private:
 	std::vector<Matrix*> B_GRAD;
 	std::vector<Matrix*> MS;
 	std::vector<Matrix*> B_MS;
+	std::vector<float> train_history;
+	std::vector<float> cv_history;
 	std::vector<int> m_lLayers;
-	Matrix *tbl;
 
 	ClusterNet m_gpus;
 	int m_output_dim;
@@ -111,6 +92,8 @@ private:
 	float get_errors(Batchtype_t batch_t);
 	void cross_validation_error();
 	void train_error();
+
+	void save_history();
 
 	void activation_function(int layer, Matrix *A);
 	void derivative_function(int layer, Matrix *A);

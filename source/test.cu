@@ -14,6 +14,7 @@
 #include <WikiMaxoutNet_PCIe.h>
 #include <WikiMaxoutNet_PCIe2.h>
 #include <WikiNetDist.h>
+#include <Layer.h>
 
 using std::cout;
 using std::endl;
@@ -1453,30 +1454,72 @@ int main(int argc, char *argv[])
     */
 
 
+	ClusterNet *gpu = new ClusterNet(1235);
 
 
+	/*
+	Matrix *X = gpu->rand(100,10);
+	Matrix *y = gpu->rand_int(100,1,0,9);
+	*/
 
 
-	cudaSetDevice(1);
 	Matrix *X = read_hdf5("/home/tim/data/mnist/X.hdf5");
 	Matrix *y = read_hdf5("/home/tim/data/mnist/y.hdf5");
 
+	BatchAllocator b = BatchAllocator();
+	b.init(X,y,(1.0-0.8571429),128,128,*gpu, Single_GPU);
+
+	Layer *l0 = new Layer(X->cols,128,Input,gpu);
+	Layer *l1 = new Layer(1200, Logistic, l0);
+	Layer *l2 = new Layer(1200, Logistic, l1);
+	Layer *l3 = new Layer(10, Softmax, l2);
+
+	//l0->link_with_next_layer(l1);
+	//l1->link_with_next_layer(l2);
+
+	for(int epoch = 0; epoch < 100; epoch++)
+	{
+		cout << "EPOCH: " << epoch + 1 << endl;
+		b.propagate_through_layers(l0,Training);
+		b.propagate_through_layers(l0,Trainerror);
+		b.propagate_through_layers(l0,CVerror);
+
+	}
+
+
+
+
+	/*
+	cudaSetDevice(0);
+
+	Matrix *X = read_hdf5("/home/tim/data/mnist/X.hdf5");
+	Matrix *y = read_hdf5("/home/tim/data/mnist/y.hdf5");
+
+
+
 	ClusterNet gpu = ClusterNet(1235);
+
 
 	BatchAllocator b = BatchAllocator();
 
 	std::vector<int> layers;
 	layers.push_back(1200);
 	layers.push_back(1200);
+	std::vector<float> dropout;
+	dropout.push_back(0.2f);
+	dropout.push_back(0.5f);
+	dropout.push_back(0.5f);
 	BatchAllocator allocator = BatchAllocator();
-	allocator.init(X,y,(1.0-0.8571429),128,256,gpu, Single_GPU);
+	allocator.init(X,y,(1.0-0.8571429),128,256,gpu, Distributed_weights);
 	DeepNeuralNetwork net = DeepNeuralNetwork(layers,Classification, gpu, allocator, 10);
-	net.EPOCHS = 250;
-	net.TRANSITION_EPOCH = 100;
+	net.EPOCHS = 500;
+	net.TRANSITION_EPOCH = 75;
 	net.LEARNING_RATE = 0.003;
 	net.UPDATE_TYPE = RMSProp;
+	net.DROPOUT = dropout;
+	//net.MAIN_UNIT = Double_Rectified_Linear;
 	net.train();
-
+	*/
 
 
 

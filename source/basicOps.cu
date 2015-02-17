@@ -963,6 +963,7 @@ Matrix *create_t_matrix(Matrix *labels, int max_label)
 void create_t_matrix(Matrix *labels, Matrix *out)
 {
 	int blocks = (labels->size/THREADS_PER_BLOCKS) + 1;
+	fill_matrix(out,0.0f);
 	kCreate_t_matrix<<<blocks,THREADS_PER_BLOCKS>>>(labels->data, out->data, out->rows, labels->size);
 }
 

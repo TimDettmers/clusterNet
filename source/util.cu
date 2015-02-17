@@ -351,6 +351,11 @@ void printmat(Matrix *A)
 
 }
 
+void printmatdim(Matrix *A)
+{
+	cout << A->rows << "x" << A->cols << endl;
+}
+
 void printhostmat(Matrix *A)
 {
   if(A->isSparse == 0)

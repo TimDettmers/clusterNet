@@ -1098,7 +1098,69 @@ void BatchAllocator::replace_current_cv_batch_with_next()
 	}
 }
 
+void BatchAllocator::propagate_through_layers(Layer *root, DataPropagationType_t type)
+{
+	Layer *end = root;
+	while(end->next){end = end->next; }
 
+	if (type == Training)
+	{
+		for(int i = 0; i < TOTAL_BATCHES; i++)
+		{
+			root->out = CURRENT_BATCH;
+			end->target = CURRENT_BATCH_Y;
+
+			broadcast_batch_to_processes();
+
+			root->forward();
+			root->backward();
+			allocate_next_batch_async();
+			root->weight_update();
+
+			replace_current_batch_with_next();
+		}
+
+		root->print_error("Fast train error: ");
+	}
+	else if(type == Trainerror)
+	{
+		for(int i = 0; i < TOTAL_BATCHES; i++)
+		{
+			root->out = CURRENT_BATCH;
+			end->target = CURRENT_BATCH_Y;
+
+			broadcast_batch_to_processes();
+
+			root->forward();
+
+			allocate_next_batch_async();
+			replace_current_batch_with_next();
+		}
+		root->print_error("Train error: ");
+	}
+	else if(type == CVerror)
+	{
+
+		for(int i = 0; i < TOTAL_BATCHES_CV; i++)
+		{
+			root->out = CURRENT_BATCH_CV;
+			end->target = CURRENT_BATCH_CV_Y;
+
+			broadcast_batch_cv_to_processes();
+
+			root->forward();
+
+			allocate_next_cv_batch_async();
+			replace_current_cv_batch_with_next();
+		}
+		root->print_error("CV error: ");
+	}
+	else
+	{
+		throw "DataPropagationType not implemented!";
+	}
+
+}
 
 
 void BatchAllocator::finish_batch_allocator()

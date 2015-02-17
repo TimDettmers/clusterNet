@@ -24,6 +24,42 @@
 #include <thrust/fill.h>
 #include <unistd.h>
 
+typedef enum Unittype_t
+{
+	Logistic = 0,
+	Rectified_Linear = 1,
+	Softmax = 2,
+	Linear = 4,
+	Double_Rectified_Linear = 8,
+	Input = 16
+} Unittype_t;
+
+typedef enum DataPropagationType_t
+{
+	Training = 0,
+	Trainerror = 1,
+	CVerror = 2
+} DataPropagationType_t;
+
+
+typedef enum WeightUpdateType_t
+{
+	NesterovRMSProp = 0,
+	NesterovMomentum = 1,
+	RMSProp = 2,
+	Momentum = 4,
+	NoMomentum = 8
+} WeightUpdateType_t;
+
+
+typedef enum Costfunction_t
+{
+	Cross_Entropy = 0,
+	Squared_Error = 1,
+	Root_Squared_Error = 2,
+	Misclassification = 4
+} Costfunction_t;
+
 
 class ClusterNet
 {

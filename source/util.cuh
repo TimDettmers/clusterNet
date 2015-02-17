@@ -33,6 +33,7 @@ int test_eq(int i1, int i2, int idx1, int idx2, char* message);
 int test_matrix(Matrix *A, int rows, int cols);
 void printmat(Matrix *A);
 void printhostmat(Matrix *A);
+void printmatdim(Matrix *A);
 void printmat(Matrix *A, int end_rows, int end_cols);
 void printmat(Matrix *A, int start_row, int end_row, int start_col, int end_col);
 void print_matrix(Matrix *A, int end_rows, int end_cols);
