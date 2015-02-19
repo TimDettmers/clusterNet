@@ -1110,14 +1110,6 @@ void BatchAllocator::propagate_through_layers(Layer *root, DataPropagationType_t
 			root->activation = CURRENT_BATCH;
 			end->target = CURRENT_BATCH_Y;
 
-			if(!root->out){ root->out = empty(root->activation->rows, root->activation->cols); }
-			else if(root->out->rows != root->activation->rows)
-			{
-				cudaFree(root->out->data);
-				free(root->out);
-				root->out = empty(root->activation->rows, root->activation->cols);
-			}
-
 			broadcast_batch_to_processes();
 
 			root->forward();
@@ -1137,14 +1129,6 @@ void BatchAllocator::propagate_through_layers(Layer *root, DataPropagationType_t
 			root->activation = CURRENT_BATCH;
 			end->target = CURRENT_BATCH_Y;
 
-			if(!root->out){ root->out = empty(root->activation->rows, root->activation->cols); }
-			else if(root->out->rows != root->activation->rows)
-			{
-				cudaFree(root->out->data);
-				free(root->out);
-				root->out = empty(root->activation->rows, root->activation->cols);
-			}
-
 			broadcast_batch_to_processes();
 
 			root->forward(false);
@@ -1162,14 +1146,6 @@ void BatchAllocator::propagate_through_layers(Layer *root, DataPropagationType_t
 		{
 			root->activation = CURRENT_BATCH_CV;
 			end->target = CURRENT_BATCH_CV_Y;
-
-			if(!root->out){ root->out = empty(root->activation->rows, root->activation->cols); }
-			else if(root->out->rows != root->activation->rows)
-			{
-				cudaFree(root->out->data);
-				free(root->out);
-				root->out = empty(root->activation->rows, root->activation->cols);
-			}
 
 			broadcast_batch_cv_to_processes();
 

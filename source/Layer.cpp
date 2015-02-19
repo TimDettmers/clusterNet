@@ -147,33 +147,46 @@ void Layer::activation_gradient()
 
 void Layer::handle_offsize()
 {
-	if(prev->out->rows != out->rows && (!out_offsize || out_offsize->rows != prev->out->rows))
+	if(!prev)
 	{
-		if(out_offsize)
+		if(!out){ out = empty(activation->rows, activation->cols); }
+		else if(out->rows != activation->rows)
 		{
-			cudaFree(out_offsize->data);
-			cudaFree(activation_offsize->data);
-			cudaFree(error_offsize->data);
-			cudaFree(bias_activations_offsize->data);
-			cudaFree(target_matrix_offsize->data);
+			cudaFree(out->data);
+			free(out);
+			out = empty(activation->rows, activation->cols);
+		}
+	}
+	else
+	{
+		if(prev->out->rows != out->rows && (!out_offsize || out_offsize->rows != prev->out->rows))
+		{
+			if(out_offsize)
+			{
+				cudaFree(out_offsize->data);
+				cudaFree(activation_offsize->data);
+				cudaFree(error_offsize->data);
+				cudaFree(bias_activations_offsize->data);
+				cudaFree(target_matrix_offsize->data);
+			}
+
+			out_offsize = empty(prev->out->rows, UNITCOUNT);
+			activation_offsize = empty(prev->out->rows, UNITCOUNT);
+			error_offsize = empty(prev->out->rows, UNITCOUNT);
+			bias_activations_offsize = empty(1,prev->out->rows);
+			target_matrix_offsize = zeros(prev->out->rows, UNITCOUNT);
 		}
 
-		out_offsize = empty(prev->out->rows, UNITCOUNT);
-		activation_offsize = empty(prev->out->rows, UNITCOUNT);
-		error_offsize = empty(prev->out->rows, UNITCOUNT);
-		bias_activations_offsize = empty(1,prev->out->rows);
-		target_matrix_offsize = zeros(prev->out->rows, UNITCOUNT);
-	}
 
-
-	if(prev->out->rows != out->rows)
-	{
-		Matrix *swap;
-		swap = out; out = out_offsize; out_offsize = swap;
-		swap = activation; activation = activation_offsize; activation_offsize = swap;
-		swap = error; error = error_offsize; error_offsize = swap;
-		swap = bias_activations; bias_activations = bias_activations_offsize; bias_activations_offsize = swap;
-		swap = target_matrix; target_matrix = target_matrix_offsize; target_matrix_offsize = swap;
+		if(prev->out->rows != out->rows)
+		{
+			Matrix *swap;
+			swap = out; out = out_offsize; out_offsize = swap;
+			swap = activation; activation = activation_offsize; activation_offsize = swap;
+			swap = error; error = error_offsize; error_offsize = swap;
+			swap = bias_activations; bias_activations = bias_activations_offsize; bias_activations_offsize = swap;
+			swap = target_matrix; target_matrix = target_matrix_offsize; target_matrix_offsize = swap;
+		}
 	}
 
 }
@@ -182,8 +195,9 @@ void Layer::handle_offsize()
 void Layer::forward(){ forward(true); }
 void Layer::forward(bool useDropout)
 {
-	if(!prev){ unit_activation(useDropout); next->forward(useDropout); return; }
 	handle_offsize();
+	if(!prev){  unit_activation(useDropout); next->forward(useDropout); return; }
+
 
 	GPU->dot(prev->out,prev->w_next,out);
 	addMatrixVector(out,prev->b_next,out);
