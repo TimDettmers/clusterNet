@@ -1103,65 +1103,35 @@ void BatchAllocator::propagate_through_layers(Layer *root, DataPropagationType_t
 	Layer *end = root;
 	while(end->next){end = end->next; }
 
-	if (type == Training)
+	for(int i = 0; i < (type == CVerror ? TOTAL_BATCHES_CV : TOTAL_BATCHES); i++)
 	{
-		for(int i = 0; i < TOTAL_BATCHES; i++)
+		root->activation = (type == CVerror ? CURRENT_BATCH_CV : CURRENT_BATCH);
+		end->target = (type == CVerror ? CURRENT_BATCH_CV_Y : CURRENT_BATCH_Y);
+
+		if(type == CVerror){ broadcast_batch_cv_to_processes(); }
+		else{ broadcast_batch_to_processes(); }
+
+		if (type == Training)
 		{
-			root->activation = CURRENT_BATCH;
-			end->target = CURRENT_BATCH_Y;
-
-			broadcast_batch_to_processes();
-
-			root->forward();
-			root->backward();
-
-			allocate_next_batch_async();
-
-			root->weight_update();
-
-			replace_current_batch_with_next();
+				root->forward();
+				root->backward();
+				root->weight_update();
 		}
+		else if(type == Trainerror || type == CVerror){ root->forward(false); root->running_error(); }
+		else{ throw "DataPropagationType not implemented!";	}
+
+		if(type == CVerror){allocate_next_cv_batch_async(); replace_current_cv_batch_with_next(); }
+		else{ allocate_next_batch_async(); replace_current_batch_with_next(); }
+
 	}
-	else if(type == Trainerror)
-	{
-		for(int i = 0; i < TOTAL_BATCHES; i++)
-		{
-			root->activation = CURRENT_BATCH;
-			end->target = CURRENT_BATCH_Y;
+	std::string message;
 
-			broadcast_batch_to_processes();
 
-			root->forward(false);
-			root->running_error();
+	if(type == Trainerror){message = "Train error: "; }
+	if(type == CVerror){message = "CV error: "; }
 
-			allocate_next_batch_async();
-			replace_current_batch_with_next();
-		}
-		root->print_error("Train error: ");
-	}
-	else if(type == CVerror)
-	{
-
-		for(int i = 0; i < TOTAL_BATCHES_CV; i++)
-		{
-			root->activation = CURRENT_BATCH_CV;
-			end->target = CURRENT_BATCH_CV_Y;
-
-			broadcast_batch_cv_to_processes();
-
-			root->forward(false);
-			root->running_error();
-
-			allocate_next_cv_batch_async();
-			replace_current_cv_batch_with_next();
-		}
-		root->print_error("CV error: ");
-	}
-	else
-	{
-		throw "DataPropagationType not implemented!";
-	}
-
+	if(type != Training)
+		root->print_error(message);
 }
 
 
