@@ -1454,14 +1454,11 @@ int main(int argc, char *argv[])
     */
 
 
+
+
+
+
 	ClusterNet *gpu = new ClusterNet(1235);
-
-
-	/*
-	Matrix *X = gpu->rand(100,10);
-	Matrix *y = gpu->rand_int(100,1,0,9);
-	*/
-
 
 	Matrix *X = read_hdf5("/home/tim/data/mnist/X.hdf5");
 	Matrix *y = read_hdf5("/home/tim/data/mnist/y.hdf5");
@@ -1477,19 +1474,28 @@ int main(int argc, char *argv[])
 	//l0->link_with_next_layer(l1);
 	//l1->link_with_next_layer(l2);
 
+	l0->DROPOUT = 0.2f;
+	l0->set_hidden_dropout(0.5f);
+
 	for(int epoch = 0; epoch < 100; epoch++)
 	{
 		cout << "EPOCH: " << epoch + 1 << endl;
+
 		b.propagate_through_layers(l0,Training);
-		b.propagate_through_layers(l0,Trainerror);
+		if(epoch % 5 == 0)
+			b.propagate_through_layers(l0,Trainerror);
+
 		b.propagate_through_layers(l0,CVerror);
+
+
+
 
 	}
 
 
 
-
 	/*
+
 	cudaSetDevice(0);
 
 	Matrix *X = read_hdf5("/home/tim/data/mnist/X.hdf5");
@@ -1510,7 +1516,7 @@ int main(int argc, char *argv[])
 	dropout.push_back(0.5f);
 	dropout.push_back(0.5f);
 	BatchAllocator allocator = BatchAllocator();
-	allocator.init(X,y,(1.0-0.8571429),128,256,gpu, Distributed_weights);
+	allocator.init(X,y,(1.0-0.8571429),128,256,gpu, Single_GPU);
 	DeepNeuralNetwork net = DeepNeuralNetwork(layers,Classification, gpu, allocator, 10);
 	net.EPOCHS = 500;
 	net.TRANSITION_EPOCH = 75;
@@ -1519,8 +1525,8 @@ int main(int argc, char *argv[])
 	net.DROPOUT = dropout;
 	//net.MAIN_UNIT = Double_Rectified_Linear;
 	net.train();
-	*/
 
+	*/
 
 
 	//cudaSetDevice(1);

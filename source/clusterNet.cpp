@@ -768,7 +768,9 @@ Matrix *ClusterNet::dropout(Matrix *A, float dropout_rate)
 {
 	Matrix *out;
 	if(A->isSparse == 0)
+	{
 		out = rand(A->rows, A->cols);
+	}
 	else
 	{
 		int current_device = 0;

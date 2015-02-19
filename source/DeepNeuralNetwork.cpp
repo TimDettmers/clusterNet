@@ -378,6 +378,9 @@ void DeepNeuralNetwork::feedforward(FeedForward_t ff)
 		if(ff == Train_error){ Z.push_back(m_BA.CURRENT_BATCH);}
 		else{ Z.push_back(m_BA.CURRENT_BATCH_CV);}
 
+
+		scalarMul(Z.back(), 1.0f-DROPOUT[0], Z.back());
+
 		for(int i = 0; i < W.size(); i++)
 		{
 			Z.push_back(m_gpus.dot(Z.back(), W[i]));

@@ -50,11 +50,13 @@ void Layer::init(int unitcount, int start_batch_size, Unittype_t unit, ClusterNe
 	{
 		out = zeros(BATCH_SIZE, UNITCOUNT);
 		bias_activations = ones(1, BATCH_SIZE);
+		activation = zeros(BATCH_SIZE, UNITCOUNT);
 	}
 	else
 	{
 		out = NULL;
 		bias_activations = NULL;
+		activation = NULL;
 	}
 
 }
@@ -77,30 +79,44 @@ void Layer::link_with_next_layer(Layer *next_layer)
 
 
 	next->out = zeros(BATCH_SIZE, next->UNITCOUNT);
+	next->activation = zeros(BATCH_SIZE, next->UNITCOUNT);
 	next->error = zeros(BATCH_SIZE, next->UNITCOUNT);
 	next->bias_activations = ones(1, BATCH_SIZE);
 	next->prev = this;
 }
 
 
-void Layer::activation(Matrix *input)
+void Layer::unit_activation(){ unit_activation(true); }
+void Layer::unit_activation(bool useDropout)
 {
 	switch(UNIT_TYPE)
 	{
 		case Logistic:
-			logistic(out,out);
+			logistic(out,activation);
 			break;
 		case Rectified_Linear:
-			rectified_linear(out,out);
+			rectified_linear(out,activation);
 			break;
 		case Softmax:
 			softmax(out,out);
 			break;
 		case Double_Rectified_Linear:
-			doubleRectifiedLinear(out,out);
+			doubleRectifiedLinear(out,activation);
 			break;
 		case Linear:
+			LinearUnit(out, activation);
 			break;
+		case Input:
+			break;
+	}
+
+
+	if(UNIT_TYPE != Softmax)
+	{
+		if(useDropout)
+			GPU->dropout(activation,out,DROPOUT);
+		else
+			scalarMul(activation,1.0f-DROPOUT, out);
 	}
 
 
@@ -112,13 +128,13 @@ void Layer::activation_gradient()
 	switch(UNIT_TYPE)
 	{
 		case Logistic:
-			logisticGrad(out,out);
+			logisticGrad(activation,activation);
 			break;
 		case Rectified_Linear:
-			rectified_linear_derivative(out,out);
+			rectified_linear_derivative(activation,activation);
 			break;
 		case Double_Rectified_Linear:
-			double_rectified_linear_derivative(out,out);
+			double_rectified_linear_derivative(activation,activation);
 			break;
 		case Softmax:
 			break;
@@ -136,12 +152,14 @@ void Layer::handle_offsize()
 		if(out_offsize)
 		{
 			cudaFree(out_offsize->data);
+			cudaFree(activation_offsize->data);
 			cudaFree(error_offsize->data);
 			cudaFree(bias_activations_offsize->data);
 			cudaFree(target_matrix_offsize->data);
 		}
 
 		out_offsize = empty(prev->out->rows, UNITCOUNT);
+		activation_offsize = empty(prev->out->rows, UNITCOUNT);
 		error_offsize = empty(prev->out->rows, UNITCOUNT);
 		bias_activations_offsize = empty(1,prev->out->rows);
 		target_matrix_offsize = zeros(prev->out->rows, UNITCOUNT);
@@ -152,6 +170,7 @@ void Layer::handle_offsize()
 	{
 		Matrix *swap;
 		swap = out; out = out_offsize; out_offsize = swap;
+		swap = activation; activation = activation_offsize; activation_offsize = swap;
 		swap = error; error = error_offsize; error_offsize = swap;
 		swap = bias_activations; bias_activations = bias_activations_offsize; bias_activations_offsize = swap;
 		swap = target_matrix; target_matrix = target_matrix_offsize; target_matrix_offsize = swap;
@@ -160,18 +179,18 @@ void Layer::handle_offsize()
 }
 
 
-
-void Layer::forward()
+void Layer::forward(){ forward(true); }
+void Layer::forward(bool useDropout)
 {
-	if(!prev){ next->forward(); next->running_error(); return; }
+	if(!prev){ unit_activation(useDropout); next->forward(useDropout); return; }
 	handle_offsize();
 
 	GPU->dot(prev->out,prev->w_next,out);
 	addMatrixVector(out,prev->b_next,out);
-    activation(out);
+    unit_activation(useDropout);
 
     if(next != 0)
-    	next->forward();
+    	next->forward(useDropout);
 }
 
 
@@ -212,17 +231,17 @@ void Layer::backward()
 	{
 		if(out->cols != target->cols && !target_matrix){ target_matrix = zeros(BATCH_SIZE,out->cols); }
 		if(out->cols != target->cols){ create_t_matrix(target,target_matrix); sub(out,target_matrix,error); return; }
-		else{ sub(out,target,error);  return;}
+		else{ sub(activation,target,error);  return;}
 	}
 
-	GPU->Tdot(out, next->error, w_grad_next);
+	GPU->Tdot(activation, next->error, w_grad_next);
 	GPU->dot(next->bias_activations, next->error,b_grad_next);
 
 	if(UNIT_TYPE == Input){ return; }
 
 	activation_gradient();
 	GPU->dotT(next->error, w_next,error);
-	mul(error, out, error);
+	mul(error, activation, error);
 
 }
 
@@ -235,9 +254,7 @@ void Layer::weight_update()
 	switch(UPDATE_TYPE)
 	{
 		case RMSProp:
-			//cout << sum(w_next) << endl;
 			RMSprop_with_weight_update(w_rms_next,w_grad_next,w_next,w_next,RMSPROP_MOMENTUM,LEARNING_RATE,out->rows,MOMENTUM);
-			//cout << sum(w_next) << endl;
 			break;
 		default:
 			throw "Unknown update type!";
@@ -254,6 +271,13 @@ void Layer::print_error(string message)
 	cout << message << RUNNING_ERROR/RUNNING_SAMPLE_SIZE << endl;
 	RUNNING_ERROR = 0.0f;
 	RUNNING_SAMPLE_SIZE = 0.0f;
+}
+
+void Layer::set_hidden_dropout(float dropout)
+{
+	if(!next){ return; }
+	next->DROPOUT = dropout;
+	next->set_hidden_dropout(dropout);
 }
 
 Layer::~Layer()

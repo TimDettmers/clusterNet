@@ -733,6 +733,16 @@ __global__ void kDoubleRectifiedLinear(float *A, float *out, int size)
   }
 }
 
+__global__ void kLinear(float *A, float *out, int size)
+{
+  const unsigned int numThreads = blockDim.x * gridDim.x;
+  const int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
+
+  for (unsigned int i = idx;i < size; i += numThreads)
+      out[i] = A[i];
+
+}
+
 __global__ void kDoubleRectifiedLinear_Derivative(float *A, float *out, int size)
 {
 	  const unsigned int numThreads = blockDim.x * gridDim.x;
@@ -833,6 +843,22 @@ __global__ void kDropout(float *A, float *rdm, float dropout, int size)
 
 	  for (unsigned int i = idx;i < size; i += numThreads)
 		  rdm[i] = rdm[i] > dropout ? A[i] : 0.0f;
+
+}
+
+__global__ void kDropout_cached(float *A, float *dropout, float *out, int current_idx, int size)
+{
+	  const unsigned int numThreads = blockDim.x * gridDim.x;
+	  const int idx = ((blockIdx.x * blockDim.x) + threadIdx.x);
+
+	  int shifted_idx = 0;
+	  int offset = 0;
+	  for (unsigned int i = idx;i < size; i += numThreads)
+	  {
+		  shifted_idx = i +current_idx;
+		  offset = shifted_idx/10000;
+		  out[i] = dropout[shifted_idx - (offset*10000)] == 1.0f ? A[i] : 0.0f;
+	  }
 
 }
 

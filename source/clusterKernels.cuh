@@ -48,6 +48,7 @@ __global__ void kLogistic(float *A, float *out, int size);
 __global__ void kLogisticGrad(float *A, float *out, int size);
 __global__ void kArange(float *out, int start, int rows, int cols, int size);
 __global__ void kDropout(float *A, float *rdm, float dropout, int size);
+__global__ void kDropout_cached(float *A, float *dropout, float *out, int current_idx, int size);
 __global__ void kRMSprop(float *RMS, float *grad, float RMS_multiplier, float learning_rate, int batch_size, int size);
 __global__ void kRMSprop_with_momentum_update(float *RMS, float *grad, float *w, float *m, float RMS_multiplier, float learning_rate, int batch_size, int size, float momentum);
 __global__ void kRMSprop_with_momentum_weight_update(float *RMS, float *grad, float *w, float *m, float RMS_multiplier, float learning_rate, int batch_size, int size, float momentum);
@@ -62,6 +63,7 @@ __global__ void kCreateSparseRdmWeight(float *rdm, float* indicies, float *out, 
 __global__ void kRectifiedLinear(float *A, float *out, int size);
 __global__ void kRectifiedLinear_Derivative(float *A, float *out, int size);
 __global__ void kSquaredError(float *A, float *t, float *out, int size);
+__global__ void kLinear(float *A, float *out, int size);
 __global__ void kDoubleRectifiedLinear(float* A, float* out, int size);
 __global__ void kDoubleRectifiedLinear_Derivative(float *A, float *out, int size);
 __global__ void kSparseDot(int m, int n, int k, float *data, int* indptr, int* indices, float *dense_data, float* target, float beta, float alpha);

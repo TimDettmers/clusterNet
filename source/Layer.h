@@ -22,8 +22,10 @@ public:
 	Matrix *bias_activations;
 	Matrix *out;
 	Matrix *error;
+	Matrix *activation;
 
 	Matrix *out_offsize;
+	Matrix *activation_offsize;
 	Matrix *error_offsize;
 	Matrix *bias_activations_offsize;
 	Matrix *target_matrix_offsize;
@@ -48,6 +50,7 @@ public:
 	WeightUpdateType_t UPDATE_TYPE;
 
 	virtual void forward();
+	virtual void forward(bool useDropout);
 	virtual void running_error();
 	virtual void backward();
 	virtual void print_error(std::string message);
@@ -55,6 +58,7 @@ public:
 
 	virtual void link_with_next_layer(Layer *next_layer);
 	virtual void init(int unitcount, int start_batch_size, Unittype_t unit, ClusterNet *gpu);
+	virtual void set_hidden_dropout(float dropout);
 	virtual ~Layer();
 	Layer(int unitcount, int start_batch_size, Unittype_t unit, ClusterNet *gpu);
 	Layer(int unitcount, Unittype_t unit);
@@ -65,7 +69,8 @@ public:
 	Layer(int unitcount, Layer *prev);
 
 private:
-	virtual void activation(Matrix *input);
+	virtual void unit_activation();
+	virtual void unit_activation(bool useDropout);
 	virtual void activation_gradient();
 	void handle_offsize();
 

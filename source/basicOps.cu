@@ -716,6 +716,20 @@ void doubleRectifiedLinear(Matrix *A, Matrix *out)
   kDoubleRectifiedLinear<<<block_size,THREADS_PER_BLOCKS>>>(A->data, out->data, A->size);
 }
 
+Matrix *LinearUnit(Matrix *A)
+{
+  Matrix *out = empty(A->rows,A->cols);
+  LinearUnit(A, out);
+
+  return out;
+}
+
+void LinearUnit(Matrix *A, Matrix *out)
+{
+  int block_size = (A->size/THREADS_PER_BLOCKS) + 1;
+  kLinear<<<block_size,THREADS_PER_BLOCKS>>>(A->data, out->data, A->size);
+}
+
 Matrix *hardTanH(Matrix *A)
 {
   Matrix *out = empty(A->rows,A->cols);
@@ -1044,6 +1058,12 @@ void dropout(Matrix *A, Matrix *rdm, float dropout_rate)
 {
 	int blocks = (A->size/THREADS_PER_BLOCKS) + 1;
 	kDropout<<<blocks, THREADS_PER_BLOCKS>>>(A->data, rdm->data, dropout_rate, rdm->size);
+}
+
+void dropout_cached(Matrix *A, Matrix *dropout, Matrix *out, int idx)
+{
+	int blocks = (A->size/THREADS_PER_BLOCKS) + 1;
+	kDropout_cached<<<blocks, THREADS_PER_BLOCKS>>>(A->data, dropout->data, out->data, idx, out->size);
 }
 
 void RMSprop(Matrix *RMS, Matrix *grad, float RMS_multiplier, float learning_rate, int batch_size)

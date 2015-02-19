@@ -1107,31 +1107,48 @@ void BatchAllocator::propagate_through_layers(Layer *root, DataPropagationType_t
 	{
 		for(int i = 0; i < TOTAL_BATCHES; i++)
 		{
-			root->out = CURRENT_BATCH;
+			root->activation = CURRENT_BATCH;
 			end->target = CURRENT_BATCH_Y;
+
+			if(!root->out){ root->out = empty(root->activation->rows, root->activation->cols); }
+			else if(root->out->rows != root->activation->rows)
+			{
+				cudaFree(root->out->data);
+				free(root->out);
+				root->out = empty(root->activation->rows, root->activation->cols);
+			}
 
 			broadcast_batch_to_processes();
 
 			root->forward();
 			root->backward();
+
 			allocate_next_batch_async();
+
 			root->weight_update();
 
 			replace_current_batch_with_next();
 		}
-
-		root->print_error("Fast train error: ");
 	}
 	else if(type == Trainerror)
 	{
 		for(int i = 0; i < TOTAL_BATCHES; i++)
 		{
-			root->out = CURRENT_BATCH;
+			root->activation = CURRENT_BATCH;
 			end->target = CURRENT_BATCH_Y;
+
+			if(!root->out){ root->out = empty(root->activation->rows, root->activation->cols); }
+			else if(root->out->rows != root->activation->rows)
+			{
+				cudaFree(root->out->data);
+				free(root->out);
+				root->out = empty(root->activation->rows, root->activation->cols);
+			}
 
 			broadcast_batch_to_processes();
 
-			root->forward();
+			root->forward(false);
+			root->running_error();
 
 			allocate_next_batch_async();
 			replace_current_batch_with_next();
@@ -1143,12 +1160,21 @@ void BatchAllocator::propagate_through_layers(Layer *root, DataPropagationType_t
 
 		for(int i = 0; i < TOTAL_BATCHES_CV; i++)
 		{
-			root->out = CURRENT_BATCH_CV;
+			root->activation = CURRENT_BATCH_CV;
 			end->target = CURRENT_BATCH_CV_Y;
+
+			if(!root->out){ root->out = empty(root->activation->rows, root->activation->cols); }
+			else if(root->out->rows != root->activation->rows)
+			{
+				cudaFree(root->out->data);
+				free(root->out);
+				root->out = empty(root->activation->rows, root->activation->cols);
+			}
 
 			broadcast_batch_cv_to_processes();
 
-			root->forward();
+			root->forward(false);
+			root->running_error();
 
 			allocate_next_cv_batch_async();
 			replace_current_cv_batch_with_next();
