@@ -351,9 +351,14 @@ void printmat(Matrix *A)
 
 }
 
-void printmatdim(Matrix *A)
+void printdim(Matrix *A)
 {
 	cout << A->rows << "x" << A->cols << endl;
+}
+
+void printsum(Matrix *A)
+{
+	cout << sum(A) << endl;
 }
 
 void printhostmat(Matrix *A)

@@ -786,6 +786,12 @@ void square(Matrix *A, Matrix *out)
   kSquare<<<block_size,THREADS_PER_BLOCKS>>>(A->data, out->data, A->size);
 }
 
+void renormalizeWeights(Matrix *w, Matrix *unit_sums, float limit)
+{
+  int block_size = (w->size/THREADS_PER_BLOCKS) + 1;
+  kRenormalizeWeights<<<block_size,THREADS_PER_BLOCKS>>>(w->data, unit_sums->data, limit, w->rows,w->cols);
+}
+
 Matrix *abs(Matrix *A)
 {
   Matrix *out = empty(A->rows,A->cols);
@@ -950,6 +956,24 @@ void addMatrixVector(Matrix *A, Matrix *v, Matrix *out)
 	assert(A->cols == v->cols);
 	int blocks = (A->size/THREADS_PER_BLOCKS) + 1;
 	kAddMatrixVector<<<blocks,THREADS_PER_BLOCKS>>>(A->data, v->data, out->data, A->rows, A->size);
+}
+
+Matrix *mulMatrixVector(Matrix *A, Matrix *v)
+{
+	Matrix *out = empty(A->rows,A->cols);
+	mulMatrixVector(A, v, out);
+
+	return out;
+}
+
+void mulMatrixVector(Matrix *A, Matrix *v, Matrix *out)
+{
+	if(A->cols != v->cols)
+		printf("Error dimensions do not match: %i columns for matrix vs. %i for vector",A->cols,v->cols);
+
+	assert(A->cols == v->cols);
+	int blocks = (A->size/THREADS_PER_BLOCKS) + 1;
+	kMulMatrixVector<<<blocks,THREADS_PER_BLOCKS>>>(A->data, v->data, out->data, A->rows, A->size);
 }
 
 void softmax(Matrix *A, Matrix *out)

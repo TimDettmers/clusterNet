@@ -108,6 +108,7 @@ void compression_8bit_test(Matrix *tbl, Matrix *A, float precision,  Matrix *out
 
 void decompression_8bit(Matrix *tbl_flt, Matrix *A, float precision,  Matrix *out);
 
+void renormalizeWeights(Matrix *w, Matrix *unit_sums, float limit);
 
 Matrix *square(Matrix *A);
 void square(Matrix *A, Matrix *out);
@@ -140,6 +141,8 @@ Matrix *subMatrixVector(Matrix *A, Matrix *v);
 void subMatrixVector(Matrix *A, Matrix *v, Matrix *out);
 Matrix *addMatrixVector(Matrix *A, Matrix *v);
 void addMatrixVector(Matrix *A, Matrix *v, Matrix *out);
+Matrix *mulMatrixVector(Matrix *A, Matrix *v);
+void mulMatrixVector(Matrix *A, Matrix *v, Matrix *out);
 Matrix *argmax(Matrix *A);
 void argmax(Matrix* A, Matrix* out);
 Matrix *create_t_matrix(Matrix *labels, int max_label);

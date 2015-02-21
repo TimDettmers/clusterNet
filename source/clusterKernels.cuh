@@ -6,6 +6,7 @@
 __global__ void kCompression_8bit_test(float *tbl, float *A, float precision, int size, float *out);
 __global__ void kCompression_8bit(float *flt_tbl, float *A, float precision, int size, unsigned char *out);
 __global__ void kDecompression_8bit(float *flt_tbl, unsigned char *A, float precision, int size, float *out);
+__global__ void kRenormalizeWeights(float *w, float *unit_sums, float limit, int rows, int cols);
 __global__ void kGetNonZeroColumns(float *A, float *out, int rows, int cols);
 __global__ void kGetNonZeroElements(float *A, float *out, int size);
 __global__ void kFill_with(float *m, float fill_value, int size);
@@ -40,6 +41,7 @@ __device__ void reduceToMax(float* sdata, unsigned int tid);
 __device__ void reduceToSumLocal(float* sdata, unsigned int tid);
 __global__ void kSubMatrixVector(float *A, float *v, float *out, int rows, int size);
 __global__ void kAddMatrixVector(float *A, float *v, float *out, int rows, int size);
+__global__ void kMulMatrixVector(float *A, float *v, float *out, int rows, int size);
 __global__ void kArgmax(float* A, float* out, unsigned int height, unsigned int width);
 __global__ void kCreate_t_matrix(float *labels, float *out, int rows, int size);
 __global__ void kEqual(float *A, float *B, float *out, int size);

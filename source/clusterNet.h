@@ -101,6 +101,8 @@ public:
 	 void dotT_sparse(Matrix *A, Matrix *B, Matrix *out);
 	 void Tdot_sparse(Matrix *A, Matrix *B, Matrix *out);
 
+	 Matrix *distribute_rows_hdf5_file(std::string path);
+
 	 void RMSprop_with_nesterov_weight_update_PCIe(Matrix **RMS, Matrix **grad, Matrix **w, Matrix **m, float RMS_multiplier, float learning_rate, int batch_size, float momentum);
 
 	 Matrix *rand(int rows, int cols);

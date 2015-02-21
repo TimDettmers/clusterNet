@@ -64,14 +64,17 @@ void ClusterNet::init(int seed)
 
 
 
+	/*
 	char buff[4096];
 	ssize_t len = ::readlink("/proc/self/exe", buff, sizeof(buff)-1);
 	std::string path = std::string(buff);
 	replace(path,"/build/clusterNet.out","/source/");
 	flt_tbl = to_gpu(read_hdf5((path+"8bit_floats.hdf5").c_str()));
+	*/
 
 	int current_device = 0;
 	cudaGetDevice(&current_device);
+	cout << "Active device: GPU" << current_device << endl;
 	/*
 	for(int i = 0; i < GPU_COUNT; i++)
 	{
@@ -199,6 +202,8 @@ void ClusterNet::compute_GPUID_and_Nodes()
 	NODES = MASTER_GPU_RANKS.size();
 
 }
+
+
 
 void ClusterNet::compute_PCIe_ranks()
 {
@@ -1351,5 +1356,61 @@ void ClusterNet::addGradients_PCIe(Matrix **grad)
 
 }
 
+Matrix *ClusterNet::distribute_rows_hdf5_file(std::string path)
+{
+
+	int rows = 0;
+	int cols = 0;
+	Matrix *out;
+	if(MYRANK == 0)
+	{
+		Matrix *cpu = read_hdf5(path.c_str());
+		Matrix *gpu = to_gpu(cpu);
+
+		std::vector<Matrix*> splits;
+
+		int split_size = cpu->rows/MPI_SIZE;
+		int offsize = cpu->rows - (split_size*MPI_SIZE);
+
+		for(int i = 0; i < MPI_SIZE; i++)
+		{
+			int start = (split_size*i) + offsize;
+			int end = split_size*(i+1);
+
+
+			if(i==0){ start -= offsize; end +=offsize; }
+
+			Matrix *gpuslice = slice_rows(gpu,start,end-1);
+			Matrix *cpuslice = to_host(gpuslice);
+
+			splits.push_back(cpuslice);
+
+			cudaFree(gpuslice->data);
+			free(gpuslice);
+		}
+
+
+		for(int i=1; i < MPI_SIZE; i++)
+		{
+			MPI_Send(&splits[i]->rows,1,MPI_INT,i,999,MPI_COMM_WORLD);
+			MPI_Send(&splits[i]->cols,1,MPI_INT,i,999,MPI_COMM_WORLD);
+			MPI_Send(splits[i]->data,splits[i]->size,MPI_FLOAT,i,999,MPI_COMM_WORLD);
+			free(splits[i]->data);
+			free(splits[i]);
+		}
+
+		out = splits[0];
+	}
+	else
+	{
+		MPI_Recv(&rows,1,MPI_INT,0,999,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
+		MPI_Recv(&cols,1,MPI_INT,0,999,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
+		out = empty_cpu(rows,cols);
+		MPI_Recv(out->data,out->size,MPI_FLOAT,0,999,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
+
+	}
+
+	return out;
+}
 
 

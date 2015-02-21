@@ -123,6 +123,8 @@ void BatchAllocator::init(float cross_validation_size, int batch_size, int batch
 		m_sparse_matrix_info_cv_y[i] = 0;
 	}
 
+	cout << "Split into " << TRAIN_SET_ROWS << " rows for the train set and " << CV_SET_ROWS << "f or the CV set." << endl;
+
 	if(BATCH_SIZE_CV > (m_Rows*cross_validation_size))
 	{
 		std::cout << "ERROR: Cross validation batch size must be smaller than the cross validation set." << std::endl;
@@ -135,8 +137,8 @@ void BatchAllocator::init(float cross_validation_size, int batch_size, int batch
 		throw "ERROR: Batch size must be smaller than the training set.";
 	}
 
-	if(m_mygpuID == 0)
-	{
+	//if(m_mygpuID == 0)
+	//{
 		m_Rows = m_full_X->rows;
 		m_Cols_X = m_full_X->cols;
 		m_Cols_y = m_full_y->cols;
@@ -145,7 +147,7 @@ void BatchAllocator::init(float cross_validation_size, int batch_size, int batch
 		cudaStreamCreate(&m_streamNext_batch_y);
 		cudaStreamCreate(&m_streamNext_batch_cv_X);
 		cudaStreamCreate(&m_streamNext_batch_cv_y);
-	}
+	//}
 
 	init_batch_buffer();
 
@@ -162,6 +164,7 @@ void BatchAllocator::init(float cross_validation_size, int batch_size, int batch
 		m_request_cv_y.push_back(request_cv_y);
 	}
 
+	/*
 	if(m_mygpuID == 0)
 	{
 		if(BATCH_METHOD == Distributed_weights ||
@@ -210,6 +213,13 @@ void BatchAllocator::init(float cross_validation_size, int batch_size, int batch
 
 
 	}
+	*/
+
+
+	m_next_batch_number = 0;
+	m_next_batch_number_cv = 0;
+
+	init_copy_to_buffer();
 
 	if(BATCH_METHOD != Distributed_weights_sparse)
 	{
@@ -399,8 +409,8 @@ void BatchAllocator::broadcast_batch_to_processes()
 
 	if(BATCH_METHOD != Distributed_weights_sparse)
 	{
-		if(m_mygpuID == 0)
-		{
+		//if(m_mygpuID == 0)
+		//{
 			if(m_full_X->isSparse != 1)
 				memcpy(m_next_buffer_X->data,&m_full_X->data[(m_full_X->cols * (m_next_batch_number) * BATCH_SIZE)], copy_range_bytes_X);
 			else
@@ -411,6 +421,7 @@ void BatchAllocator::broadcast_batch_to_processes()
 			else
 				slice_sparse_to_dense(m_full_y,m_next_buffer_y,m_next_batch_number*BATCH_SIZE, partial_batch_size);
 
+		/*
 			for(int i = 1; i < m_cluster.PCIe_RANKS.size() && BATCH_METHOD != Single_GPU; i++)
 			{
 				MPI_Isend(m_next_buffer_X->data,m_next_buffer_X->size,MPI_FLOAT,m_cluster.PCIe_RANKS[i],999,MPI_COMM_WORLD,&m_requests_send_X[i-1]);
@@ -423,6 +434,7 @@ void BatchAllocator::broadcast_batch_to_processes()
 			MPI_Irecv(m_next_buffer_X->data,m_next_buffer_X->size,MPI_FLOAT,m_cluster.PCIe_RANKS[0],999,MPI_COMM_WORLD,&m_request_X[0]);
 			MPI_Irecv(m_next_buffer_y->data,m_next_buffer_y->size,MPI_FLOAT,m_cluster.PCIe_RANKS[0],998,MPI_COMM_WORLD,&m_request_y[0]);
 		}
+		*/
 	}
 	else
 	{
@@ -611,8 +623,8 @@ void BatchAllocator::broadcast_batch_cv_to_processes()
 
 	if(BATCH_METHOD != Distributed_weights_sparse)
 	{
-		if(m_mygpuID == 0)
-		{
+		//if(m_mygpuID == 0)
+		//{
 			if(m_full_X->isSparse != 1)
 				memcpy(m_next_buffer_cv_X->data,&m_full_X->data[(TRAIN_SET_ROWS * m_full_X->cols)  + ((m_next_batch_number_cv) * BATCH_SIZE_CV * m_full_X->cols)],
 						copy_range_bytes_X);
@@ -625,6 +637,7 @@ void BatchAllocator::broadcast_batch_cv_to_processes()
 			else
 				slice_sparse_to_dense(m_full_y,m_next_buffer_cv_y,TRAIN_SET_ROWS + (m_next_batch_number_cv * BATCH_SIZE_CV), partial_batch_size);
 
+	/*
 			for(int i = 1; i < m_cluster.PCIe_RANKS.size() && BATCH_METHOD != Single_GPU; i++)
 			{
 				MPI_Isend(m_next_buffer_cv_X->data,m_next_buffer_cv_X->size,MPI_FLOAT,m_cluster.PCIe_RANKS[i],999,MPI_COMM_WORLD,&m_requests_send_cv_X[i-1]);
@@ -636,6 +649,7 @@ void BatchAllocator::broadcast_batch_cv_to_processes()
 			MPI_Irecv(m_next_buffer_cv_X->data,m_next_buffer_cv_X->size,MPI_FLOAT,m_cluster.PCIe_RANKS[0],999,MPI_COMM_WORLD,&m_request_cv_X[0]);
 			MPI_Irecv(m_next_buffer_cv_y->data,m_next_buffer_cv_y->size,MPI_FLOAT,m_cluster.PCIe_RANKS[0],998,MPI_COMM_WORLD,&m_request_cv_y[0]);
 		}
+		*/
 	}
 	else
 	{
@@ -771,6 +785,7 @@ void BatchAllocator::allocate_next_batch_async()
 		update_next_batch_matrix_info();
 
 
+	/*
 	if(m_mygpuID != 0)
 	{
 		if(BATCH_METHOD != Distributed_weights_sparse)
@@ -821,6 +836,7 @@ void BatchAllocator::allocate_next_batch_async()
 			}
 		}
 	}
+	*/
 
 	if(BATCH_METHOD != Distributed_weights_sparse)
 	{
@@ -873,7 +889,7 @@ void BatchAllocator::allocate_next_cv_batch_async()
 	if(BATCH_METHOD == Distributed_weights_sparse)
 		update_next_cv_batch_matrix_info();
 
-
+	/*
 	if(m_mygpuID != 0)
 	{
 		if(BATCH_METHOD != Distributed_weights_sparse)
@@ -924,6 +940,7 @@ void BatchAllocator::allocate_next_cv_batch_async()
 			}
 		}
 	}
+	*/
 
 	//cout << "buffer data: ";
 	//for(int i = m_next_buffer_cv_X->size-10; i < m_next_buffer_cv_X->size; i++)
@@ -1132,6 +1149,9 @@ void BatchAllocator::propagate_through_layers(Layer *root, DataPropagationType_t
 
 	if(type != Training)
 		root->print_error(message);
+
+
+
 }
 
 

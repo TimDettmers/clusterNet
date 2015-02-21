@@ -34,6 +34,8 @@ public:
 	Matrix *target_matrix;
 
 
+
+
 	ClusterNet *GPU;
 
 	float LEARNING_RATE;
@@ -41,6 +43,7 @@ public:
 	float RMSPROP_MOMENTUM;
 	float RUNNING_ERROR;
 	float RUNNING_SAMPLE_SIZE;
+	float L2;
     Unittype_t UNIT_TYPE;
 	Costfunction_t COST;
 	float DROPOUT;
@@ -49,16 +52,6 @@ public:
 
 	WeightUpdateType_t UPDATE_TYPE;
 
-	virtual void forward();
-	virtual void forward(bool useDropout);
-	virtual void running_error();
-	virtual void backward();
-	virtual void print_error(std::string message);
-	virtual void weight_update();
-
-	virtual void link_with_next_layer(Layer *next_layer);
-	virtual void init(int unitcount, int start_batch_size, Unittype_t unit, ClusterNet *gpu);
-	virtual void set_hidden_dropout(float dropout);
 	virtual ~Layer();
 	Layer(int unitcount, int start_batch_size, Unittype_t unit, ClusterNet *gpu);
 	Layer(int unitcount, Unittype_t unit);
@@ -67,6 +60,24 @@ public:
 	Layer(int unitcount, int start_batch_size, Unittype_t unit, Layer *prev, ClusterNet *gpu);
 	Layer(int unitcount, Unittype_t unit, Layer *prev);
 	Layer(int unitcount, Layer *prev);
+
+	virtual void forward();
+	virtual void forward(bool useDropout);
+	virtual void running_error();
+	virtual void backward();
+	virtual void print_error(std::string message);
+	virtual void weight_update();
+
+	virtual void limit_magnitude();
+
+	virtual void link_with_next_layer(Layer *next_layer);
+	virtual void init(int unitcount, int start_batch_size, Unittype_t unit, ClusterNet *gpu);
+	virtual void set_hidden_dropout(float dropout);
+
+	virtual void dropout_decay();
+	virtual void learning_rate_decay(float decay_rate);
+
+
 
 private:
 	virtual void unit_activation();

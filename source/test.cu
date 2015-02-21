@@ -1457,40 +1457,48 @@ int main(int argc, char *argv[])
 
 
 
+	ClusterNet *gpu = new ClusterNet(argc,argv,1235,true);
 
-	ClusterNet *gpu = new ClusterNet(1235);
+	//Matrix *X = read_hdf5("/home/tim/data/mnist/X.hdf5");
+	//Matrix *y = read_hdf5("/home/tim/data/mnist/y.hdf5");
+	Matrix *X = gpu->distribute_rows_hdf5_file("/home/tim/data/mnist/X.hdf5");
+	Matrix *y = gpu->distribute_rows_hdf5_file("/home/tim/data/mnist/y.hdf5");
 
-	Matrix *X = read_hdf5("/home/tim/data/mnist/X.hdf5");
-	Matrix *y = read_hdf5("/home/tim/data/mnist/y.hdf5");
 
 	BatchAllocator b = BatchAllocator();
-	b.init(X,y,(1.0-0.8571429),128,128,*gpu, Single_GPU);
+	b.init(X,y,(1.0-0.85715),128,128,*gpu, Single_GPU);
 
 	Layer *l0 = new Layer(X->cols,128,Input,gpu);
 	Layer *l1 = new Layer(1200, Logistic, l0);
 	Layer *l2 = new Layer(1200, Logistic, l1);
 	Layer *l3 = new Layer(10, Softmax, l2);
 
-	//l0->link_with_next_layer(l1);
-	//l1->link_with_next_layer(l2);
-
 	l0->DROPOUT = 0.2f;
 	l0->set_hidden_dropout(0.5f);
 
-	for(int epoch = 0; epoch < 100; epoch++)
+	cout << gpu->MYRANK << endl;
+
+	float decay = 0.95f;
+	for(int epoch = 0; epoch < 1000; epoch++)
 	{
 		cout << "EPOCH: " << epoch + 1 << endl;
 
 		b.propagate_through_layers(l0,Training);
-		if(epoch % 5 == 0)
-			b.propagate_through_layers(l0,Trainerror);
-
+		b.propagate_through_layers(l0,Trainerror);
 		b.propagate_through_layers(l0,CVerror);
 
 
+		l0->learning_rate_decay(decay);
+
+		if(epoch == 75)
+		{
+			//l0->dropout_decay();
+			//decay = 0.85f;
+		}
 
 
 	}
+
 
 
 

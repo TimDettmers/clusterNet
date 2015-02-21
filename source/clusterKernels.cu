@@ -31,6 +31,28 @@ __global__ void kGetNonZeroColumns(float *A, float *out, int rows, int cols)
 	}
 }
 
+__global__ void kRenormalizeWeights(float *w, float *unit_sums, float limit, int rows, int cols)
+{
+	const unsigned int numThreads = blockDim.x * gridDim.x;
+	const int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
+	const int size = rows*cols;
+
+	int myCol = 0;
+	float rel_diff = 0.0f;
+	for (unsigned int i = idx;i < size; i += numThreads)
+	{
+		myCol = i/rows;
+		if(unit_sums[myCol] > limit)
+		{
+			rel_diff = 1.0f/unit_sums[myCol];
+			w[i] *= rel_diff;
+		}
+		else{ continue; }
+
+	}
+
+}
+
 
 
 
@@ -647,6 +669,21 @@ __global__ void kAddMatrixVector(float *A, float *v, float *out, int rows, int s
   }
 }
 
+//for column major data
+__global__ void kMulMatrixVector(float *A, float *v, float *out, int rows, int size)
+{
+  const unsigned int numThreads = blockDim.x * gridDim.x;
+  const int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
+  //offset = current_column * rows
+  int offset = 0;
+
+  for (unsigned int i = idx;i < size; i += numThreads)
+  {
+	  offset = (i / rows); //note: int arithmetic
+	  out[i] =  A[i] * v[offset];
+  }
+}
+
 __global__ void kArgmax(float* A, float* out, unsigned int rows, unsigned int cols)
 {
 	  const unsigned int numThreads = blockDim.x * gridDim.x;
@@ -1138,7 +1175,7 @@ __global__ void kRMSprop_with_weight_update (float *RMS, float *grad, float *w, 
 
 	  for (unsigned int i = idx;i < size; i += numThreads)
 	  {
-		  grad_value = fdividef(grad[i],(float)batch_size);
+		  grad_value = fdividef(grad[i],(float)batch_size) ;
 		  RMS_value = (RMS_multiplier*RMS[i]) + (powf(grad_value,2.0f)*rms_reciprocal);
 		  grad_value = learning_rate*fdividef(grad_value,(sqrtf(RMS_value)+1.0e-08f));
 
@@ -1147,6 +1184,8 @@ __global__ void kRMSprop_with_weight_update (float *RMS, float *grad, float *w, 
 
 	  }
 }
+
+
 
 __global__ void kRMSprop_with_weight_update_8bit(float *RMS, float *grad, float *w, float *m, float RMS_multiplier, float learning_rate, int batch_size, int size, float momentum)
 {

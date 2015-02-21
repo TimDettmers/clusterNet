@@ -40,6 +40,7 @@ void Layer::init(int unitcount, int start_batch_size, Unittype_t unit, ClusterNe
 	BATCH_SIZE = start_batch_size;
 	RUNNING_ERROR = 0.0f;
 	RUNNING_SAMPLE_SIZE = 0.0f;
+	L2 = 15.0f;
 
 	UPDATE_TYPE = RMSProp;
 	COST = Misclassification;
@@ -275,6 +276,21 @@ void Layer::weight_update()
 			break;
 	}
 
+	//limit_magnitude();
+
+}
+
+void Layer::limit_magnitude()
+{
+
+	square(w_next,w_grad_next);
+	Matrix *temp = ones(w_grad_next->cols,1);
+	Matrix *sums = GPU->dot(w_grad_next,temp);
+	renormalizeWeights(w_next,sums,L2);
+	cudaFree(temp->data);
+	cudaFree(sums->data);
+	free(temp);
+	free(sums);
 
 }
 
@@ -292,6 +308,23 @@ void Layer::set_hidden_dropout(float dropout)
 	if(!next){ return; }
 	next->DROPOUT = dropout;
 	next->set_hidden_dropout(dropout);
+}
+
+void Layer::learning_rate_decay(float decay_rate)
+{
+	if(!next){ return; }
+	next->LEARNING_RATE *= decay_rate;
+	next->learning_rate_decay(decay_rate);
+}
+
+void Layer::dropout_decay()
+{
+	if(!prev){ cout << "Decaying dropout!" << endl; }
+	if(!next){ return;}
+
+	cout << "Setting dropout from " << DROPOUT << " to " << DROPOUT/2.0f << endl;
+	DROPOUT /= 2.0f;
+	next->dropout_decay();
 }
 
 Layer::~Layer()
