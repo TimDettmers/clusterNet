@@ -64,13 +64,13 @@ void ClusterNet::init(int seed)
 
 
 
-	/*
+
 	char buff[4096];
 	ssize_t len = ::readlink("/proc/self/exe", buff, sizeof(buff)-1);
 	std::string path = std::string(buff);
 	replace(path,"/build/clusterNet.out","/source/");
-	flt_tbl = to_gpu(read_hdf5((path+"8bit_floats.hdf5").c_str()));
-	*/
+	flt_tbl = to_gpu(read_hdf5("/home/tim/git/clusterNet/source/8bit_floats.hdf5"));
+
 
 	int current_device = 0;
 	cudaGetDevice(&current_device);
@@ -747,25 +747,24 @@ void ClusterNet::tick(std::string name)
 		m_dictTickTock[name] = ::tick();
 	}
 }
-void ClusterNet::tock()
-{
-	tock("default");
-}
-void ClusterNet::tock(std::string name)
+float ClusterNet::tock(){ return tock("default"); }
+float ClusterNet::tock(std::string name)
 {
 	if (m_dictTickTockCumulative.count(name) > 0)
 	{
 		::tock("<<<Cumulative>>>: " + name, m_dictTickTockCumulative[name]);
+		float value = m_dictTickTockCumulative[name];
 		m_dictTickTockCumulative.erase(name);
-	} else
+		return value;
+	}
+	else
 	{
 		if (m_dictTickTock.count(name) == 0)
 			cout << "Error for name: " << name << endl;
-		assert(
-				("No tick event was registered for the name" + name, m_dictTickTock.count(
-						name) > 0));
-		::tock(m_dictTickTock[name], name);
+		assert(("No tick event was registered for the name" + name, m_dictTickTock.count(name) > 0));
+		float value = ::tock(m_dictTickTock[name], name);
 		m_dictTickTock.erase(name);
+		return value;
 	}
 }
 

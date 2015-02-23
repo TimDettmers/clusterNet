@@ -958,6 +958,24 @@ void addMatrixVector(Matrix *A, Matrix *v, Matrix *out)
 	kAddMatrixVector<<<blocks,THREADS_PER_BLOCKS>>>(A->data, v->data, out->data, A->rows, A->size);
 }
 
+Matrix *addScaledMatrixVector(Matrix *A, Matrix *v, float weight)
+{
+	Matrix *out = empty(A->rows,A->cols);
+	addScaledMatrixVector(A, v, weight, out);
+
+	return out;
+}
+
+void addScaledMatrixVector(Matrix *A, Matrix *v, float weight, Matrix *out)
+{
+	if(A->cols != v->cols)
+		printf("Error dimensions do not match: %i columns for matrix vs. %i for vector",A->cols,v->cols);
+
+	assert(A->cols == v->cols);
+	int blocks = (A->size/THREADS_PER_BLOCKS) + 1;
+	kAddScaledMatrixVector<<<blocks,THREADS_PER_BLOCKS>>>(A->data, v->data, weight, out->data, A->rows, A->size);
+}
+
 Matrix *mulMatrixVector(Matrix *A, Matrix *v)
 {
 	Matrix *out = empty(A->rows,A->cols);

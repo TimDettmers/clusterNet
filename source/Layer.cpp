@@ -19,14 +19,26 @@ Layer::Layer(int unitcount, Layer *prev){ init(unitcount, 0,Rectified_Linear, NU
 
 void Layer::init(int unitcount, int start_batch_size, Unittype_t unit, ClusterNet *gpu)
 {
+
+	send_request = new MPI_Request;
+	recv_request = new MPI_Request;
 	next = NULL;
 	prev = NULL;
 	w_next = NULL;
 	b_next = NULL;
+	w_next_sync = NULL;
+	b_next_sync = NULL;
 	w_rms_next = NULL;
 	b_rms_next = NULL;
 	w_grad_next = NULL;
 	b_grad_next = NULL;
+
+	w_next_sync_send = NULL;
+	b_next_sync_send = NULL;
+	w_next_sync_recv = NULL;
+	b_next_sync_recv = NULL;
+
+	isSynchronizing = false;
 
 	target = NULL;
 	target_matrix = NULL;
@@ -44,6 +56,7 @@ void Layer::init(int unitcount, int start_batch_size, Unittype_t unit, ClusterNe
 
 	UPDATE_TYPE = RMSProp;
 	COST = Misclassification;
+	PARALLELISM = None;
 
 	GPU = gpu;
 
@@ -72,12 +85,17 @@ void Layer::link_with_next_layer(Layer *next_layer)
 	w_next = w;
 	w_grad_next = zeros(UNITCOUNT,next_layer->UNITCOUNT);
 	w_rms_next = zeros(UNITCOUNT,next_layer->UNITCOUNT);
+	if(PARALLELISM == DataParallelism){w_next_sync = zeros(UNITCOUNT,next_layer->UNITCOUNT); }
+	if(PARALLELISM == DataParallelism){w_next_sync_send = empty_char(UNITCOUNT,next_layer->UNITCOUNT); }
+	if(PARALLELISM == DataParallelism){w_next_sync_recv = empty_char(UNITCOUNT,next_layer->UNITCOUNT); }
 
 	Matrix *b = zeros(1,next_layer->UNITCOUNT);
 	b_next = b;
 	b_grad_next = zeros(1,next_layer->UNITCOUNT);
 	b_rms_next = zeros(1,next_layer->UNITCOUNT);
-
+	if(PARALLELISM == DataParallelism){b_next_sync = zeros(1,next_layer->UNITCOUNT); }
+	if(PARALLELISM == DataParallelism){b_next_sync_send = empty_char(1,next_layer->UNITCOUNT); }
+	if(PARALLELISM == DataParallelism){b_next_sync_recv = empty_char(1,next_layer->UNITCOUNT); }
 
 	next->out = zeros(BATCH_SIZE, next->UNITCOUNT);
 	next->activation = zeros(BATCH_SIZE, next->UNITCOUNT);
@@ -111,7 +129,6 @@ void Layer::unit_activation(bool useDropout)
 			break;
 	}
 
-
 	if(UNIT_TYPE != Softmax)
 	{
 		if(useDropout)
@@ -129,13 +146,13 @@ void Layer::activation_gradient()
 	switch(UNIT_TYPE)
 	{
 		case Logistic:
-			logisticGrad(activation,activation);
+			logisticGrad(activation,out);
 			break;
 		case Rectified_Linear:
-			rectified_linear_derivative(activation,activation);
+			rectified_linear_derivative(activation,out);
 			break;
 		case Double_Rectified_Linear:
-			double_rectified_linear_derivative(activation,activation);
+			double_rectified_linear_derivative(activation,out);
 			break;
 		case Softmax:
 			break;
@@ -198,14 +215,13 @@ void Layer::forward(bool useDropout)
 {
 	handle_offsize();
 	if(!prev){  unit_activation(useDropout); next->forward(useDropout); return; }
-
+	if(useDropout){ prev->wait_for_synchronization(); prev->weight_update(); }
 
 	GPU->dot(prev->out,prev->w_next,out);
 	addMatrixVector(out,prev->b_next,out);
     unit_activation(useDropout);
 
-    if(next != 0)
-    	next->forward(useDropout);
+    if(next){ next->forward(useDropout); }
 }
 
 
@@ -239,9 +255,9 @@ void Layer::running_error()
 
 
 
-void Layer::backward()
+void Layer::backward_errors()
 {
-	if(!target){ next->backward(); }
+	if(!target){ next->backward_errors(); }
 	if(target)
 	{
 		if(out->cols != target->cols && !target_matrix){ target_matrix = zeros(BATCH_SIZE,out->cols); }
@@ -249,27 +265,87 @@ void Layer::backward()
 		else{ sub(activation,target,error);  return;}
 	}
 
-	GPU->Tdot(activation, next->error, w_grad_next);
-	GPU->dot(next->bias_activations, next->error,b_grad_next);
-
-	if(UNIT_TYPE == Input){ return; }
+	if(UNIT_TYPE == Input){ backward_grads(); return; }
 
 	activation_gradient();
 	GPU->dotT(next->error, w_next,error);
-	mul(error, activation, error);
+	mul(error, out, error);
 
+}
+
+void Layer::backward_grads()
+{
+	GPU->Tdot(activation, next->error, w_grad_next);
+	MPI_synchronization_async();
+	if(!next->target){ next->backward_grads(); }
+	//GPU->dot(next->bias_activations, next->error,b_grad_next);
+
+}
+
+void Layer::MPI_synchronization_async()
+{
+	if(PARALLELISM != DataParallelism){ return; }
+
+	int target = GPU->MYRANK +1 == GPU->MPI_SIZE ? 0 : GPU->MYRANK+1;
+	int source = GPU->MYRANK-1 == -1 ? GPU->MPI_SIZE-1 : GPU->MYRANK-1;
+
+	/*
+	GPU->compression_8bit(w_grad_next,0.001,w_next_sync_send);
+	for (int i = 0; i < GPU->MPI_SIZE - 1; i++)
+	{
+		MPI_Isend(w_next_sync_send->char_data,w_next_sync_send->size,MPI_CHAR,target,i,MPI_COMM_WORLD, send_request);
+		MPI_Irecv(w_next_sync_recv->char_data,w_next_sync_recv->size,MPI_CHAR,source,i,MPI_COMM_WORLD,recv_request);
+		target = target +1 == GPU->MPI_SIZE ? 0 : target+1;
+		source = source-1 == -1 ? GPU->MPI_SIZE-1 : source-1;
+	}
+	isSynchronizing = true;
+	*/
+
+
+
+	for (int i = 0; i < GPU->MPI_SIZE - 1; i++)
+	{
+		MPI_Isend(w_grad_next->data,w_grad_next->size,MPI_FLOAT,target,i,MPI_COMM_WORLD, send_request);
+		MPI_Irecv(w_next_sync->data,w_grad_next->size,MPI_FLOAT,source,i,MPI_COMM_WORLD,recv_request);
+		target = target +1 == GPU->MPI_SIZE ? 0 : target+1;
+		source = source-1 == -1 ? GPU->MPI_SIZE-1 : source-1;
+	}
+	isSynchronizing = true;
+
+
+}
+
+void Layer::wait_for_synchronization()
+{
+	if(target){ return; }
+	if(!isSynchronizing){ return; }
+	//GPU->tick();
+	//MPI_Wait(next->send_request,MPI_STATUS_IGNORE);
+	MPI_Wait(recv_request,MPI_STATUS_IGNORE);
+
+	//float secs = GPU->tock()/1000.0f;
+	//cout << w_next_sync->bytes/1024./1024./1024./secs << " GB/s" << endl;
+	//printdim(w_next_sync);
+
+	//GPU->decompression_8bit(w_next_sync_recv,0.001,w_next_sync);
+	add(w_next_sync,w_grad_next,w_grad_next);
+	isSynchronizing = false;
 }
 
 void Layer::weight_update()
 {
 	if(target){ return; }
 
-	next->weight_update();
+	//next->weight_update();
 
 	switch(UPDATE_TYPE)
 	{
 		case RMSProp:
-			RMSprop_with_weight_update(w_rms_next,w_grad_next,w_next,w_next,RMSPROP_MOMENTUM,LEARNING_RATE,out->rows,MOMENTUM);
+			RMSprop_with_weight_update(w_rms_next,w_grad_next,w_next,w_next,RMSPROP_MOMENTUM,LEARNING_RATE,out->rows*GPU->MPI_SIZE,MOMENTUM);
+			//RMSprop_with_weight_update(b_rms_next,b_grad_next,b_next,b_next,RMSPROP_MOMENTUM,LEARNING_RATE/100.0f,out->rows,MOMENTUM);
+			//scalarMul(b_grad_next, LEARNING_RATE/float(out->rows*GPU->MPI_SIZE) ,b_grad_next);
+			//sub(b_next,b_grad_next,b_next);
+
 			break;
 		default:
 			throw "Unknown update type!";

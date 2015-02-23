@@ -22,9 +22,9 @@ Matrix *read_hdf5(const char *filepath, const char *tag);
 void write_hdf5(const char * filepath, Matrix *A);
 
 cudaEvent_t* tick();
-void tock(cudaEvent_t* startstop);
-void tock(cudaEvent_t* startstop, std::string text);
-void tock(std::string text, float tocks);
+float tock(cudaEvent_t* startstop);
+float tock(cudaEvent_t* startstop, std::string text);
+float tock(std::string text, float tocks);
 float tock(cudaEvent_t* startstop, float tocks);
 int test_eq(float f1, float f2, char* message);
 int test_eq(float f1, float f2, int idx1, int idx2, char* message);

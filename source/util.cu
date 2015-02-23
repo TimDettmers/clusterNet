@@ -226,18 +226,20 @@ cudaEvent_t* tick()
     return startstop;
 }
 
-void tock(cudaEvent_t* startstop){ tock(startstop, "Time for the kernel(s): "); }
-void tock(cudaEvent_t* startstop, std::string text)
+float tock(cudaEvent_t* startstop){ return tock(startstop, "Time for the kernel(s): "); }
+float tock(cudaEvent_t* startstop, std::string text)
 {
 	float time;
 	cudaEventRecord(startstop[1], 0);
 	cudaEventSynchronize(startstop[1]);
 	cudaEventElapsedTime(&time, startstop[0], startstop[1]);
 	printf((text + ": %f ms.\n").c_str(), time);
+	return time;
 }
-void tock(std::string text, float tocks)
+float tock(std::string text, float tocks)
 {
 	printf((text + ": %f ms.\n").c_str(), tocks);
+	return tocks;
 }
 float tock(cudaEvent_t* startstop, float tocks)
 {

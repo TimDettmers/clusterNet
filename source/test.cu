@@ -1384,81 +1384,321 @@ void *print_message(void*)
     return 0;
 }
 
-int main(int argc, char *argv[])
+void bandwidth_test_MPI(int argc, char *argv[])
 {
-
-	//run_normal_net();
-	//run_maxout_network();
-
-
-	//async_test();
-
-
-	/*
-	ClusterNet gpus = ClusterNet(1234565);
-
-	Matrix *X = read_hdf5("/home/tim/mnist_full_X.hdf5");
-	Matrix *y = read_hdf5("/home/tim/mnist_full_y.hdf5");
-
-	std::vector<int> layers;
-	layers.push_back(512);
-
-	BatchAllocator allocator = BatchAllocator();
-	allocator.init(X,y,0.2,128,512,gpus, Single_GPU);
-	DeepNeuralNetwork net = DeepNeuralNetwork(layers,Classification, gpus, allocator, 10);
-
-	net.train();
-	*/
-
-
-	
-
-
-
-
-	//async_test(argc,argv);
-
-
-
-
-	/*
-	ClusterNet gpus = ClusterNet(argc,argv,123635, false);
-	WikiNetDist net = WikiNetDist(gpus);
-	net.run();
-	*/
-
-
-
-
-
-	//y = to_host(create_t_matrix(to_gpu(y), 10));
-	//Matrix *t = to_host(create_t_matrix(to_gpu(y),10));
-
-
-
-	/*
-	Matrix *rdm = gpu.randn(200,6);
-	Matrix *out = gpu.randn(200,6);
-
-	scalarMul(rdm,1.0e-4f,rdm);
-    compression_8bit(tbl,rdm,1.0e-3f,out);
-
-    for(int i = 0 ; i < 200; i++)
-    {
-
-     printmat(rdm,i,i+1,0,6);
-     printmat(out,i,i+1,0,6);
-     cout << "------------------------" << endl;
-    }
-
-    */
-
-
-
-
-
 	ClusterNet *gpu = new ClusterNet(argc,argv,1235,true);
 
+	std::vector<MPI_Request*> sends;
+	std::vector<MPI_Request*> recvs;
+	std::vector<Matrix*> lSync;
+	std::vector<Matrix*> lData;
+
+	int packages = 1;
+	float time = 0;
+
+	for(int epoch = 1; epoch < 20; epoch++)
+	{
+		if(lData.size() > 0)
+		{
+			for(int i = 0; i < packages; i++)
+			{
+
+					cudaFree(lSync[i]->data);
+					cudaFree(lData[i]->data);
+
+			}
+
+			lSync.clear();
+			lData.clear();
+		}
+
+		for(int i = 0; i < packages; i++)
+		{
+			lSync.push_back(zeros(128*epoch,128*epoch));
+			lData.push_back(gpu->rand(128*epoch,128*epoch));
+		}
+
+		for(int j = 0; j < packages; j++)
+		{
+
+
+			MPI_Request *send_request = new MPI_Request;
+			MPI_Request *recv_request = new MPI_Request;
+
+			sends.push_back(send_request);
+			recvs.push_back(recv_request);
+
+			int target = gpu->MYRANK +1 == gpu->MPI_SIZE ? 0 : gpu->MYRANK+1;
+			int source = gpu->MYRANK-1 == -1 ? gpu->MPI_SIZE-1 : gpu->MYRANK-1;
+
+			gpu->tick();
+			for (int i = 0; i < gpu->MPI_SIZE -1; i++)
+			{
+				//MPI_Irecv(lSync[j]->data,lSync[j]->size,MPI_FLOAT,source,999,MPI_COMM_WORLD,recv_request);
+				//MPI_Isend(lData[j]->data,lData[j]->size,MPI_FLOAT,target,999,MPI_COMM_WORLD,send_request);
+				//MPI_Isend(lData[j]->data,lData[j]->size,MPI_FLOAT,target,j,MPI_COMM_WORLD,send_request);
+				if(i == gpu->MYRANK)
+				{
+					MPI_Send(lData[j]->data,lData[j]->size,MPI_FLOAT,target,j,MPI_COMM_WORLD);
+					MPI_Recv(lSync[j]->data,lSync[j]->size,MPI_FLOAT,source,j,MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+				}
+				else
+				{
+					MPI_Recv(lSync[j]->data,lSync[j]->size,MPI_FLOAT,source,j,MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+					MPI_Send(lData[j]->data,lData[j]->size,MPI_FLOAT,target,j,MPI_COMM_WORLD);
+				}
+
+
+			}
+
+
+		}
+
+
+		/*
+		gpu->tick();
+		for(int i = 0; i < packages; i++)
+		{
+			MPI_Wait(sends[i],MPI_STATUS_IGNORE);
+			MPI_Wait(recvs[i],MPI_STATUS_IGNORE);
+		}
+		*/
+		time = gpu->tock();
+
+
+		for(int i = 0; i < packages; i++)
+			assert(sum(lData[i]) == sum(lSync[i]));
+
+		printdim(lData[0]);
+		cout << 1000*2*packages*lData[0]->bytes/1024./1024./1024./time << " GB/s" << endl;
+	}
+
+	gpu->shutdown_MPI();
+
+}
+
+void bandwidth_test_peer()
+{
+
+	ClusterNet *gpu = new ClusterNet(1235);
+
+	std::vector<Matrix*> lSync0;
+	std::vector<Matrix*> lData0;
+	std::vector<Matrix*> lSync1;
+	std::vector<Matrix*> lData1;
+
+	std::vector<cudaStream_t> s0s;
+	std::vector<cudaStream_t> s1s;
+
+	int packages = 1;
+	float time = 0;
+
+	cudaSetDevice(0);
+	cudaDeviceEnablePeerAccess(1,0);
+	cudaSetDevice(1);
+	cudaDeviceEnablePeerAccess(0,0);
+	for(int i = 0; i < packages; i++)
+	{
+		cudaStream_t s0;
+		cudaStream_t s1;
+		cudaSetDevice(0);
+		cudaStreamCreate(&s0);
+		cudaSetDevice(1);
+		cudaStreamCreate(&s1);
+		s0s.push_back(s0);
+		s1s.push_back(s1);
+	}
+	cudaSetDevice(0);
+	int access = 0;
+	cudaDeviceCanAccessPeer(&access,0,1);
+	cout << access << endl;
+	cudaDeviceCanAccessPeer(&access,1,0);
+	cout << access << endl;
+
+	for(int epoch = 199; epoch < 200; epoch++)
+	{
+		if(lSync0.size() > 0)
+		{
+			for(int i = 0; i < packages; i++)
+			{
+
+					cudaFree(lSync0[i]->data);
+					cudaFree(lData0[i]->data);
+					cudaFree(lSync1[i]->data);
+					cudaFree(lData1[i]->data);
+
+			}
+
+			lSync0.clear();
+			lData0.clear();
+			lSync1.clear();
+			lData1.clear();
+		}
+
+		for(int i = 0; i < packages; i++)
+		{
+			cudaSetDevice(0);
+			lSync0.push_back(zeros(128*epoch,128*epoch));
+			lData0.push_back(gpu->rand(128*epoch,128*epoch));
+			cudaSetDevice(1);
+			lSync1.push_back(zeros(128*epoch,128*epoch));
+			lData1.push_back(gpu->rand(128*epoch,128*epoch));
+		}
+
+		cudaSetDevice(0);
+		gpu->tick();
+		for(int j = 0; j < packages; j++)
+		{
+			cudaMemcpyAsync(lSync1[j]->data,lData0[j]->data,lData0[j]->bytes,cudaMemcpyDefault, s0s[j]);
+			cudaSetDevice(1);
+			cudaMemcpyAsync(lSync0[j]->data,lData1[j]->data,lData1[j]->bytes,cudaMemcpyDefault,s1s[j]);
+			cudaSetDevice(0);
+		}
+
+
+
+
+
+		for(int i = 0; i < packages; i++)
+		{
+			cudaStreamSynchronize(s0s[i]);
+			cudaStreamSynchronize(s1s[i]);
+		}
+
+
+		time = gpu->tock();
+
+		for(int i = 0; i < packages; i++)
+			//cout << sum(lData0[i])  << " vs. " << sum(lSync1[i]) << endl;
+			assert(sum(lData0[i]) == sum(lSync1[i]));
+
+		for(int i = 0; i < packages; i++)
+			assert(sum(lData1[i]) == sum(lSync0[i]));
+
+
+
+		cout << 1000*2*packages*lData0[0]->bytes/1024./1024./1024./time << " GB/s" << endl;
+	}
+
+}
+
+void bandwidth_test_kernel()
+{
+
+	ClusterNet *gpu = new ClusterNet(1235);
+
+	std::vector<Matrix*> lSync0;
+	std::vector<Matrix*> lData0;
+	std::vector<Matrix*> lSync1;
+	std::vector<Matrix*> lData1;
+
+	std::vector<cudaStream_t> s0s;
+	std::vector<cudaStream_t> s1s;
+
+	int packages = 10;
+	float time = 0;
+
+	cudaSetDevice(0);
+	cudaDeviceEnablePeerAccess(1,0);
+	cudaSetDevice(1);
+	cudaDeviceEnablePeerAccess(0,0);
+	for(int i = 0; i < packages; i++)
+	{
+		cudaStream_t s0;
+		cudaStream_t s1;
+		cudaSetDevice(0);
+		cudaStreamCreate(&s0);
+		cudaSetDevice(1);
+		cudaStreamCreate(&s1);
+		s0s.push_back(s0);
+		s1s.push_back(s1);
+	}
+	cudaSetDevice(0);
+	int access = 0;
+	cudaDeviceCanAccessPeer(&access,0,1);
+	cout << access << endl;
+	cudaDeviceCanAccessPeer(&access,1,0);
+	cout << access << endl;
+
+	for(int epoch = 1; epoch < 200; epoch++)
+	{
+		if(lSync0.size() > 0)
+		{
+			for(int i = 0; i < packages; i++)
+			{
+
+					cudaFree(lSync0[i]->data);
+					cudaFree(lData0[i]->data);
+					cudaFree(lSync1[i]->data);
+					cudaFree(lData1[i]->data);
+
+			}
+
+			lSync0.clear();
+			lData0.clear();
+			lSync1.clear();
+			lData1.clear();
+		}
+
+		for(int i = 0; i < packages; i++)
+		{
+			cudaSetDevice(0);
+			lSync0.push_back(zeros(128*epoch,128*epoch));
+			lData0.push_back(gpu->rand(128*epoch,128*epoch));
+			cudaSetDevice(1);
+			lSync1.push_back(zeros(128*epoch,128*epoch));
+			lData1.push_back(gpu->rand(128*epoch,128*epoch));
+		}
+
+		cudaSetDevice(0);
+		gpu->tick();
+
+		for(int j = 0; j < packages; j++)
+		{
+			add(lSync0[j],lData1[j],lSync0[j]);
+			cudaSetDevice(1);
+			add(lSync1[j],lData0[j],lSync1[j]);
+			cudaSetDevice(0);
+		}
+
+		cudaDeviceSynchronize();
+		cudaSetDevice(1);
+		cudaDeviceSynchronize();
+		cudaSetDevice(0);
+		time = gpu->tock();
+
+		/*
+		for(int i = 0; i < packages; i++)
+			assert(sum(lData0[i]) == sum(lSync1[i]));
+
+		for(int i = 0; i < packages; i++)
+			assert(sum(lData1[i]) == sum(lSync0[i]));
+			*/
+
+
+		printdim(lSync0[0]);
+		cout << 1000*2*packages*lData0[0]->bytes/1024./1024./1024./time << " GB/s" << endl;
+	}
+
+}
+
+
+
+int main(int argc, char *argv[])
+{
+	
+	//bandwidth_test_peer();
+
+	//bandwidth_test_MPI(argc,argv);
+
+	//bandwidth_test_kernel();
+
+
+
+
+
+
+	ClusterNet *gpu = new ClusterNet(argc,argv,123635,true);
 	//Matrix *X = read_hdf5("/home/tim/data/mnist/X.hdf5");
 	//Matrix *y = read_hdf5("/home/tim/data/mnist/y.hdf5");
 	Matrix *X = gpu->distribute_rows_hdf5_file("/home/tim/data/mnist/X.hdf5");
@@ -1469,17 +1709,21 @@ int main(int argc, char *argv[])
 	b.init(X,y,(1.0-0.85715),128,128,*gpu, Single_GPU);
 
 	Layer *l0 = new Layer(X->cols,128,Input,gpu);
+	l0->PARALLELISM = DataParallelism;
 	Layer *l1 = new Layer(1200, Logistic, l0);
+	l1->PARALLELISM = DataParallelism;
 	Layer *l2 = new Layer(1200, Logistic, l1);
+	l2->PARALLELISM = DataParallelism;
 	Layer *l3 = new Layer(10, Softmax, l2);
+
 
 	l0->DROPOUT = 0.2f;
 	l0->set_hidden_dropout(0.5f);
 
 	cout << gpu->MYRANK << endl;
 
-	float decay = 0.95f;
-	for(int epoch = 0; epoch < 1000; epoch++)
+	float decay = 0.99f;
+	for(int epoch = 0; epoch < 100; epoch++)
 	{
 		cout << "EPOCH: " << epoch + 1 << endl;
 
@@ -1492,13 +1736,15 @@ int main(int argc, char *argv[])
 
 		if(epoch == 75)
 		{
-			//l0->dropout_decay();
-			//decay = 0.85f;
+			l0->dropout_decay();
+			decay = 0.85f;
 		}
 
 
 	}
 
+
+	gpu->shutdown_MPI();
 
 
 

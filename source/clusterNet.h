@@ -52,6 +52,14 @@ typedef enum WeightUpdateType_t
 } WeightUpdateType_t;
 
 
+typedef enum ParallelismType_t
+{
+	None = 0,
+	DataParallelism = 1,
+	ModelParallelism = 2
+} ParallelismType_t;
+
+
 typedef enum Costfunction_t
 {
 	Cross_Entropy = 0,
@@ -126,8 +134,8 @@ public:
 
 	 void tick(std::string name);
 	 void tick();
-	 void tock(std::string name);
-	 void tock();
+	 float tock(std::string name);
+	 float tock();
 
 	 void benchmark_dot();
 	 void shutdown_MPI();

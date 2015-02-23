@@ -1131,8 +1131,10 @@ void BatchAllocator::propagate_through_layers(Layer *root, DataPropagationType_t
 		if (type == Training)
 		{
 				root->forward();
-				root->backward();
-				root->weight_update();
+				//m_cluster.tick();
+				root->backward_errors();
+				//root->weight_update();
+				//m_cluster.tick();
 		}
 		else if(type == Trainerror || type == CVerror){ root->forward(false); root->running_error(); }
 		else{ throw "DataPropagationType not implemented!";	}
@@ -1142,6 +1144,9 @@ void BatchAllocator::propagate_through_layers(Layer *root, DataPropagationType_t
 
 	}
 	std::string message;
+
+	//if (type == Training)
+		//m_cluster.tock();
 
 
 	if(type == Trainerror){message = "Train error: "; }

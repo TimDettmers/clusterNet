@@ -141,6 +141,8 @@ Matrix *subMatrixVector(Matrix *A, Matrix *v);
 void subMatrixVector(Matrix *A, Matrix *v, Matrix *out);
 Matrix *addMatrixVector(Matrix *A, Matrix *v);
 void addMatrixVector(Matrix *A, Matrix *v, Matrix *out);
+Matrix *addScaledMatrixVector(Matrix *A, Matrix *v, float weight);
+void addScaledMatrixVector(Matrix *A, Matrix *v, float weight, Matrix *out);
 Matrix *mulMatrixVector(Matrix *A, Matrix *v);
 void mulMatrixVector(Matrix *A, Matrix *v, Matrix *out);
 Matrix *argmax(Matrix *A);

@@ -16,6 +16,13 @@ public:
 	Matrix *w_next;
 	Matrix *b_next;
 
+	Matrix *w_next_sync;
+	Matrix *b_next_sync;
+	Matrix *w_next_sync_recv;
+	Matrix *b_next_sync_recv;
+	Matrix *w_next_sync_send;
+	Matrix *b_next_sync_send;
+
 	Matrix *w_rms_next;
 	Matrix *b_rms_next;
 
@@ -33,8 +40,8 @@ public:
 	Matrix *target;
 	Matrix *target_matrix;
 
-
-
+	MPI_Request *send_request;
+	MPI_Request *recv_request;
 
 	ClusterNet *GPU;
 
@@ -50,7 +57,11 @@ public:
 	int UNITCOUNT;
 	int BATCH_SIZE;
 
+	bool isSynchronizing;
+
 	WeightUpdateType_t UPDATE_TYPE;
+
+	ParallelismType_t PARALLELISM;
 
 	virtual ~Layer();
 	Layer(int unitcount, int start_batch_size, Unittype_t unit, ClusterNet *gpu);
@@ -64,9 +75,13 @@ public:
 	virtual void forward();
 	virtual void forward(bool useDropout);
 	virtual void running_error();
-	virtual void backward();
+	virtual void backward_errors();
+	virtual void backward_grads();
 	virtual void print_error(std::string message);
 	virtual void weight_update();
+
+	virtual void MPI_synchronization_async();
+	virtual void wait_for_synchronization();
 
 	virtual void limit_magnitude();
 
