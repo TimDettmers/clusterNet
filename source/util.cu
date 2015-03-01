@@ -308,7 +308,10 @@ void print_matrix(Matrix *A, int end_rows, int end_cols)
 			  printf("[");
 			  for(int col =0; col < end_cols; col++)
 			  {
-				  printf("%f ",A->data[(row*A->cols)+col]);
+				  if(A->data[(row*A->cols)+col] > 0.0f)
+					  printf("% f ",A->data[(row*A->cols)+col]);
+				  else
+					  printf("%f ",A->data[(row*A->cols)+col]);
 			  }
 			  printf("]\n");
 		  }

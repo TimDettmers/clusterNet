@@ -71,10 +71,12 @@ void ClusterNet::init(int seed)
 	replace(path,"/build/clusterNet.out","/source/");
 	flt_tbl = to_gpu(read_hdf5("/home/tim/git/clusterNet/source/8bit_floats.hdf5"));
 
-
 	int current_device = 0;
 	cudaGetDevice(&current_device);
 	cout << "Active device: GPU" << current_device << endl;
+
+
+	seeds = rand_int(512,128,0,2147483647);
 	/*
 	for(int i = 0; i < GPU_COUNT; i++)
 	{
@@ -671,6 +673,16 @@ void ClusterNet::dotMPI(Matrix *A, Matrix *B, Matrix *out, bool applyTranspose_A
 
 }
 
+
+Matrix *ClusterNet::rand_numbers(int rows, int cols)
+{
+	return ::rand_numbers(rows, cols, seeds);
+}
+void ClusterNet::rand_numbers(int rows, int cols, Matrix *out)
+{
+	::rand_numbers(out, seeds);
+}
+
 //Uniform
 Matrix *ClusterNet::rand(int rows, int cols)
 {
@@ -713,7 +725,7 @@ void ClusterNet::randn(int rows, int cols, float mean, float std, Matrix *out)
 {
 	int current_device = 0;
 	cudaGetDevice(&current_device);
-	curandGenerateNormal(m_generator, out->data, rows * cols, 0.0f, 1.0f);
+	curandGenerateNormal(m_generator, out->data, rows * cols, mean, std);
 }
 
 Matrix *ClusterNet::rand_int(int rows, int cols, int low, int high)
@@ -1332,6 +1344,19 @@ Matrix *ClusterNet::decompression_8bit(Matrix *A, float precision)
 {
 	Matrix *out = empty(A->rows,A->cols);
 	::decompression_8bit(flt_tbl, A, precision, out);
+	return out;
+}
+
+
+void ClusterNet::dot8bit(Matrix *A, Matrix *B, float precisionA, float precisionB,  Matrix *out)
+{
+	::dot8bit(A,B,out,flt_tbl, precisionA, precisionB);
+}
+
+Matrix *ClusterNet::dot8bit(Matrix *A, Matrix *B, float precisionA, float precisionB)
+{
+	Matrix *out = empty(A->rows,A->cols);
+	::dot8bit(A,B,out,flt_tbl, precisionA, precisionB);
 	return out;
 }
 

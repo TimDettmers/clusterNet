@@ -169,6 +169,9 @@ void squared_error(Matrix *A, Matrix *targets, Matrix *out);
 
 void expand_to_maxout_grad(Matrix *error, Matrix *idx, Matrix *grad);
 
+Matrix *rand_numbers(int rows, int cols, Matrix *seeds);
+void rand_numbers(Matrix *out, Matrix *seeds);
+
 int checkMatrixOperation(Matrix *A, Matrix *B, Matrix *C, cublasOperation_t T1, cublasOperation_t T2, int blnMatrixProduct);
 int blnFaultySizes(Matrix *A, Matrix *B, Matrix *C);
 int blnFaultyMatrixProductSizes(Matrix *A, Matrix *B, Matrix *C, cublasOperation_t T1, cublasOperation_t T2);
@@ -198,4 +201,5 @@ void update_vocab_with_gradient(Matrix *grad, Matrix *vocab_idx, Matrix *vocab, 
 void concatVocabBatchesN(Matrix** arrBatch_X, Matrix **arrBatch_Y, Matrix *out_X, Matrix *out_Y, int window_size, int matrices_count);
 void expand_vocab_gradient_middle_word(Matrix *grad, Matrix *vocab_idx, Matrix *vocab_grad);
 void matmul(Matrix *A, Matrix *B, Matrix *out, int T1, int T2);
+void dot8bit(Matrix *charA, Matrix *charB, Matrix* out, Matrix *flt_tbl, float precisionA, float precisionB);
 #endif

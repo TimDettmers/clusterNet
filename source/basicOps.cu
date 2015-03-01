@@ -169,6 +169,21 @@ Matrix *ones(int rows, int cols)
   return fill_matrix(rows, cols, 1.0f);
 }
 
+
+Matrix *rand_numbers(int rows, int cols, Matrix *seeds)
+{
+	Matrix *out = zeros(rows,cols);
+	rand_numbers(out, seeds);
+	return out;
+}
+
+void rand_numbers(Matrix *out, Matrix *seeds)
+{
+	dim3 threads(128);
+	dim3 blocks(512);
+	kRdmNumbers<<<blocks,threads>>>(seeds->data, out->size, out->data);
+}
+
 void rand_int(Matrix *uniform_rdm,int low, int high)
 {
 	int block_size = (uniform_rdm->size/THREADS_PER_BLOCKS) + 1;
@@ -1434,5 +1449,13 @@ void matmul(Matrix *A, Matrix *B, Matrix *out, int T1, int T2)
 		dim3 grid( (A->cols - 1)/32 + 1, (B->cols - 1)/32 + 1 );
 		sgemm_kernel_T_N_32_32_8_8_8<<< grid, threads >>>( out->data, A->data, B->data, A->cols, B->cols, A->rows, A->rows, B->rows, out->rows, 1, 0 );
 	}
+}
+
+void dot8bit(Matrix *charA, Matrix *charB, Matrix* out, Matrix *flt_tbl, float precisionA, float precisionB)
+{
+	dim3 threads(16,4);
+	dim3 grids(1 + ((charA->rows-1)/32));
+	printf("launched with %i grids\n",grids.x);
+	kDot8bit<<<grids,threads>>>(charA->char_data, charB->char_data, out->data,charA->rows, charA->cols,charB->cols,flt_tbl->data, precisionA, precisionB);
 }
 

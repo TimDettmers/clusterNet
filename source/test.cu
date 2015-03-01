@@ -1698,7 +1698,70 @@ int main(int argc, char *argv[])
 
 
 
+	//ClusterNet *gpu = new ClusterNet(234);
+
+
+	/*
+	Matrix *rdm = gpu->rand_numbers(10,10);
+
+	printmat(rdm);
+	*/
+
+	/*
+	int out_rows = 128;
+	int out_cols = 800;
+	int inner = 1000;
+
+
+	Matrix *A = gpu->rand(out_rows,inner);
+	Matrix *B = gpu->randn(inner,out_cols,0,0.01);
+
+	Matrix *out1 = empty(out_rows,out_cols);
+
+	gpu->dot(A,B,out1);
+	//printmat(out);
+	//printsum(out);
+	cout << "----------------" << endl;
+
+	Matrix *out2 = zeros(out_rows,out_cols);
+	Matrix *charA = empty_char(out_rows,inner);
+	Matrix *charB = empty_char(inner,out_cols);
+	float maxA = max(abs(A));
+	float maxB = max(abs(B));
+	gpu->compression_8bit(A,maxA,charA);
+	gpu->compression_8bit(B,maxB,charB);
+
+
+	//printmat(A);
+	//printmat(gpu->decompression_8bit(charA,maxA));
+	//printmat(B);
+	//printmat(gpu->decompression_8bit(charB,maxB));
+	cout << sum(gpuSqrt(square(sub(B,gpu->decompression_8bit(charB,maxB)))))/(float)B->size << endl;
+	cout << sum(gpuSqrt(square(sub(A,gpu->decompression_8bit(charA,maxA)))))/(float)B->size << endl;
+	//gpu->compression_8bit(A,maxA,charA);
+
+	gpu->dot8bit(charA,charB,maxA,maxB,out2);
+	//printmat(out);
+	//printsum(out1);
+	//printsum(out2);
+
+	//printmat(out1);
+	//printmat(out2);
+	cout << sum(gpuSqrt(square(sub(out1,out2))))/(float)out1->size << endl;
+
+
+	cout << "max A " << maxA <<endl;
+	cout << "max B " << maxB <<endl;
+	*/
+
+
+
+
+
+
+
 	ClusterNet *gpu = new ClusterNet(argc,argv,123635,true);
+
 	//Matrix *X = read_hdf5("/home/tim/data/mnist/X.hdf5");
 	//Matrix *y = read_hdf5("/home/tim/data/mnist/y.hdf5");
 	Matrix *X = gpu->distribute_rows_hdf5_file("/home/tim/data/mnist/X.hdf5");
@@ -1709,12 +1772,13 @@ int main(int argc, char *argv[])
 	b.init(X,y,(1.0-0.85715),128,128,*gpu, Single_GPU);
 
 	Layer *l0 = new Layer(X->cols,128,Input,gpu);
-	l0->PARALLELISM = DataParallelism;
-	Layer *l1 = new Layer(1200, Logistic, l0);
-	l1->PARALLELISM = DataParallelism;
-	Layer *l2 = new Layer(1200, Logistic, l1);
-	l2->PARALLELISM = DataParallelism;
+	//l0->PARALLELISM = DataParallelism;
+	Layer *l1 = new Layer(1024, Logistic, l0);
+	//l1->PARALLELISM = DataParallelism;
+	Layer *l2 = new Layer(1024, Logistic, l1);
+	//l2->PARALLELISM = DataParallelism;
 	Layer *l3 = new Layer(10, Softmax, l2);
+	//l3->PARALLELISM = DataParallelism;
 
 
 	l0->DROPOUT = 0.2f;
@@ -1723,7 +1787,8 @@ int main(int argc, char *argv[])
 	cout << gpu->MYRANK << endl;
 
 	float decay = 0.99f;
-	for(int epoch = 0; epoch < 100; epoch++)
+	gpu->tick();
+	for(int epoch = 0; epoch < 20; epoch++)
 	{
 		cout << "EPOCH: " << epoch + 1 << endl;
 
@@ -1742,6 +1807,7 @@ int main(int argc, char *argv[])
 
 
 	}
+	gpu->tock();
 
 
 	gpu->shutdown_MPI();

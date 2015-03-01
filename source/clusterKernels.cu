@@ -75,6 +75,54 @@ __global__ void kFill_with(int *m, int fill_value, int size)
        m[i] = fill_value;
 }
 
+__global__ void kRdmNumbers(float *seed, int size, float *out)
+{
+	const unsigned int numThreads = blockDim.x * gridDim.x;
+	const int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
+	unsigned long long s[ 2 ];
+	//s[0] = (long long)seed[(gridDim.x*blockIdx.x)  + threadIdx.x];
+	//s[1] = (long long)seed[(gridDim.x*(blockIdx.x+1))  + threadIdx.x];
+
+	s[0] = 17;
+	s[1] = 83;
+	unsigned long long s1 = s[ 0 ];
+	unsigned long long s0 = s[ 1 ];
+	unsigned long long rdm64 = 23459867034598355;
+
+
+	if(idx == 0)
+	{
+		printf("rdm: %i\n", rdm64);
+		printf("rdm1: %i\n", (unsigned int)(rdm64&0xffffffff));
+		printf("rdm2: %i\n", (unsigned int)((rdm64>>32)&0xffffffff));
+	}
+
+    unsigned int rdm32_1 = 0;
+    unsigned int rdm32_2 = 0;
+	//printf("seed 1: %i\n", seed[(gridDim.x*blockIdx.x)  + threadIdx.x]);
+	//printf("seed 2: %i\n", seed[(gridDim.x*(blockIdx.x+1))  + threadIdx.x]);
+	//printf("idx: %i\n", idx);
+	for(int i = idx*2; i < size; i+=numThreads*2)
+	{
+		s1 = s[0];
+		s0 = s[1];
+		s[0] = s0;
+		s1 ^= s1 << 23; // a
+
+		rdm64 =  (s[1 ] = (s1 ^ s0 ^ (s1 >> 17) ^ (s0 >> 26))) + s0; // b, c
+
+		rdm32_1 = (rdm64&0xffffffff);
+		rdm32_2 = ((rdm64>>32)&0xffffffff);
+		out[i] = rdm32_1;
+		out[i+1] = rdm32_2;
+
+	}
+
+	seed[(gridDim.x*blockIdx.x)  + threadIdx.x] = s[0];
+	seed[(gridDim.x*(blockIdx.x+1))  + threadIdx.x] = s[1];
+
+}
+
 __global__ void kCreateRdmSqrtWeight_Logistic(float *A, int in, int out, int size)
 {
   const unsigned int numThreads = blockDim.x * gridDim.x;
@@ -1089,22 +1137,25 @@ __global__ void kDecompression_8bit(float *flt_tbl, unsigned char *A, float prec
 
 	const unsigned int numThreads = blockDim.x * gridDim.x;
 	const int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
-	unsigned char value = 0;
-	float divisor = 0.1f/precision;
 
 	__shared__ float tbl_floats[256];
 	if(threadIdx.x < 126)
 	{
-		tbl_floats[threadIdx.x] = fdividef(flt_tbl[threadIdx.x],divisor);
+		tbl_floats[threadIdx.x] = flt_tbl[threadIdx.x]*precision;
 		tbl_floats[threadIdx.x+128] = -tbl_floats[threadIdx.x];
 	}
+
+
+	tbl_floats[126] = 0.0f;
+	tbl_floats[254] = -0.0f;
+	tbl_floats[127] = precision;
+	tbl_floats[255] = -precision;
 
 	__syncthreads();
 
 	for (int i = idx;i < size; i += numThreads)
 	{
-		value =A[i];
-		out[i] = value == 127 ? 0.0f : tbl_floats[value];
+		out[i] = tbl_floats[A[i]];
 	}
 }
 
@@ -1115,8 +1166,8 @@ __global__ void kCompression_8bit(float *flt_tbl, float *A, float precision, int
 	const int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
 
 	float absnumber = 0.0f;
-	float multiplier = 0.1f/precision;
-	float threshold = precision/1.e6f;
+	float threshold_lower = 0.0000015;
+	float threshold_upper = 0.995703;
 	int isNegative = 0;
 	int pivot = 63;
 	int upper_pivot = 125;
@@ -1135,9 +1186,10 @@ __global__ void kCompression_8bit(float *flt_tbl, float *A, float precision, int
 		  pivot = 63;
 		  upper_pivot = 125;
 		  lower_pivot = 0;
-		  absnumber = A[i]*multiplier;
+		  absnumber = A[i]/precision;
 		  if(absnumber < 0.0f){isNegative = 1; absnumber=-absnumber; }
-		  if(absnumber < threshold){ out[i] = (unsigned char)127; continue; }
+		  if(absnumber < threshold_lower){ out[i] = (unsigned char)126; continue; }
+		  if(absnumber > threshold_upper){ out[i] = (isNegative == 0 ? (unsigned char)127 : (unsigned char)255); continue; }
 		  for(int j = 32; j > 0; j>>=1)
 		  {
 			  if(absnumber > tbl_floats[pivot])
@@ -1584,6 +1636,56 @@ __global__ void kExpandVocabGradientMiddleWord(float *grad, float *vocab_idx, fl
 		int myVocabIdx = blockDim.x*myIdx;
 		atomicAdd(&vocab_grad[myVocabIdx + threadIdx.x],grad[blockIdx.x + (blockIdx.y*blockDim.x*gridDim.x) + (threadIdx.x*gridDim.x)]);
 	}
+
+}
+
+
+
+
+__global__ void kDot8bit(unsigned char *A, unsigned char *B, float *out, int rowsA, int colsA, int colsB, float *flt_tbl, float precisionA, float precisionB)
+{
+	const unsigned int threads_per_block = blockDim.x*blockDim.y;
+	const int mygrid = blockIdx.x;
+	const int myidx = (threadIdx.y*blockDim.x)+threadIdx.x;
+
+	__shared__ float tbl_floatsA[256];
+	__shared__ float tbl_floatsB[256];
+	for(int i = myidx; i < 126; i++)
+	{
+		tbl_floatsA[i] = flt_tbl[i]*precisionA;
+		tbl_floatsA[i+128] = -tbl_floatsA[i];
+		tbl_floatsB[i] = flt_tbl[i]*precisionB;
+		tbl_floatsB[i+128] = -tbl_floatsB[i];
+	}
+	tbl_floatsA[126] = 0.0f;
+	tbl_floatsB[126] = 0.0f;
+	tbl_floatsA[127] = precisionA;
+	tbl_floatsB[127] = -precisionA;
+	tbl_floatsA[254] = -0.0f;
+	tbl_floatsB[254] = -0.0f;
+	tbl_floatsA[255] = precisionB;
+	tbl_floatsB[255] = -precisionB;
+
+	__syncthreads();
+
+
+
+	for(int Arow = mygrid; Arow < rowsA; Arow+=gridDim.x)
+	{
+		for(int Bcol = myidx; Bcol < colsB; Bcol+=threads_per_block)
+		{
+			int idxout = (Bcol*rowsA) + Arow;
+			for(int Acol = 0; Acol < colsA; Acol++)
+				out[idxout] += tbl_floatsA[A[(Acol*rowsA)+Arow]] * tbl_floatsB[B[(colsA*Bcol)  + Acol]];
+
+		}
+
+
+	}
+
+
+
+
 
 }
 

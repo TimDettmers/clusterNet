@@ -289,6 +289,7 @@ void Layer::MPI_synchronization_async()
 	int target = GPU->MYRANK +1 == GPU->MPI_SIZE ? 0 : GPU->MYRANK+1;
 	int source = GPU->MYRANK-1 == -1 ? GPU->MPI_SIZE-1 : GPU->MYRANK-1;
 
+
 	/*
 	GPU->compression_8bit(w_grad_next,0.001,w_next_sync_send);
 	for (int i = 0; i < GPU->MPI_SIZE - 1; i++)
@@ -303,6 +304,7 @@ void Layer::MPI_synchronization_async()
 
 
 
+
 	for (int i = 0; i < GPU->MPI_SIZE - 1; i++)
 	{
 		MPI_Isend(w_grad_next->data,w_grad_next->size,MPI_FLOAT,target,i,MPI_COMM_WORLD, send_request);
@@ -311,6 +313,7 @@ void Layer::MPI_synchronization_async()
 		source = source-1 == -1 ? GPU->MPI_SIZE-1 : source-1;
 	}
 	isSynchronizing = true;
+
 
 
 }

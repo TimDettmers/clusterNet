@@ -118,6 +118,10 @@ public:
 	 void rand(int rows, int cols, bool useSameSeedGenerator, Matrix *out);
 
 
+	 Matrix *rand_numbers(int rows, int cols);
+	 void rand_numbers(int rows, int cols, Matrix *out);
+
+
 	 Matrix *randn(int rows, int cols);
 	 Matrix *randn(int rows, int cols, float mean, float std);
 	 void randn(int rows, int cols, float mean, float std, Matrix *out);
@@ -131,6 +135,9 @@ public:
 	 void decompression_8bit(Matrix *A, float precision, Matrix *out);
 	 Matrix *compression_8bit_test(Matrix *A, float precision);
 	 void compression_8bit_test(Matrix *A, float precision, Matrix *out);
+
+	 void dot8bit(Matrix *A, Matrix *B, float precisionA, float precisionB,  Matrix *out);
+	 Matrix *dot8bit(Matrix *A, Matrix *B, float precisionA, float precisionB);
 
 	 void tick(std::string name);
 	 void tick();
@@ -214,6 +221,7 @@ private:
 	 pthread_t *m_threads;
 
 	 Matrix *flt_tbl;
+	 Matrix *seeds;
 
 	 bool m_hasMPI;
 	 bool m_cublasInitialized;

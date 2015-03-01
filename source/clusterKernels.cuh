@@ -3,6 +3,7 @@
 
 #include "curand.h"
 #include "curand_kernel.h"
+__global__ void kRdmNumbers(float *seed, int size, float *out);
 __global__ void kCompression_8bit_test(float *tbl, float *A, float precision, int size, float *out);
 __global__ void kCompression_8bit(float *flt_tbl, float *A, float precision, int size, unsigned char *out);
 __global__ void kDecompression_8bit(float *flt_tbl, unsigned char *A, float precision, int size, float *out);
@@ -43,6 +44,7 @@ __global__ void kSubMatrixVector(float *A, float *v, float *out, int rows, int s
 __global__ void kAddMatrixVector(float *A, float *v, float *out, int rows, int size);
 __global__ void kMulMatrixVector(float *A, float *v, float *out, int rows, int size);
 __global__ void kAddScaledMatrixVector(float *A, float *v, float weight, float *out, int rows, int size);
+__global__ void kDot8bit(unsigned char *A, unsigned char *B, float *out, int rowsA, int colsA, int colsB, float *flt_tbl, float precisionA, float precisionB);
 __global__ void kArgmax(float* A, float* out, unsigned int height, unsigned int width);
 __global__ void kCreate_t_matrix(float *labels, float *out, int rows, int size);
 __global__ void kEqual(float *A, float *B, float *out, int size);
