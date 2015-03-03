@@ -1689,6 +1689,56 @@ __global__ void kDot8bit(unsigned char *A, unsigned char *B, float *out, int row
 
 }
 
+__global__ void kDot8bit_shared(unsigned char *A, unsigned char *B, float *out, int rowsA, int colsA, int colsB, float *flt_tbl, float precisionA, float precisionB)
+{
+	int myidx = (threadIdx.y*blockDim.x)+threadIdx.x;
+
+	__shared__ unsigned char A_tile[64][256]; //64x32 banks
+	__shared__ unsigned char B_tile[64][256];//256x8 banks
+
+	__shared__ float tbl_floatsA[256];
+	__shared__ float tbl_floatsB[256];
+	for(int i = myidx; i < 126; i++)
+	{
+		tbl_floatsA[i] = flt_tbl[i]*precisionA;
+		tbl_floatsA[i+128] = -tbl_floatsA[i];
+		tbl_floatsB[i] = flt_tbl[i]*precisionB;
+		tbl_floatsB[i+128] = -tbl_floatsB[i];
+	}
+	tbl_floatsA[126] = 0.0f;
+	tbl_floatsB[126] = 0.0f;
+	tbl_floatsA[127] = precisionA;
+	tbl_floatsB[127] = -precisionA;
+	tbl_floatsA[254] = -0.0f;
+	tbl_floatsB[254] = -0.0f;
+	tbl_floatsA[255] = precisionB;
+	tbl_floatsB[255] = -precisionB;
+
+	__syncthreads();
+
+
+	myidx = threadIdx.y*16;
+	for(int Arow = threadIdx.x; Arow < rowsA; Arow+=64)//threadDim.x = 64
+	{
+		for(int Acol = threadIdx.y*16; Acol < colsA; Acol+=256)//threadDim.y = 16
+		{
+			for(int i = 0; i < 16; i++)
+				A_tile[Arow][Acol+i] = A[((Acol+i)*rowsA)+ Arow];
+
+			for(int i = 0; i < 16; i++)
+				B_tile[Arow][Acol+i] = B[(Arow*colsA)+ Acol+i];//B_tile is transposed to avoid bank conflicts with 64 threads
+
+			__syncthreads();
+			for(int Bcol = 0; Bcol < 64; Bcol++)
+				for (int i = 0; i < 16; ++i)//
+					atomicAdd(&out[((Bcol)*rowsA) + Arow],tbl_floatsA[A_tile[threadIdx.x][myidx + i]] * tbl_floatsB[B_tile[Bcol][myidx + i]]);
+
+		}
+	}
+
+
+}
+
 __global__ void MatMul(float* A, float* B, float* C, int ARows, int ACols, int BRows, int BCols, int CRows, int CCols)
 {
     float CValue = 0;

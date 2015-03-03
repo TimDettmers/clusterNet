@@ -1360,6 +1360,18 @@ Matrix *ClusterNet::dot8bit(Matrix *A, Matrix *B, float precisionA, float precis
 	return out;
 }
 
+void ClusterNet::dot8bit_shared(Matrix *A, Matrix *B, float precisionA, float precisionB,  Matrix *out)
+{
+	::dot8bit_shared(A,B,out,flt_tbl, precisionA, precisionB);
+}
+
+Matrix *ClusterNet::dot8bit_shared(Matrix *A, Matrix *B, float precisionA, float precisionB)
+{
+	Matrix *out = empty(A->rows,A->cols);
+	::dot8bit_shared(A,B,out,flt_tbl, precisionA, precisionB);
+	return out;
+}
+
 
 
 void ClusterNet::addGradients_PCIe(Matrix **grad)

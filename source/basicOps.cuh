@@ -202,4 +202,5 @@ void concatVocabBatchesN(Matrix** arrBatch_X, Matrix **arrBatch_Y, Matrix *out_X
 void expand_vocab_gradient_middle_word(Matrix *grad, Matrix *vocab_idx, Matrix *vocab_grad);
 void matmul(Matrix *A, Matrix *B, Matrix *out, int T1, int T2);
 void dot8bit(Matrix *charA, Matrix *charB, Matrix* out, Matrix *flt_tbl, float precisionA, float precisionB);
+void dot8bit_shared(Matrix *charA, Matrix *charB, Matrix* out, Matrix *flt_tbl, float precisionA, float precisionB);
 #endif

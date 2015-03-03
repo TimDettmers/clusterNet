@@ -210,6 +210,35 @@ void Layer::handle_offsize()
 }
 
 
+void Layer::dot_switch(Matrix *A, Matrix *B, Matrix *out)
+{
+	GPU->dot(A,B,out);
+	/*
+	Matrix *Achar = empty_char(A->rows,A->cols);
+	Matrix *Bchar = empty_char(B->rows,B->cols);
+	Matrix *absA = empty(A->rows,A->cols);
+	Matrix *absB = empty(B->rows,B->cols);
+
+	abs(A,absA);
+	abs(B,absB);
+
+	GPU->compression_8bit(A,max(absA),Achar);
+	GPU->compression_8bit(B,max(absB),Bchar);
+
+	GPU->dot8bit(Achar,Bchar,max(absA),max(absB),out);
+
+	cudaFree(Achar->char_data);
+	cudaFree(Bchar->char_data);
+	cudaFree(absA->data);
+	cudaFree(absB->data);
+
+	free(Achar);
+	free(Bchar);
+	free(absA);
+	free(absB);
+	*/
+}
+
 void Layer::forward(){ forward(true); }
 void Layer::forward(bool useDropout)
 {
@@ -217,7 +246,8 @@ void Layer::forward(bool useDropout)
 	if(!prev){  unit_activation(useDropout); next->forward(useDropout); return; }
 	if(useDropout){ prev->wait_for_synchronization(); prev->weight_update(); }
 
-	GPU->dot(prev->out,prev->w_next,out);
+	//GPU->dot(prev->out,prev->w_next,out);
+	dot_switch(prev->out,prev->w_next,out);
 	addMatrixVector(out,prev->b_next,out);
     unit_activation(useDropout);
 

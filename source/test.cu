@@ -1684,6 +1684,7 @@ void bandwidth_test_kernel()
 
 
 
+
 int main(int argc, char *argv[])
 {
 	
@@ -1707,25 +1708,23 @@ int main(int argc, char *argv[])
 	printmat(rdm);
 	*/
 
+
 	/*
-	int out_rows = 128;
-	int out_cols = 800;
-	int inner = 1000;
+	ClusterNet *gpu = new ClusterNet(234);
+	int out_rows = 64;
+	int out_cols = 64;
+	int inner = 256;
 
 
 	Matrix *A = gpu->rand(out_rows,inner);
 	Matrix *B = gpu->randn(inner,out_cols,0,0.01);
-
 	Matrix *out1 = empty(out_rows,out_cols);
 
-	gpu->dot(A,B,out1);
-	//printmat(out);
-	//printsum(out);
-	cout << "----------------" << endl;
-
-	Matrix *out2 = zeros(out_rows,out_cols);
 	Matrix *charA = empty_char(out_rows,inner);
 	Matrix *charB = empty_char(inner,out_cols);
+	Matrix *out2 = zeros(out_rows,out_cols);
+
+	gpu->dot(A,B,out1);
 	float maxA = max(abs(A));
 	float maxB = max(abs(B));
 	gpu->compression_8bit(A,maxA,charA);
@@ -1740,10 +1739,12 @@ int main(int argc, char *argv[])
 	cout << sum(gpuSqrt(square(sub(A,gpu->decompression_8bit(charA,maxA)))))/(float)B->size << endl;
 	//gpu->compression_8bit(A,maxA,charA);
 
-	gpu->dot8bit(charA,charB,maxA,maxB,out2);
-	//printmat(out);
-	//printsum(out1);
-	//printsum(out2);
+	//out1 = zeros(out_rows,out_cols);
+	//gpu->dot8bit(charA,charB,maxA,maxB,out2);
+	gpu->dot8bit_shared(charA,charB,maxA,maxB,out2);
+	//printmat(gpu->decompression_8bit(charB,maxB));
+	//printmat(out1);
+	//printmat(out2);
 
 	//printmat(out1);
 	//printmat(out2);
@@ -1773,9 +1774,9 @@ int main(int argc, char *argv[])
 
 	Layer *l0 = new Layer(X->cols,128,Input,gpu);
 	//l0->PARALLELISM = DataParallelism;
-	Layer *l1 = new Layer(1024, Logistic, l0);
+	Layer *l1 = new Layer(2048, Logistic, l0);
 	//l1->PARALLELISM = DataParallelism;
-	Layer *l2 = new Layer(1024, Logistic, l1);
+	Layer *l2 = new Layer(2048, Logistic, l1);
 	//l2->PARALLELISM = DataParallelism;
 	Layer *l3 = new Layer(10, Softmax, l2);
 	//l3->PARALLELISM = DataParallelism;
@@ -1788,7 +1789,8 @@ int main(int argc, char *argv[])
 
 	float decay = 0.99f;
 	gpu->tick();
-	for(int epoch = 0; epoch < 20; epoch++)
+	gpu->tick("pass");
+	for(int epoch = 0; epoch < 25; epoch++)
 	{
 		cout << "EPOCH: " << epoch + 1 << endl;
 
@@ -1807,10 +1809,12 @@ int main(int argc, char *argv[])
 
 
 	}
+	gpu->tock("pass");
 	gpu->tock();
 
 
 	gpu->shutdown_MPI();
+
 
 
 

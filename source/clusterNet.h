@@ -138,6 +138,8 @@ public:
 
 	 void dot8bit(Matrix *A, Matrix *B, float precisionA, float precisionB,  Matrix *out);
 	 Matrix *dot8bit(Matrix *A, Matrix *B, float precisionA, float precisionB);
+	 void dot8bit_shared(Matrix *A, Matrix *B, float precisionA, float precisionB,  Matrix *out);
+	 Matrix *dot8bit_shared(Matrix *A, Matrix *B, float precisionA, float precisionB);
 
 	 void tick(std::string name);
 	 void tick();

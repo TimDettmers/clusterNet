@@ -92,6 +92,8 @@ public:
 	virtual void dropout_decay();
 	virtual void learning_rate_decay(float decay_rate);
 
+	virtual void dot_switch(Matrix *A, Matrix *B, Matrix *out);
+
 
 
 private:

@@ -1122,6 +1122,7 @@ void BatchAllocator::propagate_through_layers(Layer *root, DataPropagationType_t
 
 	for(int i = 0; i < (type == CVerror ? TOTAL_BATCHES_CV : TOTAL_BATCHES); i++)
 	{
+		//cout << i << endl;
 		root->activation = (type == CVerror ? CURRENT_BATCH_CV : CURRENT_BATCH);
 		end->target = (type == CVerror ? CURRENT_BATCH_CV_Y : CURRENT_BATCH_Y);
 
