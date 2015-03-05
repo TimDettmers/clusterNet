@@ -1453,8 +1453,8 @@ void matmul(Matrix *A, Matrix *B, Matrix *out, int T1, int T2)
 
 void dot8bit(Matrix *charA, Matrix *charB, Matrix* out, Matrix *flt_tbl, float precisionA, float precisionB)
 {
-	dim3 threads(64,16);
-	dim3 grids(1 + ((charA->rows-1)/64));
+	dim3 threads(16,4);
+	dim3 grids(1 + ((charA->rows-1)/32));
 	//printf("launched with %i grids\n",grids.x);
 	kDot8bit<<<grids,threads>>>(charA->char_data, charB->char_data, out->data,charA->rows, charA->cols,charB->cols,flt_tbl->data, precisionA, precisionB);
 
@@ -1463,7 +1463,7 @@ void dot8bit(Matrix *charA, Matrix *charB, Matrix* out, Matrix *flt_tbl, float p
 void dot8bit_shared(Matrix *charA, Matrix *charB, Matrix* out, Matrix *flt_tbl, float precisionA, float precisionB)
 {
 	dim3 threads(64,16);
-	dim3 grids(1 + ((charA->rows-1)/64));
+	dim3 grids(1 + ((charA->rows-1)/64), 1 + ((charA->cols-1)/256));
 
 	cudaFuncSetCacheConfig(kDot8bit_shared, cudaFuncCachePreferShared);
 	//printf("launched with %i grids\n",grids.x);

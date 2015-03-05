@@ -1718,23 +1718,38 @@ __global__ void kDot8bit_shared(unsigned char *A, unsigned char *B, float *out, 
 
 
 	myidx = threadIdx.y*16;
-	for(int Arow = threadIdx.x; Arow < rowsA; Arow+=64)//threadDim.x = 64
-	{
-		for(int Acol = threadIdx.y*16; Acol < colsA; Acol+=256)//threadDim.y = 16
+	int Arow = threadIdx.x+(blockIdx.x*64);
+	for(int i = 0; i < colsB; i++){ out[((i)*rowsA) + Arow] = 0.0f; }//zero output
+
+	int Acol = (threadIdx.y*16)+(blockIdx.y*256);
+
+		for(int i = 0; i < 16; i++)
+			A_tile[threadIdx.x][myidx+i] = A[((Acol+i)*rowsA)+ Arow];
+
+
+
+		int offset = 0;
+		for(int Bcol = threadIdx.x ; Bcol < colsB; Bcol+=64)
 		{
-			for(int i = 0; i < 16; i++)
-				A_tile[Arow][Acol+i] = A[((Acol+i)*rowsA)+ Arow];
 
 			for(int i = 0; i < 16; i++)
-				B_tile[Arow][Acol+i] = B[(Arow*colsA)+ Acol+i];//B_tile is transposed to avoid bank conflicts with 64 threads
+				B_tile[threadIdx.x][myidx+i] = B[(Bcol*colsA)+ Acol+i];//B_tile is transposed to avoid bank conflicts with 64 threads
 
 			__syncthreads();
-			for(int Bcol = 0; Bcol < 64; Bcol++)
-				for (int i = 0; i < 16; ++i)//
-					atomicAdd(&out[((Bcol)*rowsA) + Arow],tbl_floatsA[A_tile[threadIdx.x][myidx + i]] * tbl_floatsB[B_tile[Bcol][myidx + i]]);
 
+			for(int Bcol2 = offset; Bcol2 < 64 + offset; Bcol2++)
+			{
+				for (int i = 0; i < 16; ++i)
+					atomicAdd(&out[((Bcol2)*rowsA) + Arow],tbl_floatsA[A_tile[threadIdx.x][myidx + i]] * tbl_floatsB[B_tile[Bcol2-offset][myidx + i]]);
+
+
+
+			}
+			offset +=64;
 		}
-	}
+
+
+
 
 
 }

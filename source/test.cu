@@ -1709,11 +1709,11 @@ int main(int argc, char *argv[])
 	*/
 
 
-	/*
+
 	ClusterNet *gpu = new ClusterNet(234);
-	int out_rows = 64;
-	int out_cols = 64;
-	int inner = 256;
+	int out_rows = 192;
+	int out_cols = 128;
+	int inner = 512;
 
 
 	Matrix *A = gpu->rand(out_rows,inner);
@@ -1722,7 +1722,7 @@ int main(int argc, char *argv[])
 
 	Matrix *charA = empty_char(out_rows,inner);
 	Matrix *charB = empty_char(inner,out_cols);
-	Matrix *out2 = zeros(out_rows,out_cols);
+	Matrix *out2 = empty(out_rows,out_cols);
 
 	gpu->dot(A,B,out1);
 	float maxA = max(abs(A));
@@ -1739,21 +1739,21 @@ int main(int argc, char *argv[])
 	cout << sum(gpuSqrt(square(sub(A,gpu->decompression_8bit(charA,maxA)))))/(float)B->size << endl;
 	//gpu->compression_8bit(A,maxA,charA);
 
-	//out1 = zeros(out_rows,out_cols);
-	//gpu->dot8bit(charA,charB,maxA,maxB,out2);
+	printmat(out1,180,185,70,80);
+	out1 = zeros(out_rows,out_cols);
+	gpu->dot8bit(charA,charB,maxA,maxB,out1);
 	gpu->dot8bit_shared(charA,charB,maxA,maxB,out2);
 	//printmat(gpu->decompression_8bit(charB,maxB));
-	//printmat(out1);
-	//printmat(out2);
+	printmat(out1,180,185,70,80);
+	printmat(out2,180,185,70,80);
 
-	//printmat(out1);
-	//printmat(out2);
+	printsum(out1);
+	printsum(out2);
 	cout << sum(gpuSqrt(square(sub(out1,out2))))/(float)out1->size << endl;
 
 
 	cout << "max A " << maxA <<endl;
 	cout << "max B " << maxB <<endl;
-	*/
 
 
 
@@ -1761,7 +1761,9 @@ int main(int argc, char *argv[])
 
 
 
+	/*
 	ClusterNet *gpu = new ClusterNet(argc,argv,123635,true);
+
 
 	//Matrix *X = read_hdf5("/home/tim/data/mnist/X.hdf5");
 	//Matrix *y = read_hdf5("/home/tim/data/mnist/y.hdf5");
@@ -1790,7 +1792,7 @@ int main(int argc, char *argv[])
 	float decay = 0.99f;
 	gpu->tick();
 	gpu->tick("pass");
-	for(int epoch = 0; epoch < 25; epoch++)
+	for(int epoch = 0; epoch < 100; epoch++)
 	{
 		cout << "EPOCH: " << epoch + 1 << endl;
 
@@ -1814,7 +1816,7 @@ int main(int argc, char *argv[])
 
 
 	gpu->shutdown_MPI();
-
+	*/
 
 
 
