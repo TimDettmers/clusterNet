@@ -1717,36 +1717,52 @@ __global__ void kDot8bit_shared(unsigned char *A, unsigned char *B, float *out, 
 	__syncthreads();
 
 
+	int offset = 0;
 	myidx = threadIdx.y*16;
 	int Arow = threadIdx.x+(blockIdx.x*64);
-	for(int i = 0; i < colsB; i++){ out[((i)*rowsA) + Arow] = 0.0f; }//zero output
-
 	int Acol = (threadIdx.y*16)+(blockIdx.y*256);
 
-		for(int i = 0; i < 16; i++)
-			A_tile[threadIdx.x][myidx+i] = A[((Acol+i)*rowsA)+ Arow];
 
 
+	if(Arow < rowsA)
+	{
+		for(int i = 0; i < 16; i++){ A_tile[threadIdx.x][myidx+i] = A[((Acol+i)*rowsA)+ Arow]; }
+		for(int i = threadIdx.y; i < colsB; i+=blockDim.y){ out[((i)*rowsA) + Arow] = 0.0f; }
+	}
+	else
+		for(int i = 0; i < 16; i++){ A_tile[threadIdx.x][myidx+i] = 126; }
 
-		int offset = 0;
-		for(int Bcol = threadIdx.x ; Bcol < colsB; Bcol+=64)
+	for(int Btile = 0 ; Btile < colsB; Btile+=64)
+	{
+		if(Btile+threadIdx.x  < colsB)
 		{
-
 			for(int i = 0; i < 16; i++)
-				B_tile[threadIdx.x][myidx+i] = B[(Bcol*colsA)+ Acol+i];//B_tile is transposed to avoid bank conflicts with 64 threads
+			{
+				if(Acol+i < colsA)
+					B_tile[threadIdx.x][myidx+i] = B[((threadIdx.x + Btile)*colsA)+ Acol+i];//B_tile is transposed to avoid bank conflicts with 64 threads
+				else
+					B_tile[threadIdx.x][myidx+i] = 126;
+			}
+		}
+		else
+		{
+			for(int i = 0; i < 16; i++)
+				B_tile[threadIdx.x][myidx+i] = 126;//B_tile is transposed to avoid bank conflicts with 64 threads
+		}
 
-			__syncthreads();
-
+		__syncthreads();
 			for(int Bcol2 = offset; Bcol2 < 64 + offset; Bcol2++)
 			{
-				for (int i = 0; i < 16; ++i)
-					atomicAdd(&out[((Bcol2)*rowsA) + Arow],tbl_floatsA[A_tile[threadIdx.x][myidx + i]] * tbl_floatsB[B_tile[Bcol2-offset][myidx + i]]);
-
-
+					for (int i = 0; i < 16; ++i)
+						atomicAdd(&out[((Bcol2)*rowsA) + Arow],
+								tbl_floatsA[A_tile[threadIdx.x][myidx + i]] *
+								tbl_floatsB[B_tile[Bcol2-offset][myidx + i]]);
 
 			}
-			offset +=64;
-		}
+
+		offset +=64;
+	}
+
 
 
 

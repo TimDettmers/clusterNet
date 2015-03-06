@@ -212,8 +212,8 @@ void Layer::handle_offsize()
 
 void Layer::dot_switch(Matrix *A, Matrix *B, Matrix *out)
 {
-	GPU->dot(A,B,out);
-	/*
+	//GPU->dot(A,B,out);
+
 	Matrix *Achar = empty_char(A->rows,A->cols);
 	Matrix *Bchar = empty_char(B->rows,B->cols);
 	Matrix *absA = empty(A->rows,A->cols);
@@ -225,7 +225,7 @@ void Layer::dot_switch(Matrix *A, Matrix *B, Matrix *out)
 	GPU->compression_8bit(A,max(absA),Achar);
 	GPU->compression_8bit(B,max(absB),Bchar);
 
-	GPU->dot8bit(Achar,Bchar,max(absA),max(absB),out);
+	GPU->dot8bit_shared(Achar,Bchar,max(absA),max(absB),out);
 
 	cudaFree(Achar->char_data);
 	cudaFree(Bchar->char_data);
@@ -236,7 +236,7 @@ void Layer::dot_switch(Matrix *A, Matrix *B, Matrix *out)
 	free(Bchar);
 	free(absA);
 	free(absB);
-	*/
+
 }
 
 void Layer::forward(){ forward(true); }

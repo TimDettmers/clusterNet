@@ -1709,22 +1709,27 @@ int main(int argc, char *argv[])
 	*/
 
 
-
+	/*
 	ClusterNet *gpu = new ClusterNet(234);
-	int out_rows = 192;
-	int out_cols = 128;
-	int inner = 512;
+	int out_rows = 128;
+	int out_cols = 800;
+	int inner = 784;
 
 
 	Matrix *A = gpu->rand(out_rows,inner);
-	Matrix *B = gpu->randn(inner,out_cols,0,0.01);
-	Matrix *out1 = empty(out_rows,out_cols);
+	Matrix *B = gpu->rand(inner,out_cols);
+	Matrix *out1 = zeros(out_rows,out_cols);
 
 	Matrix *charA = empty_char(out_rows,inner);
 	Matrix *charB = empty_char(inner,out_cols);
 	Matrix *out2 = empty(out_rows,out_cols);
+	Matrix *out3 = empty(out_rows,out_cols);
 
-	gpu->dot(A,B,out1);
+	gpu->tick();
+	for(int i = 0; i < 100; i++)
+		gpu->dot(A,B,out3);
+	gpu->tock();
+
 	float maxA = max(abs(A));
 	float maxB = max(abs(B));
 	gpu->compression_8bit(A,maxA,charA);
@@ -1735,25 +1740,41 @@ int main(int argc, char *argv[])
 	//printmat(gpu->decompression_8bit(charA,maxA));
 	//printmat(B);
 	//printmat(gpu->decompression_8bit(charB,maxB));
-	cout << sum(gpuSqrt(square(sub(B,gpu->decompression_8bit(charB,maxB)))))/(float)B->size << endl;
-	cout << sum(gpuSqrt(square(sub(A,gpu->decompression_8bit(charA,maxA)))))/(float)B->size << endl;
+	//cout << sum(gpuSqrt(square(sub(B,gpu->decompression_8bit(charB,maxB)))))/(float)B->size << endl;
+	//cout << sum(gpuSqrt(square(sub(A,gpu->decompression_8bit(charA,maxA)))))/(float)B->size << endl;
 	//gpu->compression_8bit(A,maxA,charA);
 
-	printmat(out1,180,185,70,80);
-	out1 = zeros(out_rows,out_cols);
-	gpu->dot8bit(charA,charB,maxA,maxB,out1);
-	gpu->dot8bit_shared(charA,charB,maxA,maxB,out2);
+	//printmat(out1);
+	//printmat(out1,60,65,70,80);
+	gpu->tick();
+	for(int i = 0; i < 100; i++)
+	{
+		fill_matrix(out1,0.0f);
+		gpu->dot8bit(charA,charB,maxA,maxB,out1);
+	}
+	gpu->tock();
+
+	gpu->tick();
+	for(int i = 0; i < 100; i++)
+		gpu->dot8bit_shared(charA,charB,maxA,maxB,out2);
+	gpu->tock();
 	//printmat(gpu->decompression_8bit(charB,maxB));
-	printmat(out1,180,185,70,80);
-	printmat(out2,180,185,70,80);
+	//printmat(out1,60,65,70,80);
+	//printmat(out2,60,65,70,80);
+	//printmat(out1);
+	//printmat(out2);
 
-	printsum(out1);
-	printsum(out2);
+	//printsum(out1);
+	//printsum(out2);
 	cout << sum(gpuSqrt(square(sub(out1,out2))))/(float)out1->size << endl;
+	cout << sum(gpuSqrt(square(sub(out1,out3))))/(float)out1->size << endl;
+	cout << sum(gpuSqrt(square(sub(out2,out3))))/(float)out1->size << endl;
 
 
-	cout << "max A " << maxA <<endl;
-	cout << "max B " << maxB <<endl;
+	//cout << "max A " << maxA <<endl;
+	//cout << "max B " << maxB <<endl;
+
+	*/
 
 
 
@@ -1761,7 +1782,6 @@ int main(int argc, char *argv[])
 
 
 
-	/*
 	ClusterNet *gpu = new ClusterNet(argc,argv,123635,true);
 
 
@@ -1816,7 +1836,7 @@ int main(int argc, char *argv[])
 
 
 	gpu->shutdown_MPI();
-	*/
+
 
 
 
