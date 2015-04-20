@@ -1,8 +1,8 @@
 CC = nvcc
-MPI_DIR=/usr/mpi/openmpi-1.7.4
+MPI_DIR=/usr/local/openmpi
 #MPI_DIR=/usr/mpi/openmpi-1.8.1
-HDF5_DIR = /home/tim/hdf5/
-SZIP_DIR = /home/tim/Downloads/szip-2.1/szip/
+HDF5_DIR = /home/tim/apps/hdf5-1.8.14/hdf5
+SZIP_DIR = /home/tim/apps/szip-2.1/szip/
 TOP := $(dir $(CURDIR)/$(word $(words $(MAKEFILE_LIST)),$(MAKEFILE_LIST)))
 TESTS := tests/testSuite.cu $(wildcard tests/*_test.cu) 
 NODES=tim@10.0.0.2
@@ -32,4 +32,4 @@ test:
 
 run:
 	#scp $(TOP)$(EXECSRC) $(NODES):$(TOP)build/;
-	$(MPI_DIR)/bin/mpirun -x LD_LIBRARY_PATH -np 1 -hostfile  $(HOSTFILE) $(TOP)$(EXECSRC)
+	$(MPI_DIR)/bin/mpirun -x LD_LIBRARY_PATH -np 2  $(TOP)$(EXECSRC)

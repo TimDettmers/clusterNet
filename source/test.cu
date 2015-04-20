@@ -1787,21 +1787,21 @@ int main(int argc, char *argv[])
 
 	//Matrix *X = read_hdf5("/home/tim/data/mnist/X.hdf5");
 	//Matrix *y = read_hdf5("/home/tim/data/mnist/y.hdf5");
-	Matrix *X = gpu->distribute_rows_hdf5_file("/home/tim/data/mnist/X.hdf5");
-	Matrix *y = gpu->distribute_rows_hdf5_file("/home/tim/data/mnist/y.hdf5");
+	Matrix *X = gpu->distribute_rows_hdf5_file("/home/tim/data/MNIST/X.hdf5");
+	Matrix *y = gpu->distribute_rows_hdf5_file("/home/tim/data/MNIST/y.hdf5");
 
 
 	BatchAllocator b = BatchAllocator();
 	b.init(X,y,(1.0-0.85715),128,128,*gpu, Single_GPU);
 
 	Layer *l0 = new Layer(X->cols,128,Input,gpu);
-	//l0->PARALLELISM = DataParallelism;
-	Layer *l1 = new Layer(2048, Logistic, l0);
-	//l1->PARALLELISM = DataParallelism;
-	Layer *l2 = new Layer(2048, Logistic, l1);
-	//l2->PARALLELISM = DataParallelism;
+	l0->PARALLELISM = DataParallelism;
+	Layer *l1 = new Layer(1024, Logistic, l0);
+	l1->PARALLELISM = DataParallelism;
+	Layer *l2 = new Layer(1024, Logistic, l1);
+	l2->PARALLELISM = DataParallelism;
 	Layer *l3 = new Layer(10, Softmax, l2);
-	//l3->PARALLELISM = DataParallelism;
+	l3->PARALLELISM = DataParallelism;
 
 
 	l0->DROPOUT = 0.2f;
@@ -1815,7 +1815,7 @@ int main(int argc, char *argv[])
 	for(int epoch = 0; epoch < 100; epoch++)
 	{
 		cout << "EPOCH: " << epoch + 1 << endl;
-
+		gpu->tick("EPOCH");
 		b.propagate_through_layers(l0,Training);
 		b.propagate_through_layers(l0,Trainerror);
 		b.propagate_through_layers(l0,CVerror);
@@ -1828,6 +1828,7 @@ int main(int argc, char *argv[])
 			l0->dropout_decay();
 			decay = 0.85f;
 		}
+		gpu->tock("EPOCH");
 
 
 	}
@@ -1844,8 +1845,8 @@ int main(int argc, char *argv[])
 
 	cudaSetDevice(0);
 
-	Matrix *X = read_hdf5("/home/tim/data/mnist/X.hdf5");
-	Matrix *y = read_hdf5("/home/tim/data/mnist/y.hdf5");
+	Matrix *X = read_hdf5("/home/tim/data/MNIST/X.hdf5");
+	Matrix *y = read_hdf5("/home/tim/data/MNIST/y.hdf5");
 
 
 

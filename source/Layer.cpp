@@ -212,8 +212,8 @@ void Layer::handle_offsize()
 
 void Layer::dot_switch(Matrix *A, Matrix *B, Matrix *out)
 {
-	//GPU->dot(A,B,out);
-
+	GPU->dot(A,B,out);
+	/*
 	Matrix *Achar = empty_char(A->rows,A->cols);
 	Matrix *Bchar = empty_char(B->rows,B->cols);
 	Matrix *absA = empty(A->rows,A->cols);
@@ -236,6 +236,7 @@ void Layer::dot_switch(Matrix *A, Matrix *B, Matrix *out)
 	free(Bchar);
 	free(absA);
 	free(absB);
+	*/
 
 }
 
@@ -320,7 +321,8 @@ void Layer::MPI_synchronization_async()
 	int source = GPU->MYRANK-1 == -1 ? GPU->MPI_SIZE-1 : GPU->MYRANK-1;
 
 
-	/*
+	cout << "pre sync" << endl;
+	
 	GPU->compression_8bit(w_grad_next,0.001,w_next_sync_send);
 	for (int i = 0; i < GPU->MPI_SIZE - 1; i++)
 	{
@@ -330,11 +332,13 @@ void Layer::MPI_synchronization_async()
 		source = source-1 == -1 ? GPU->MPI_SIZE-1 : source-1;
 	}
 	isSynchronizing = true;
-	*/
+
+	cout << "post sync" << endl;
+	
 
 
 
-
+	/*
 	for (int i = 0; i < GPU->MPI_SIZE - 1; i++)
 	{
 		MPI_Isend(w_grad_next->data,w_grad_next->size,MPI_FLOAT,target,i,MPI_COMM_WORLD, send_request);
@@ -343,6 +347,7 @@ void Layer::MPI_synchronization_async()
 		source = source-1 == -1 ? GPU->MPI_SIZE-1 : source-1;
 	}
 	isSynchronizing = true;
+	*/
 
 
 
@@ -353,14 +358,15 @@ void Layer::wait_for_synchronization()
 	if(target){ return; }
 	if(!isSynchronizing){ return; }
 	//GPU->tick();
-	//MPI_Wait(next->send_request,MPI_STATUS_IGNORE);
+	MPI_Wait(next->send_request,MPI_STATUS_IGNORE);
 	MPI_Wait(recv_request,MPI_STATUS_IGNORE);
 
 	//float secs = GPU->tock()/1000.0f;
 	//cout << w_next_sync->bytes/1024./1024./1024./secs << " GB/s" << endl;
 	//printdim(w_next_sync);
-
-	//GPU->decompression_8bit(w_next_sync_recv,0.001,w_next_sync);
+	cout << "pre decomrpess" << endl;
+	GPU->decompression_8bit(w_next_sync_recv,0.001,w_next_sync);
+	cout << "post decompress" << endl;
 	add(w_next_sync,w_grad_next,w_grad_next);
 	isSynchronizing = false;
 }

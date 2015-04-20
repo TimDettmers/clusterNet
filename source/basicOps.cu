@@ -1011,7 +1011,7 @@ void mulMatrixVector(Matrix *A, Matrix *v, Matrix *out)
 
 void softmax(Matrix *A, Matrix *out)
 {
-    kSoftMax<<<1, A->rows > THREADS_PER_BLOCKS ? THREADS_PER_BLOCKS : A->rows>>>(A->data, out->data, A->rows, A->cols);
+    kSoftMax<<<1, (A->rows > THREADS_PER_BLOCKS ? THREADS_PER_BLOCKS : A->rows)>>>(A->data, out->data, A->rows, A->cols);
 
     cudaThreadSynchronize();
 
@@ -1047,7 +1047,7 @@ Matrix *argmax(Matrix *A)
 }
 void argmax(Matrix* A, Matrix* out)
 {
-	kArgmax<<<1,A->rows > THREADS_PER_BLOCKS ? THREADS_PER_BLOCKS : A->rows>>>(A->data, out->data, A->rows, A->cols);
+	kArgmax<<<1,(A->rows > THREADS_PER_BLOCKS ? THREADS_PER_BLOCKS : A->rows)>>>(A->data, out->data, A->rows, A->cols);
 
 	cudaThreadSynchronize();
 
