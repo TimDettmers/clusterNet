@@ -1157,21 +1157,22 @@ void LocalGrad(Matrix *z, Matrix *w, Matrix *y, float learning_rate, int batch_s
 void compression_8bit_test(Matrix *tbl, Matrix *A, float precision,  Matrix *out)
 {
 	int blocks = (A->size/THREADS_PER_BLOCKS) + 1;
-	kCompression_8bit_test<<<blocks,THREADS_PER_BLOCKS>>>(tbl->data, A->data, precision, A->size, out->data);
+	kCompression_8bit_test<<<blocks,256>>>(tbl->data, A->data, precision, A->size, out->data);
 }
 
 void compression_8bit(Matrix *tbl_flt, Matrix *A, float precision,  Matrix *out)
 {
-	int blocks = (A->size/THREADS_PER_BLOCKS) + 1;
-	kCompression_8bit<<<blocks,THREADS_PER_BLOCKS>>>(tbl_flt->data, A->data, precision, A->size, out->char_data);
+	int blocks = (A->size/128) + 1;
+
+	kCompression_8bit<<<blocks,128>>>(tbl_flt->data, A->data, precision, A->size, out->char_data);
 }
 
 
 
 void decompression_8bit(Matrix *tbl_flt, Matrix *A, float precision,  Matrix *out)
 {
-	int blocks = (A->size/THREADS_PER_BLOCKS) + 1;
-	kDecompression_8bit<<<blocks,THREADS_PER_BLOCKS>>>(tbl_flt->data,  A->char_data, precision, A->size, out->data);
+	int blocks = (A->size/128) + 1;
+	kDecompression_8bit<<<blocks,128>>>(tbl_flt->data,  A->char_data, precision, A->size, out->data);
 }
 
 void RMSprop_with_nesterov_weight_update(Matrix *RMS, Matrix *grad, Matrix *w, Matrix *m, float RMS_multiplier, float learning_rate, int batch_size, float momentum)

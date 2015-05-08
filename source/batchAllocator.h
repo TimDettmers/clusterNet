@@ -24,6 +24,7 @@ class BatchAllocator
 {
 
 public:
+	 BatchAllocator();
 	 BatchAllocationMethod_t BATCH_METHOD;
 	 Matrix *CURRENT_BATCH;
 	 Matrix *CURRENT_BATCH_Y;
@@ -46,8 +47,8 @@ public:
 	 void replace_current_batch_with_next();
 	 void replace_current_cv_batch_with_next();
 
-	 void init(Matrix *X, Matrix *y, float cross_validation_size, int batch_size, int cv_batch_size, ClusterNet cluster, BatchAllocationMethod_t batchmethod);
-	 void init(std::string path_X, std::string path_y, float cross_validation_size, int batch_size, int cv_batch_size, ClusterNet cluster, BatchAllocationMethod_t batchmethod);
+	 void init(Matrix *X, Matrix *y, float cross_validation_size, int batch_size, int cv_batch_size, ClusterNet *cluster, BatchAllocationMethod_t batchmethod);
+	 void init(std::string path_X, std::string path_y, float cross_validation_size, int batch_size, int cv_batch_size, ClusterNet *cluster, BatchAllocationMethod_t batchmethod);
 	 void init(Matrix *X, Matrix *y, float cross_validation_size, int batch_size, int cv_batch_size);
 
 	 void propagate_through_layers(Layer *root, DataPropagationType_t type);
@@ -78,7 +79,7 @@ private:
 	 int m_sparse_matrix_info_cv_X[6];
 	 int m_sparse_matrix_info_cv_y[6];
 
-	 ClusterNet m_cluster;
+	 ClusterNet *m_cluster;
 	 MPI_Status m_status;
 
 	 cudaStream_t m_streamNext_batch_X;

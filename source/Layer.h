@@ -9,14 +9,13 @@
 class Layer
 {
 public:
-	Matrix *w_grad_next;
 	Matrix *b_grad_next;
 	Layer *next;
 	Layer *prev;
 	Matrix *w_next;
 	Matrix *b_next;
 
-	Matrix *w_next_sync;
+	std::vector<Matrix* > vec_w_grad_next;
 	Matrix *b_next_sync;
 	Matrix *w_next_sync_recv;
 	Matrix *b_next_sync_recv;
@@ -40,8 +39,8 @@ public:
 	Matrix *target;
 	Matrix *target_matrix;
 
-	MPI_Request *send_request;
-	MPI_Request *recv_request;
+	std::vector<MPI_Request* > send_request;
+	std::vector<MPI_Request* > recv_request;
 
 	ClusterNet *GPU;
 
@@ -91,8 +90,6 @@ public:
 
 	virtual void dropout_decay();
 	virtual void learning_rate_decay(float decay_rate);
-
-	virtual void dot_switch(Matrix *A, Matrix *B, Matrix *out);
 
 
 

@@ -14,23 +14,19 @@ Layer::Layer(int unitcount){ init(unitcount, 0,Rectified_Linear, NULL); }
 
 Layer::Layer(int unitcount, int start_batch_size, Unittype_t unit, Layer *prev, ClusterNet *gpu)
 { init(unitcount, start_batch_size,unit,gpu); prev->link_with_next_layer(this); }
-Layer::Layer(int unitcount, Unittype_t unit, Layer *prev){ init(unitcount, 0,unit, NULL); prev->link_with_next_layer(this); }
+Layer::Layer(int unitcount, Unittype_t unit, Layer *prev){ init(unitcount, 0,unit, prev->GPU); prev->link_with_next_layer(this); }
 Layer::Layer(int unitcount, Layer *prev){ init(unitcount, 0,Rectified_Linear, NULL); prev->link_with_next_layer(this); }
 
 void Layer::init(int unitcount, int start_batch_size, Unittype_t unit, ClusterNet *gpu)
 {
 
-	send_request = new MPI_Request;
-	recv_request = new MPI_Request;
 	next = NULL;
 	prev = NULL;
 	w_next = NULL;
 	b_next = NULL;
-	w_next_sync = NULL;
 	b_next_sync = NULL;
 	w_rms_next = NULL;
 	b_rms_next = NULL;
-	w_grad_next = NULL;
 	b_grad_next = NULL;
 
 	w_next_sync_send = NULL;
@@ -60,6 +56,13 @@ void Layer::init(int unitcount, int start_batch_size, Unittype_t unit, ClusterNe
 
 	GPU = gpu;
 
+	for(int i = 0; i < GPU->MPI_SIZE; i++)
+	{
+
+		send_request.push_back(new MPI_Request);
+		recv_request.push_back(new MPI_Request);
+	}
+
 	if(BATCH_SIZE > 0)
 	{
 		out = zeros(BATCH_SIZE, UNITCOUNT);
@@ -83,9 +86,8 @@ void Layer::link_with_next_layer(Layer *next_layer)
 
 	Matrix *w = GPU->uniformSqrtWeight(UNITCOUNT,next_layer->UNITCOUNT);
 	w_next = w;
-	w_grad_next = zeros(UNITCOUNT,next_layer->UNITCOUNT);
 	w_rms_next = zeros(UNITCOUNT,next_layer->UNITCOUNT);
-	if(PARALLELISM == DataParallelism){w_next_sync = zeros(UNITCOUNT,next_layer->UNITCOUNT); }
+	if(PARALLELISM == DataParallelism){ for(int i = 0; i < GPU->MPI_SIZE; i++) vec_w_grad_next.push_back(zeros(UNITCOUNT,next_layer->UNITCOUNT)); }
 	if(PARALLELISM == DataParallelism){w_next_sync_send = empty_char(UNITCOUNT,next_layer->UNITCOUNT); }
 	if(PARALLELISM == DataParallelism){w_next_sync_recv = empty_char(UNITCOUNT,next_layer->UNITCOUNT); }
 
@@ -209,37 +211,6 @@ void Layer::handle_offsize()
 
 }
 
-
-void Layer::dot_switch(Matrix *A, Matrix *B, Matrix *out)
-{
-	GPU->dot(A,B,out);
-	/*
-	Matrix *Achar = empty_char(A->rows,A->cols);
-	Matrix *Bchar = empty_char(B->rows,B->cols);
-	Matrix *absA = empty(A->rows,A->cols);
-	Matrix *absB = empty(B->rows,B->cols);
-
-	abs(A,absA);
-	abs(B,absB);
-
-	GPU->compression_8bit(A,max(absA),Achar);
-	GPU->compression_8bit(B,max(absB),Bchar);
-
-	GPU->dot8bit_shared(Achar,Bchar,max(absA),max(absB),out);
-
-	cudaFree(Achar->char_data);
-	cudaFree(Bchar->char_data);
-	cudaFree(absA->data);
-	cudaFree(absB->data);
-
-	free(Achar);
-	free(Bchar);
-	free(absA);
-	free(absB);
-	*/
-
-}
-
 void Layer::forward(){ forward(true); }
 void Layer::forward(bool useDropout)
 {
@@ -247,8 +218,7 @@ void Layer::forward(bool useDropout)
 	if(!prev){  unit_activation(useDropout); next->forward(useDropout); return; }
 	if(useDropout){ prev->wait_for_synchronization(); prev->weight_update(); }
 
-	//GPU->dot(prev->out,prev->w_next,out);
-	dot_switch(prev->out,prev->w_next,out);
+	GPU->dot(prev->out,prev->w_next,out);
 	addMatrixVector(out,prev->b_next,out);
     unit_activation(useDropout);
 
@@ -306,7 +276,7 @@ void Layer::backward_errors()
 
 void Layer::backward_grads()
 {
-	GPU->Tdot(activation, next->error, w_grad_next);
+	GPU->Tdot(activation, next->error, vec_w_grad_next[GPU->MYRANK]);
 	MPI_synchronization_async();
 	if(!next->target){ next->backward_grads(); }
 	//GPU->dot(next->bias_activations, next->error,b_grad_next);
@@ -320,8 +290,9 @@ void Layer::MPI_synchronization_async()
 	int target = GPU->MYRANK +1 == GPU->MPI_SIZE ? 0 : GPU->MYRANK+1;
 	int source = GPU->MYRANK-1 == -1 ? GPU->MPI_SIZE-1 : GPU->MYRANK-1;
 
+	/*
 
-	cout << "pre sync" << endl;
+	//cout << "pre sync" << endl;
 	
 	GPU->compression_8bit(w_grad_next,0.001,w_next_sync_send);
 	for (int i = 0; i < GPU->MPI_SIZE - 1; i++)
@@ -333,21 +304,22 @@ void Layer::MPI_synchronization_async()
 	}
 	isSynchronizing = true;
 
-	cout << "post sync" << endl;
+	//cout << "post sync" << endl;
+	*/
 	
 
 
 
-	/*
+
 	for (int i = 0; i < GPU->MPI_SIZE - 1; i++)
 	{
-		MPI_Isend(w_grad_next->data,w_grad_next->size,MPI_FLOAT,target,i,MPI_COMM_WORLD, send_request);
-		MPI_Irecv(w_next_sync->data,w_grad_next->size,MPI_FLOAT,source,i,MPI_COMM_WORLD,recv_request);
+		MPI_Isend(vec_w_grad_next[GPU->MYRANK]->data,vec_w_grad_next[GPU->MYRANK]->size,MPI_FLOAT,target,i,MPI_COMM_WORLD, send_request[target]);
+		MPI_Irecv(vec_w_grad_next[source]->data,vec_w_grad_next[source]->size,MPI_FLOAT,source,i,MPI_COMM_WORLD,recv_request[source]);
 		target = target +1 == GPU->MPI_SIZE ? 0 : target+1;
 		source = source-1 == -1 ? GPU->MPI_SIZE-1 : source-1;
 	}
 	isSynchronizing = true;
-	*/
+
 
 
 
@@ -358,16 +330,27 @@ void Layer::wait_for_synchronization()
 	if(target){ return; }
 	if(!isSynchronizing){ return; }
 	//GPU->tick();
-	MPI_Wait(next->send_request,MPI_STATUS_IGNORE);
-	MPI_Wait(recv_request,MPI_STATUS_IGNORE);
+	//MPI_Wait(next->send_request,MPI_STATUS_IGNORE);_w_next_sync
+
+	for(int i = 0; i < GPU->MPI_SIZE; i++)
+	{
+		if(i== GPU->MYRANK){ continue; }
+		MPI_Wait(send_request[i],MPI_STATUS_IGNORE);
+		MPI_Wait(recv_request[i],MPI_STATUS_IGNORE);
+	}
 
 	//float secs = GPU->tock()/1000.0f;
 	//cout << w_next_sync->bytes/1024./1024./1024./secs << " GB/s" << endl;
 	//printdim(w_next_sync);
-	cout << "pre decomrpess" << endl;
-	GPU->decompression_8bit(w_next_sync_recv,0.001,w_next_sync);
-	cout << "post decompress" << endl;
-	add(w_next_sync,w_grad_next,w_grad_next);
+	//cout << "pre decomrpess" << endl;
+	//GPU->decompression_8bit(w_next_sync_recv,0.001,w_next_sync);
+	//cout << "post decompress" << endl;
+	for(int i = 0; i < GPU->MPI_SIZE; i++)
+	{
+		if(i == GPU->MYRANK){ continue; }
+		//printsum(vec_w_grad_next[i]);
+		add(vec_w_grad_next[GPU->MYRANK],vec_w_grad_next[i],vec_w_grad_next[GPU->MYRANK]);
+	}
 	isSynchronizing = false;
 }
 
@@ -380,7 +363,7 @@ void Layer::weight_update()
 	switch(UPDATE_TYPE)
 	{
 		case RMSProp:
-			RMSprop_with_weight_update(w_rms_next,w_grad_next,w_next,w_next,RMSPROP_MOMENTUM,LEARNING_RATE,out->rows*GPU->MPI_SIZE,MOMENTUM);
+			RMSprop_with_weight_update(w_rms_next,vec_w_grad_next[GPU->MYRANK],w_next,w_next,RMSPROP_MOMENTUM,LEARNING_RATE,out->rows*GPU->MPI_SIZE,MOMENTUM);
 			//RMSprop_with_weight_update(b_rms_next,b_grad_next,b_next,b_next,RMSPROP_MOMENTUM,LEARNING_RATE/100.0f,out->rows,MOMENTUM);
 			//scalarMul(b_grad_next, LEARNING_RATE/float(out->rows*GPU->MPI_SIZE) ,b_grad_next);
 			//sub(b_next,b_grad_next,b_next);
@@ -398,9 +381,9 @@ void Layer::weight_update()
 void Layer::limit_magnitude()
 {
 
-	square(w_next,w_grad_next);
-	Matrix *temp = ones(w_grad_next->cols,1);
-	Matrix *sums = GPU->dot(w_grad_next,temp);
+	square(w_next,vec_w_grad_next[GPU->MYRANK]);
+	Matrix *temp = ones(vec_w_grad_next[GPU->MYRANK]->cols,1);
+	Matrix *sums = GPU->dot(vec_w_grad_next[GPU->MYRANK],temp);
 	renormalizeWeights(w_next,sums,L2);
 	cudaFree(temp->data);
 	cudaFree(sums->data);

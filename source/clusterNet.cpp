@@ -527,6 +527,15 @@ void ClusterNet::dotMPI(Matrix *A, Matrix *B, Matrix *out, bool applyTranspose_A
 						arrOut[i] = empty(A->rows, col_split_size);
 				}
 				m_matrixCache[strMatrixName] = arrOut;
+				Matrix** arrOut2 = (Matrix**) malloc(sizeof(Matrix*) * MPI_SIZE);
+				for (int i = 0; i < MPI_SIZE; i++)
+				{
+					if (i == MPI_SIZE - 1)
+						arrOut2[i] = empty_char(A->rows, col_split_size + remainder);
+					else
+						arrOut2[i] = empty_char(A->rows, col_split_size);
+				}
+				m_matrixCacheChar[strMatrixName] = arrOut2;
 				m_matrixCacheUsage[strMatrixName] = 1;
 
 				float **h_arrA = (float**) malloc(sizeof(float*) * MPI_SIZE);
@@ -632,9 +641,12 @@ void ClusterNet::dotMPI(Matrix *A, Matrix *B, Matrix *out, bool applyTranspose_A
 		int matrix_idx = MYRANK;
 		for (int i = 0; i < MPI_SIZE - 1; i++)
 		{
-			MPI_Isend(m_matrixCache[strMatrixName][matrix_idx]->data, m_matrixCache[strMatrixName][matrix_idx]->size, MPI_FLOAT, m_destination, 100, MPI_COMM_WORLD, &m_sendrequests[i]);
+			compression_8bit(m_matrixCache[strMatrixName][matrix_idx], 1.0f, m_matrixCacheChar[strMatrixName][matrix_idx]);
+			MPI_Isend(m_matrixCacheChar[strMatrixName][matrix_idx]->char_data, m_matrixCacheChar[strMatrixName][matrix_idx]->size, MPI_CHAR, m_destination, 100, MPI_COMM_WORLD, &m_sendrequests[i]);
 			matrix_idx = (matrix_idx - 1) < 0 ? MPI_SIZE - 1 : (matrix_idx - 1);
-			MPI_Recv(m_matrixCache[strMatrixName][matrix_idx]->data, m_matrixCache[strMatrixName][matrix_idx]->size, MPI_FLOAT, m_source, 100, MPI_COMM_WORLD, &m_status);
+			MPI_Recv(m_matrixCacheChar[strMatrixName][matrix_idx]->char_data, m_matrixCacheChar[strMatrixName][matrix_idx]->size, MPI_CHAR, m_source, 100, MPI_COMM_WORLD, &m_status);
+
+			decompression_8bit(m_matrixCacheChar[strMatrixName][matrix_idx], 1.0f, m_matrixCache[strMatrixName][matrix_idx]);
 		}
 
 		for(int i = 0; i < MPI_SIZE -1;i++ )

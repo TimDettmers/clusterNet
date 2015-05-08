@@ -16,6 +16,8 @@
 using std::cout;
 using std::endl;
 
+BatchAllocator::BatchAllocator(){}
+
 void BatchAllocator::init(Matrix *X, Matrix *y, float cross_validation_size, int batch_size, int batch_size_cv)
 {
 	m_myrank = 0;
@@ -26,13 +28,13 @@ void BatchAllocator::init(Matrix *X, Matrix *y, float cross_validation_size, int
 
 	init(cross_validation_size,batch_size,batch_size_cv);
 }
-void BatchAllocator::init(Matrix *X, Matrix *y, float cross_validation_size, int batch_size, int cv_batch_size, ClusterNet cluster, BatchAllocationMethod_t batchmethod)
+void BatchAllocator::init(Matrix *X, Matrix *y, float cross_validation_size, int batch_size, int cv_batch_size, ClusterNet *cluster, BatchAllocationMethod_t batchmethod)
 {
 	m_cluster = cluster;
 
-	m_mygpuID = m_cluster.MYGPUID;
-	m_myrank = m_cluster.MYRANK;
-	if(m_cluster.MYGPUID != 0)
+	m_mygpuID = m_cluster->MYGPUID;
+	m_myrank = m_cluster->MYRANK;
+	if(m_cluster->MYGPUID != 0)
 	{
 		/*
 		cudaFree(X->data);
@@ -57,14 +59,14 @@ void BatchAllocator::init(Matrix *X, Matrix *y, float cross_validation_size, int
 	init(cross_validation_size,batch_size,cv_batch_size);
 
 }
-void BatchAllocator::init(std::string path_X, std::string path_y, float cross_validation_size, int batch_size, int cv_batch_size, ClusterNet cluster, BatchAllocationMethod_t batchmethod)
+void BatchAllocator::init(std::string path_X, std::string path_y, float cross_validation_size, int batch_size, int cv_batch_size, ClusterNet *cluster, BatchAllocationMethod_t batchmethod)
 {
 	m_cluster = cluster;
 	Matrix *X;
 	Matrix *y;
-	m_mygpuID = m_cluster.MYGPUID;
-	m_myrank = m_cluster.MYRANK;
-	if(m_cluster.MYGPUID == 0 || batchmethod == Single_GPU)
+	m_mygpuID = m_cluster->MYGPUID;
+	m_myrank = m_cluster->MYRANK;
+	if(m_cluster->MYGPUID == 0 || batchmethod == Single_GPU)
 	{
 		if(path_X.find("cvs") != std::string::npos)
 		{
@@ -169,9 +171,9 @@ void BatchAllocator::init(float cross_validation_size, int batch_size, int batch
 	{
 		if(BATCH_METHOD == Distributed_weights ||
 		   BATCH_METHOD == Distributed_weights_sparse)
-		{ m_myrank = m_cluster.MYRANK; }
+		{ m_myrank = m_cluster->MYRANK; }
 
-		for(int i = 0; i < (m_cluster.PCIe_RANKS.size()-1)*request_count;i++)
+		for(int i = 0; i < (m_cluster->PCIe_RANKS.size()-1)*request_count;i++)
 		{
 			MPI_Request send_X;
 			MPI_Request send_y;
@@ -189,12 +191,12 @@ void BatchAllocator::init(float cross_validation_size, int batch_size, int batch
 
 		if(BATCH_METHOD == Distributed_weights)
 		{
-			for(int i = 0; i < m_cluster.PCIe_RANKS.size()-1; i++)
+			for(int i = 0; i < m_cluster->PCIe_RANKS.size()-1; i++)
 			{
-				MPI_Send(m_next_buffer_X->data,m_next_buffer_X->size, MPI_FLOAT,m_cluster.PCIe_RANKS[i+1],999,MPI_COMM_WORLD);
-				MPI_Send(m_next_buffer_y->data,m_next_buffer_y->size, MPI_FLOAT,m_cluster.PCIe_RANKS[i+1],998,MPI_COMM_WORLD);
-				MPI_Send(m_next_buffer_cv_X->data,m_next_buffer_cv_X->size, MPI_FLOAT,m_cluster.PCIe_RANKS[i+1],997,MPI_COMM_WORLD);
-				MPI_Send(m_next_buffer_cv_y->data,m_next_buffer_cv_y->size, MPI_FLOAT,m_cluster.PCIe_RANKS[i+1],996,MPI_COMM_WORLD);
+				MPI_Send(m_next_buffer_X->data,m_next_buffer_X->size, MPI_FLOAT,m_cluster->PCIe_RANKS[i+1],999,MPI_COMM_WORLD);
+				MPI_Send(m_next_buffer_y->data,m_next_buffer_y->size, MPI_FLOAT,m_cluster->PCIe_RANKS[i+1],998,MPI_COMM_WORLD);
+				MPI_Send(m_next_buffer_cv_X->data,m_next_buffer_cv_X->size, MPI_FLOAT,m_cluster->PCIe_RANKS[i+1],997,MPI_COMM_WORLD);
+				MPI_Send(m_next_buffer_cv_y->data,m_next_buffer_cv_y->size, MPI_FLOAT,m_cluster->PCIe_RANKS[i+1],996,MPI_COMM_WORLD);
 			}
 		}
 
@@ -204,11 +206,11 @@ void BatchAllocator::init(float cross_validation_size, int batch_size, int batch
 
 		if(BATCH_METHOD != Distributed_weights_sparse)
 		{
-			m_myrank = m_cluster.MYRANK;
-			MPI_Recv(m_next_buffer_X->data,m_next_buffer_X->size,MPI_FLOAT,m_cluster.PCIe_RANKS[0],999,MPI_COMM_WORLD,&m_status);
-			MPI_Recv(m_next_buffer_y->data,m_next_buffer_y->size,MPI_FLOAT,m_cluster.PCIe_RANKS[0],998,MPI_COMM_WORLD,&m_status);
-			MPI_Recv(m_next_buffer_cv_X->data,m_next_buffer_cv_X->size,MPI_FLOAT,m_cluster.PCIe_RANKS[0],997,MPI_COMM_WORLD,&m_status);
-			MPI_Recv(m_next_buffer_cv_y->data,m_next_buffer_cv_y->size,MPI_FLOAT,m_cluster.PCIe_RANKS[0],996,MPI_COMM_WORLD,&m_status);
+			m_myrank = m_cluster->MYRANK;
+			MPI_Recv(m_next_buffer_X->data,m_next_buffer_X->size,MPI_FLOAT,m_cluster->PCIe_RANKS[0],999,MPI_COMM_WORLD,&m_status);
+			MPI_Recv(m_next_buffer_y->data,m_next_buffer_y->size,MPI_FLOAT,m_cluster->PCIe_RANKS[0],998,MPI_COMM_WORLD,&m_status);
+			MPI_Recv(m_next_buffer_cv_X->data,m_next_buffer_cv_X->size,MPI_FLOAT,m_cluster->PCIe_RANKS[0],997,MPI_COMM_WORLD,&m_status);
+			MPI_Recv(m_next_buffer_cv_y->data,m_next_buffer_cv_y->size,MPI_FLOAT,m_cluster->PCIe_RANKS[0],996,MPI_COMM_WORLD,&m_status);
 		}
 
 
@@ -281,10 +283,10 @@ void BatchAllocator::init_batch_buffer()
 			if(m_full_y->isSparse == 1)
 				sparsity_y = determine_max_sparsity(m_full_y,BATCH_SIZE);
 
-			for(int i = 1; i < m_cluster.PCIe_RANKS.size() && BATCH_METHOD != Single_GPU; i++)
+			for(int i = 1; i < m_cluster->PCIe_RANKS.size() && BATCH_METHOD != Single_GPU; i++)
 			{
-				MPI_Send(&sparsity_X,1,MPI_INT,m_cluster.PCIe_RANKS[i],10,MPI_COMM_WORLD);
-				MPI_Send(&sparsity_y,1,MPI_INT,m_cluster.PCIe_RANKS[i],11,MPI_COMM_WORLD);
+				MPI_Send(&sparsity_X,1,MPI_INT,m_cluster->PCIe_RANKS[i],10,MPI_COMM_WORLD);
+				MPI_Send(&sparsity_y,1,MPI_INT,m_cluster->PCIe_RANKS[i],11,MPI_COMM_WORLD);
 			}
 		}
 		else
@@ -370,24 +372,24 @@ void BatchAllocator::init_copy_to_buffer()
 
 void BatchAllocator::MPI_get_dataset_dimensions()
 {
-	if(m_cluster.MYGPUID == 0)
+	if(m_cluster->MYGPUID == 0)
 	{
 		m_Cols_X = m_full_X->cols;
 		m_Cols_y = m_full_y->cols;
 		m_Rows = m_full_X->rows;
 
-		for(int i = 1; i < m_cluster.PCIe_RANKS.size(); i++)
+		for(int i = 1; i < m_cluster->PCIe_RANKS.size(); i++)
 		{
-			MPI_Send(&m_Cols_X,1, MPI_INT,m_cluster.PCIe_RANKS[i],999,MPI_COMM_WORLD);
-			MPI_Send(&m_Cols_y,1, MPI_INT,m_cluster.PCIe_RANKS[i],998,MPI_COMM_WORLD);
-			MPI_Send(&m_Rows,1, MPI_INT,m_cluster.PCIe_RANKS[i],997,MPI_COMM_WORLD);
+			MPI_Send(&m_Cols_X,1, MPI_INT,m_cluster->PCIe_RANKS[i],999,MPI_COMM_WORLD);
+			MPI_Send(&m_Cols_y,1, MPI_INT,m_cluster->PCIe_RANKS[i],998,MPI_COMM_WORLD);
+			MPI_Send(&m_Rows,1, MPI_INT,m_cluster->PCIe_RANKS[i],997,MPI_COMM_WORLD);
 		}
 	}
 	else
 	{
-		MPI_Recv(&m_Cols_X,1,MPI_INT,m_cluster.PCIe_RANKS[0],999,MPI_COMM_WORLD,&m_status);
-		MPI_Recv(&m_Cols_y,1,MPI_INT,m_cluster.PCIe_RANKS[0],998,MPI_COMM_WORLD,&m_status);
-		MPI_Recv(&m_Rows,1,MPI_INT,m_cluster.PCIe_RANKS[0],997,MPI_COMM_WORLD,&m_status);
+		MPI_Recv(&m_Cols_X,1,MPI_INT,m_cluster->PCIe_RANKS[0],999,MPI_COMM_WORLD,&m_status);
+		MPI_Recv(&m_Cols_y,1,MPI_INT,m_cluster->PCIe_RANKS[0],998,MPI_COMM_WORLD,&m_status);
+		MPI_Recv(&m_Rows,1,MPI_INT,m_cluster->PCIe_RANKS[0],997,MPI_COMM_WORLD,&m_status);
 	}
 }
 
@@ -422,17 +424,17 @@ void BatchAllocator::broadcast_batch_to_processes()
 				slice_sparse_to_dense(m_full_y,m_next_buffer_y,m_next_batch_number*BATCH_SIZE, partial_batch_size);
 
 		/*
-			for(int i = 1; i < m_cluster.PCIe_RANKS.size() && BATCH_METHOD != Single_GPU; i++)
+			for(int i = 1; i < m_cluster->PCIe_RANKS.size() && BATCH_METHOD != Single_GPU; i++)
 			{
-				MPI_Isend(m_next_buffer_X->data,m_next_buffer_X->size,MPI_FLOAT,m_cluster.PCIe_RANKS[i],999,MPI_COMM_WORLD,&m_requests_send_X[i-1]);
-				MPI_Isend(m_next_buffer_y->data,m_next_buffer_y->size,MPI_FLOAT,m_cluster.PCIe_RANKS[i],998,MPI_COMM_WORLD,&m_requests_send_y[i-1]);
+				MPI_Isend(m_next_buffer_X->data,m_next_buffer_X->size,MPI_FLOAT,m_cluster->PCIe_RANKS[i],999,MPI_COMM_WORLD,&m_requests_send_X[i-1]);
+				MPI_Isend(m_next_buffer_y->data,m_next_buffer_y->size,MPI_FLOAT,m_cluster->PCIe_RANKS[i],998,MPI_COMM_WORLD,&m_requests_send_y[i-1]);
 			}
 
 		}
 		else
 		{
-			MPI_Irecv(m_next_buffer_X->data,m_next_buffer_X->size,MPI_FLOAT,m_cluster.PCIe_RANKS[0],999,MPI_COMM_WORLD,&m_request_X[0]);
-			MPI_Irecv(m_next_buffer_y->data,m_next_buffer_y->size,MPI_FLOAT,m_cluster.PCIe_RANKS[0],998,MPI_COMM_WORLD,&m_request_y[0]);
+			MPI_Irecv(m_next_buffer_X->data,m_next_buffer_X->size,MPI_FLOAT,m_cluster->PCIe_RANKS[0],999,MPI_COMM_WORLD,&m_request_X[0]);
+			MPI_Irecv(m_next_buffer_y->data,m_next_buffer_y->size,MPI_FLOAT,m_cluster->PCIe_RANKS[0],998,MPI_COMM_WORLD,&m_request_y[0]);
 		}
 		*/
 	}
@@ -493,20 +495,20 @@ void BatchAllocator::broadcast_batch_to_processes()
 
 
 
-			for(int i = 1; i < m_cluster.PCIe_RANKS.size() && BATCH_METHOD != Single_GPU; i++)
+			for(int i = 1; i < m_cluster->PCIe_RANKS.size() && BATCH_METHOD != Single_GPU; i++)
 			{
 				int k = 3*(i-1);
-				MPI_Isend(m_next_buffer_X->data,m_next_buffer_X->size,MPI_FLOAT,m_cluster.PCIe_RANKS[i],999,MPI_COMM_WORLD,&m_requests_send_X[k + 0]);
-				MPI_Isend(m_next_buffer_X->idx_cols,m_next_buffer_X->size,MPI_FLOAT,m_cluster.PCIe_RANKS[i],9991,MPI_COMM_WORLD,&m_requests_send_X[k + 1]);
-				MPI_Isend(m_next_buffer_X->ptr_rows,m_next_buffer_X->rows+1,MPI_FLOAT,m_cluster.PCIe_RANKS[i],9992,MPI_COMM_WORLD,&m_requests_send_X[k + 2]);
+				MPI_Isend(m_next_buffer_X->data,m_next_buffer_X->size,MPI_FLOAT,m_cluster->PCIe_RANKS[i],999,MPI_COMM_WORLD,&m_requests_send_X[k + 0]);
+				MPI_Isend(m_next_buffer_X->idx_cols,m_next_buffer_X->size,MPI_FLOAT,m_cluster->PCIe_RANKS[i],9991,MPI_COMM_WORLD,&m_requests_send_X[k + 1]);
+				MPI_Isend(m_next_buffer_X->ptr_rows,m_next_buffer_X->rows+1,MPI_FLOAT,m_cluster->PCIe_RANKS[i],9992,MPI_COMM_WORLD,&m_requests_send_X[k + 2]);
 
 				if(m_full_y->isSparse != 1)
-					MPI_Isend(m_next_buffer_y->data,m_next_buffer_y->size,MPI_FLOAT,m_cluster.PCIe_RANKS[i],998,MPI_COMM_WORLD,&m_requests_send_y[k]);
+					MPI_Isend(m_next_buffer_y->data,m_next_buffer_y->size,MPI_FLOAT,m_cluster->PCIe_RANKS[i],998,MPI_COMM_WORLD,&m_requests_send_y[k]);
 				else
 				{
-					MPI_Isend(m_next_buffer_y->data,m_next_buffer_y->size,MPI_FLOAT,m_cluster.PCIe_RANKS[i],998,MPI_COMM_WORLD,&m_requests_send_y[k + 0]);
-					MPI_Isend(m_next_buffer_y->idx_cols,m_next_buffer_y->size,MPI_FLOAT,m_cluster.PCIe_RANKS[i],9981,MPI_COMM_WORLD,&m_requests_send_y[k + 1]);
-					MPI_Isend(m_next_buffer_y->ptr_rows,m_next_buffer_y->rows+1,MPI_FLOAT,m_cluster.PCIe_RANKS[i],9982,MPI_COMM_WORLD,&m_requests_send_y[k + 2]);
+					MPI_Isend(m_next_buffer_y->data,m_next_buffer_y->size,MPI_FLOAT,m_cluster->PCIe_RANKS[i],998,MPI_COMM_WORLD,&m_requests_send_y[k + 0]);
+					MPI_Isend(m_next_buffer_y->idx_cols,m_next_buffer_y->size,MPI_FLOAT,m_cluster->PCIe_RANKS[i],9981,MPI_COMM_WORLD,&m_requests_send_y[k + 1]);
+					MPI_Isend(m_next_buffer_y->ptr_rows,m_next_buffer_y->rows+1,MPI_FLOAT,m_cluster->PCIe_RANKS[i],9982,MPI_COMM_WORLD,&m_requests_send_y[k + 2]);
 				}
 			}
 
@@ -515,22 +517,22 @@ void BatchAllocator::broadcast_batch_to_processes()
 		{
 			if(BATCH_METHOD != Distributed_weights_sparse)
 			{
-				MPI_Irecv(m_next_buffer_X->data,m_next_buffer_X->size,MPI_FLOAT,m_cluster.PCIe_RANKS[0],999,MPI_COMM_WORLD,&m_request_X[0]);
-				MPI_Irecv(m_next_buffer_y->data,m_next_buffer_y->size,MPI_FLOAT,m_cluster.PCIe_RANKS[0],998,MPI_COMM_WORLD,&m_request_y[0]);
+				MPI_Irecv(m_next_buffer_X->data,m_next_buffer_X->size,MPI_FLOAT,m_cluster->PCIe_RANKS[0],999,MPI_COMM_WORLD,&m_request_X[0]);
+				MPI_Irecv(m_next_buffer_y->data,m_next_buffer_y->size,MPI_FLOAT,m_cluster->PCIe_RANKS[0],998,MPI_COMM_WORLD,&m_request_y[0]);
 			}
 			else
 			{
-				MPI_Irecv(m_next_buffer_X->data,m_next_buffer_X->size,MPI_FLOAT,m_cluster.PCIe_RANKS[0],999,MPI_COMM_WORLD,&m_request_X[0]);
-				MPI_Irecv(m_next_buffer_X->idx_cols,m_next_buffer_X->size,MPI_FLOAT,m_cluster.PCIe_RANKS[0],9991,MPI_COMM_WORLD,&m_request_X[1]);
-				MPI_Irecv(m_next_buffer_X->ptr_rows,m_next_buffer_X->rows+1,MPI_FLOAT,m_cluster.PCIe_RANKS[0],9992,MPI_COMM_WORLD,&m_request_X[2]);
+				MPI_Irecv(m_next_buffer_X->data,m_next_buffer_X->size,MPI_FLOAT,m_cluster->PCIe_RANKS[0],999,MPI_COMM_WORLD,&m_request_X[0]);
+				MPI_Irecv(m_next_buffer_X->idx_cols,m_next_buffer_X->size,MPI_FLOAT,m_cluster->PCIe_RANKS[0],9991,MPI_COMM_WORLD,&m_request_X[1]);
+				MPI_Irecv(m_next_buffer_X->ptr_rows,m_next_buffer_X->rows+1,MPI_FLOAT,m_cluster->PCIe_RANKS[0],9992,MPI_COMM_WORLD,&m_request_X[2]);
 
 				if(m_full_y->isSparse != 1)
-					MPI_Irecv(m_next_buffer_y->data,m_next_buffer_y->size,MPI_FLOAT,m_cluster.PCIe_RANKS[0],998,MPI_COMM_WORLD,&m_request_y[0]);
+					MPI_Irecv(m_next_buffer_y->data,m_next_buffer_y->size,MPI_FLOAT,m_cluster->PCIe_RANKS[0],998,MPI_COMM_WORLD,&m_request_y[0]);
 				else
 				{
-					MPI_Irecv(m_next_buffer_y->data,m_next_buffer_y->size,MPI_FLOAT,m_cluster.PCIe_RANKS[0],998,MPI_COMM_WORLD,&m_request_y[0]);
-					MPI_Irecv(m_next_buffer_y->idx_cols,m_next_buffer_y->size,MPI_FLOAT,m_cluster.PCIe_RANKS[0],9981,MPI_COMM_WORLD,&m_request_y[1]);
-					MPI_Irecv(m_next_buffer_y->ptr_rows,m_next_buffer_y->size,MPI_FLOAT,m_cluster.PCIe_RANKS[0],9982,MPI_COMM_WORLD,&m_request_y[2]);
+					MPI_Irecv(m_next_buffer_y->data,m_next_buffer_y->size,MPI_FLOAT,m_cluster->PCIe_RANKS[0],998,MPI_COMM_WORLD,&m_request_y[0]);
+					MPI_Irecv(m_next_buffer_y->idx_cols,m_next_buffer_y->size,MPI_FLOAT,m_cluster->PCIe_RANKS[0],9981,MPI_COMM_WORLD,&m_request_y[1]);
+					MPI_Irecv(m_next_buffer_y->ptr_rows,m_next_buffer_y->size,MPI_FLOAT,m_cluster->PCIe_RANKS[0],9982,MPI_COMM_WORLD,&m_request_y[2]);
 				}
 			}
 		}
@@ -543,10 +545,10 @@ void BatchAllocator::update_next_batch_matrix_info()
 {
 
 	if(m_mygpuID == 0)
-		for(int i = 1; i < m_cluster.PCIe_RANKS.size() && BATCH_METHOD != Single_GPU; i++)
+		for(int i = 1; i < m_cluster->PCIe_RANKS.size() && BATCH_METHOD != Single_GPU; i++)
 		{
-			MPI_Send(m_sparse_matrix_info_X,6,MPI_INT,m_cluster.PCIe_RANKS[i],10,MPI_COMM_WORLD);
-			MPI_Send(m_sparse_matrix_info_y,6,MPI_INT,m_cluster.PCIe_RANKS[i],11,MPI_COMM_WORLD);
+			MPI_Send(m_sparse_matrix_info_X,6,MPI_INT,m_cluster->PCIe_RANKS[i],10,MPI_COMM_WORLD);
+			MPI_Send(m_sparse_matrix_info_y,6,MPI_INT,m_cluster->PCIe_RANKS[i],11,MPI_COMM_WORLD);
 		}
 	else
 	{
@@ -577,10 +579,10 @@ void BatchAllocator::update_next_cv_batch_matrix_info()
 {
 
 	if(m_mygpuID == 0)
-		for(int i = 1; i < m_cluster.PCIe_RANKS.size() && BATCH_METHOD != Single_GPU; i++)
+		for(int i = 1; i < m_cluster->PCIe_RANKS.size() && BATCH_METHOD != Single_GPU; i++)
 		{
-			MPI_Send(m_sparse_matrix_info_cv_X,6,MPI_INT,m_cluster.PCIe_RANKS[i],10,MPI_COMM_WORLD);
-			MPI_Send(m_sparse_matrix_info_cv_y,6,MPI_INT,m_cluster.PCIe_RANKS[i],11,MPI_COMM_WORLD);
+			MPI_Send(m_sparse_matrix_info_cv_X,6,MPI_INT,m_cluster->PCIe_RANKS[i],10,MPI_COMM_WORLD);
+			MPI_Send(m_sparse_matrix_info_cv_y,6,MPI_INT,m_cluster->PCIe_RANKS[i],11,MPI_COMM_WORLD);
 		}
 	else
 	{
@@ -638,16 +640,16 @@ void BatchAllocator::broadcast_batch_cv_to_processes()
 				slice_sparse_to_dense(m_full_y,m_next_buffer_cv_y,TRAIN_SET_ROWS + (m_next_batch_number_cv * BATCH_SIZE_CV), partial_batch_size);
 
 	/*
-			for(int i = 1; i < m_cluster.PCIe_RANKS.size() && BATCH_METHOD != Single_GPU; i++)
+			for(int i = 1; i < m_cluster->PCIe_RANKS.size() && BATCH_METHOD != Single_GPU; i++)
 			{
-				MPI_Isend(m_next_buffer_cv_X->data,m_next_buffer_cv_X->size,MPI_FLOAT,m_cluster.PCIe_RANKS[i],999,MPI_COMM_WORLD,&m_requests_send_cv_X[i-1]);
-				MPI_Isend(m_next_buffer_cv_y->data,m_next_buffer_cv_y->size,MPI_FLOAT,m_cluster.PCIe_RANKS[i],998,MPI_COMM_WORLD,&m_requests_send_cv_y[i-1]);
+				MPI_Isend(m_next_buffer_cv_X->data,m_next_buffer_cv_X->size,MPI_FLOAT,m_cluster->PCIe_RANKS[i],999,MPI_COMM_WORLD,&m_requests_send_cv_X[i-1]);
+				MPI_Isend(m_next_buffer_cv_y->data,m_next_buffer_cv_y->size,MPI_FLOAT,m_cluster->PCIe_RANKS[i],998,MPI_COMM_WORLD,&m_requests_send_cv_y[i-1]);
 			}
 		}
 		else
 		{
-			MPI_Irecv(m_next_buffer_cv_X->data,m_next_buffer_cv_X->size,MPI_FLOAT,m_cluster.PCIe_RANKS[0],999,MPI_COMM_WORLD,&m_request_cv_X[0]);
-			MPI_Irecv(m_next_buffer_cv_y->data,m_next_buffer_cv_y->size,MPI_FLOAT,m_cluster.PCIe_RANKS[0],998,MPI_COMM_WORLD,&m_request_cv_y[0]);
+			MPI_Irecv(m_next_buffer_cv_X->data,m_next_buffer_cv_X->size,MPI_FLOAT,m_cluster->PCIe_RANKS[0],999,MPI_COMM_WORLD,&m_request_cv_X[0]);
+			MPI_Irecv(m_next_buffer_cv_y->data,m_next_buffer_cv_y->size,MPI_FLOAT,m_cluster->PCIe_RANKS[0],998,MPI_COMM_WORLD,&m_request_cv_y[0]);
 		}
 		*/
 	}
@@ -708,20 +710,20 @@ void BatchAllocator::broadcast_batch_cv_to_processes()
 			}
 
 
-			for(int i = 1; i < m_cluster.PCIe_RANKS.size() && BATCH_METHOD != Single_GPU; i++)
+			for(int i = 1; i < m_cluster->PCIe_RANKS.size() && BATCH_METHOD != Single_GPU; i++)
 			{
 				int k = 3*(i-1);
-				MPI_Isend(m_next_buffer_cv_X->data,m_next_buffer_cv_X->size,MPI_FLOAT,m_cluster.PCIe_RANKS[i],999,MPI_COMM_WORLD,&m_requests_send_cv_X[k + 0]);
-				MPI_Isend(m_next_buffer_cv_X->idx_cols,m_next_buffer_cv_X->size,MPI_FLOAT,m_cluster.PCIe_RANKS[i],9991,MPI_COMM_WORLD,&m_requests_send_cv_X[k + 1]);
-				MPI_Isend(m_next_buffer_cv_X->ptr_rows,m_next_buffer_cv_X->rows+1,MPI_FLOAT,m_cluster.PCIe_RANKS[i],9992,MPI_COMM_WORLD,&m_requests_send_cv_X[k + 2]);
+				MPI_Isend(m_next_buffer_cv_X->data,m_next_buffer_cv_X->size,MPI_FLOAT,m_cluster->PCIe_RANKS[i],999,MPI_COMM_WORLD,&m_requests_send_cv_X[k + 0]);
+				MPI_Isend(m_next_buffer_cv_X->idx_cols,m_next_buffer_cv_X->size,MPI_FLOAT,m_cluster->PCIe_RANKS[i],9991,MPI_COMM_WORLD,&m_requests_send_cv_X[k + 1]);
+				MPI_Isend(m_next_buffer_cv_X->ptr_rows,m_next_buffer_cv_X->rows+1,MPI_FLOAT,m_cluster->PCIe_RANKS[i],9992,MPI_COMM_WORLD,&m_requests_send_cv_X[k + 2]);
 
 				if(m_full_y->isSparse != 1)
-					MPI_Isend(m_next_buffer_cv_y->data,m_next_buffer_cv_y->size,MPI_FLOAT,m_cluster.PCIe_RANKS[i],998,MPI_COMM_WORLD,&m_requests_send_cv_y[k]);
+					MPI_Isend(m_next_buffer_cv_y->data,m_next_buffer_cv_y->size,MPI_FLOAT,m_cluster->PCIe_RANKS[i],998,MPI_COMM_WORLD,&m_requests_send_cv_y[k]);
 				else
 				{
-					MPI_Isend(m_next_buffer_cv_y->data,m_next_buffer_cv_y->size,MPI_FLOAT,m_cluster.PCIe_RANKS[i],998,MPI_COMM_WORLD,&m_requests_send_cv_y[k + 0]);
-					MPI_Isend(m_next_buffer_cv_y->idx_cols,m_next_buffer_cv_y->size,MPI_FLOAT,m_cluster.PCIe_RANKS[i],9981,MPI_COMM_WORLD,&m_requests_send_cv_y[k + 1]);
-					MPI_Isend(m_next_buffer_cv_y->ptr_rows,m_next_buffer_cv_y->rows+1,MPI_FLOAT,m_cluster.PCIe_RANKS[i],9982,MPI_COMM_WORLD,&m_requests_send_cv_y[k + 2]);
+					MPI_Isend(m_next_buffer_cv_y->data,m_next_buffer_cv_y->size,MPI_FLOAT,m_cluster->PCIe_RANKS[i],998,MPI_COMM_WORLD,&m_requests_send_cv_y[k + 0]);
+					MPI_Isend(m_next_buffer_cv_y->idx_cols,m_next_buffer_cv_y->size,MPI_FLOAT,m_cluster->PCIe_RANKS[i],9981,MPI_COMM_WORLD,&m_requests_send_cv_y[k + 1]);
+					MPI_Isend(m_next_buffer_cv_y->ptr_rows,m_next_buffer_cv_y->rows+1,MPI_FLOAT,m_cluster->PCIe_RANKS[i],9982,MPI_COMM_WORLD,&m_requests_send_cv_y[k + 2]);
 				}
 			}
 		}
@@ -729,22 +731,22 @@ void BatchAllocator::broadcast_batch_cv_to_processes()
 		{
 			if(BATCH_METHOD != Distributed_weights_sparse)
 			{
-				MPI_Irecv(m_next_buffer_cv_X->data,m_next_buffer_cv_X->size,MPI_FLOAT,m_cluster.PCIe_RANKS[0],999,MPI_COMM_WORLD,&m_request_cv_X[0]);
-				MPI_Irecv(m_next_buffer_cv_y->data,m_next_buffer_cv_y->size,MPI_FLOAT,m_cluster.PCIe_RANKS[0],998,MPI_COMM_WORLD,&m_request_cv_y[0]);
+				MPI_Irecv(m_next_buffer_cv_X->data,m_next_buffer_cv_X->size,MPI_FLOAT,m_cluster->PCIe_RANKS[0],999,MPI_COMM_WORLD,&m_request_cv_X[0]);
+				MPI_Irecv(m_next_buffer_cv_y->data,m_next_buffer_cv_y->size,MPI_FLOAT,m_cluster->PCIe_RANKS[0],998,MPI_COMM_WORLD,&m_request_cv_y[0]);
 			}
 			else
 			{
-				MPI_Irecv(m_next_buffer_cv_X->data,m_next_buffer_cv_X->size,MPI_FLOAT,m_cluster.PCIe_RANKS[0],999,MPI_COMM_WORLD,&m_request_cv_X[0]);
-				MPI_Irecv(m_next_buffer_cv_X->idx_cols,m_next_buffer_cv_X->size,MPI_FLOAT,m_cluster.PCIe_RANKS[0],9991,MPI_COMM_WORLD,&m_request_cv_X[1]);
-				MPI_Irecv(m_next_buffer_cv_X->ptr_rows,m_next_buffer_cv_X->rows+1,MPI_FLOAT,m_cluster.PCIe_RANKS[0],9992,MPI_COMM_WORLD,&m_request_cv_X[2]);
+				MPI_Irecv(m_next_buffer_cv_X->data,m_next_buffer_cv_X->size,MPI_FLOAT,m_cluster->PCIe_RANKS[0],999,MPI_COMM_WORLD,&m_request_cv_X[0]);
+				MPI_Irecv(m_next_buffer_cv_X->idx_cols,m_next_buffer_cv_X->size,MPI_FLOAT,m_cluster->PCIe_RANKS[0],9991,MPI_COMM_WORLD,&m_request_cv_X[1]);
+				MPI_Irecv(m_next_buffer_cv_X->ptr_rows,m_next_buffer_cv_X->rows+1,MPI_FLOAT,m_cluster->PCIe_RANKS[0],9992,MPI_COMM_WORLD,&m_request_cv_X[2]);
 
 				if(m_full_y->isSparse != 1)
-					MPI_Irecv(m_next_buffer_cv_y->data,m_next_buffer_cv_y->size,MPI_FLOAT,m_cluster.PCIe_RANKS[0],998,MPI_COMM_WORLD,&m_request_cv_y[0]);
+					MPI_Irecv(m_next_buffer_cv_y->data,m_next_buffer_cv_y->size,MPI_FLOAT,m_cluster->PCIe_RANKS[0],998,MPI_COMM_WORLD,&m_request_cv_y[0]);
 				else
 				{
-					MPI_Irecv(m_next_buffer_cv_y->data,m_next_buffer_cv_y->size,MPI_FLOAT,m_cluster.PCIe_RANKS[0],998,MPI_COMM_WORLD,&m_request_cv_y[0]);
-					MPI_Irecv(m_next_buffer_cv_y->idx_cols,m_next_buffer_cv_y->size,MPI_FLOAT,m_cluster.PCIe_RANKS[0],9981,MPI_COMM_WORLD,&m_request_cv_y[1]);
-					MPI_Irecv(m_next_buffer_cv_y->ptr_rows,m_next_buffer_cv_y->size,MPI_FLOAT,m_cluster.PCIe_RANKS[0],9982,MPI_COMM_WORLD,&m_request_cv_y[2]);
+					MPI_Irecv(m_next_buffer_cv_y->data,m_next_buffer_cv_y->size,MPI_FLOAT,m_cluster->PCIe_RANKS[0],998,MPI_COMM_WORLD,&m_request_cv_y[0]);
+					MPI_Irecv(m_next_buffer_cv_y->idx_cols,m_next_buffer_cv_y->size,MPI_FLOAT,m_cluster->PCIe_RANKS[0],9981,MPI_COMM_WORLD,&m_request_cv_y[1]);
+					MPI_Irecv(m_next_buffer_cv_y->ptr_rows,m_next_buffer_cv_y->size,MPI_FLOAT,m_cluster->PCIe_RANKS[0],9982,MPI_COMM_WORLD,&m_request_cv_y[2]);
 				}
 			}
 		}
@@ -811,7 +813,7 @@ void BatchAllocator::allocate_next_batch_async()
 	}
 	else
 	{
-		for(int i = 0; i < m_cluster.PCIe_RANKS.size()-1  && BATCH_METHOD != Single_GPU;i++)
+		for(int i = 0; i < m_cluster->PCIe_RANKS.size()-1  && BATCH_METHOD != Single_GPU;i++)
 		{
 
 			if(BATCH_METHOD != Distributed_weights_sparse)
@@ -915,7 +917,7 @@ void BatchAllocator::allocate_next_cv_batch_async()
 	}
 	else
 	{
-		for(int i = 0; i < m_cluster.PCIe_RANKS.size()-1  && BATCH_METHOD != Single_GPU;i++)
+		for(int i = 0; i < m_cluster->PCIe_RANKS.size()-1  && BATCH_METHOD != Single_GPU;i++)
 		{
 
 			if(BATCH_METHOD != Distributed_weights_sparse)
@@ -995,9 +997,9 @@ void BatchAllocator::replace_current_batch_with_next()
 
 
 		/*
-		Matrix *A = m_cluster.sparse_to_dense(m_next_batch_X);
+		Matrix *A = m_cluster->sparse_to_dense(m_next_batch_X);
 
-		CURRENT_BATCH = m_cluster.dense_to_sparse(A);
+		CURRENT_BATCH = m_cluster->dense_to_sparse(A);
 
 		cudaFree(A->data);
 		free(A);
@@ -1132,10 +1134,10 @@ void BatchAllocator::propagate_through_layers(Layer *root, DataPropagationType_t
 		if (type == Training)
 		{
 				root->forward();
-				//m_cluster.tick();
+				//m_cluster->tick();
 				root->backward_errors();
 				//root->weight_update();
-				//m_cluster.tick();
+				//m_cluster->tick();
 		}
 		else if(type == Trainerror || type == CVerror){ root->forward(false); root->running_error(); }
 		else{ throw "DataPropagationType not implemented!";	}
@@ -1147,7 +1149,7 @@ void BatchAllocator::propagate_through_layers(Layer *root, DataPropagationType_t
 	std::string message;
 
 	//if (type == Training)
-		//m_cluster.tock();
+		//m_cluster->tock();
 
 
 	if(type == Trainerror){message = "Train error: "; }

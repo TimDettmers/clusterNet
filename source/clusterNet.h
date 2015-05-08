@@ -217,6 +217,7 @@ private:
 	 MPI_Request m_sendrequest;
 	 std::vector<MPI_Request> m_sendrequests;
 	 std::map<std::string,Matrix**> m_matrixCache;
+	 std::map<std::string,Matrix**> m_matrixCacheChar;
 	 std::map<std::string,float**> m_matrixHStackCache;
 	 std::map<std::string,int> m_matrixCacheUsage;
 	 int m_gpucount;

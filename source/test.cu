@@ -15,6 +15,7 @@
 #include <WikiMaxoutNet_PCIe2.h>
 #include <WikiNetDist.h>
 #include <Layer.h>
+#include <time.h>
 
 using std::cout;
 using std::endl;
@@ -1393,10 +1394,10 @@ void bandwidth_test_MPI(int argc, char *argv[])
 	std::vector<Matrix*> lSync;
 	std::vector<Matrix*> lData;
 
-	int packages = 1;
+	int packages = 10;
 	float time = 0;
 
-	for(int epoch = 1; epoch < 20; epoch++)
+	for(int epoch = 1; epoch < 2000; epoch++)
 	{
 		if(lData.size() > 0)
 		{
@@ -1450,6 +1451,7 @@ void bandwidth_test_MPI(int argc, char *argv[])
 
 
 			}
+			gpu->tick();
 
 
 		}
@@ -1466,11 +1468,11 @@ void bandwidth_test_MPI(int argc, char *argv[])
 		time = gpu->tock();
 
 
-		for(int i = 0; i < packages; i++)
-			assert(sum(lData[i]) == sum(lSync[i]));
+		//for(int i = 0; i < packages; i++)
+			//assert(sum(lData[i]) == sum(lSync[i]));
 
 		printdim(lData[0]);
-		cout << 1000*2*packages*lData[0]->bytes/1024./1024./1024./time << " GB/s" << endl;
+		cout << 10*packages*lData[0]->bytes/1024./1024./1024./time << " GB/s" << endl;
 	}
 
 	gpu->shutdown_MPI();
@@ -1515,7 +1517,7 @@ void bandwidth_test_peer()
 	cudaDeviceCanAccessPeer(&access,1,0);
 	cout << access << endl;
 
-	for(int epoch = 199; epoch < 200; epoch++)
+	for(int epoch = 1; epoch < 100; epoch++)
 	{
 		if(lSync0.size() > 0)
 		{
@@ -1566,18 +1568,11 @@ void bandwidth_test_peer()
 		}
 
 
-		time = gpu->tock();
-
-		for(int i = 0; i < packages; i++)
-			//cout << sum(lData0[i])  << " vs. " << sum(lSync1[i]) << endl;
-			assert(sum(lData0[i]) == sum(lSync1[i]));
-
-		for(int i = 0; i < packages; i++)
-			assert(sum(lData1[i]) == sum(lSync0[i]));
+		time = gpu->tock()/1000.;
 
 
 
-		cout << 1000*2*packages*lData0[0]->bytes/1024./1024./1024./time << " GB/s" << endl;
+		cout << packages*lData0[0]->bytes/1024./1024./1024./time << " GB/s" << endl;
 	}
 
 }
@@ -1620,7 +1615,7 @@ void bandwidth_test_kernel()
 	cudaDeviceCanAccessPeer(&access,1,0);
 	cout << access << endl;
 
-	for(int epoch = 1; epoch < 200; epoch++)
+	for(int epoch = 1; epoch < 1000; epoch++)
 	{
 		if(lSync0.size() > 0)
 		{
@@ -1683,6 +1678,266 @@ void bandwidth_test_kernel()
 }
 
 
+void bandwidth_test_compression(int argc, char *argv[])
+{
+
+	ClusterNet *gpu = new ClusterNet(argc,argv,1235,true);
+	MPI_Request *send_request = new MPI_Request;
+	MPI_Request *recv_request = new MPI_Request;
+
+	Matrix *w_grad_next = empty(1024,1024);
+	Matrix *w_next_sync = empty(1024,1024);
+
+	//warmup
+	int target = gpu->MYRANK +1 == gpu->MPI_SIZE ? 0 : gpu->MYRANK+1;
+	int source = gpu->MYRANK-1 == -1 ? gpu->MPI_SIZE-1 : gpu->MYRANK-1;
+
+	for (int i = 0; i < gpu->MPI_SIZE - 1; i++)
+	{
+		MPI_Isend(w_grad_next->data,w_grad_next->size,MPI_FLOAT,target,i,MPI_COMM_WORLD, send_request);
+		MPI_Irecv(w_next_sync->data,w_grad_next->size,MPI_FLOAT,source,i,MPI_COMM_WORLD,recv_request);
+		target = target +1 == gpu->MPI_SIZE ? 0 : target+1;
+		source = source-1 == -1 ? gpu->MPI_SIZE-1 : source-1;
+	}
+
+	MPI_Wait(recv_request,MPI_STATUS_IGNORE);
+
+	int times = 100;
+
+	gpu->tick();
+
+	for(int i = 0; i < times; i++)
+	{
+		target = gpu->MYRANK +1 == gpu->MPI_SIZE ? 0 : gpu->MYRANK+1;
+		source = gpu->MYRANK-1 == -1 ? gpu->MPI_SIZE-1 : gpu->MYRANK-1;
+
+		for (int i = 0; i < gpu->MPI_SIZE - 1; i++)
+		{
+			MPI_Isend(w_grad_next->data,w_grad_next->size,MPI_FLOAT,target,i,MPI_COMM_WORLD, send_request);
+			MPI_Recv(w_next_sync->data,w_grad_next->size,MPI_FLOAT,source,i,MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+			target = target +1 == gpu->MPI_SIZE ? 0 : target+1;
+			source = source-1 == -1 ? gpu->MPI_SIZE-1 : source-1;
+		}
+
+		//MPI_Wait(send_request,MPI_STATUS_IGNORE);
+	}
+
+
+	float sec = gpu->tock()*1000.0;
+	float GB = 3*times*w_grad_next->bytes/(1024.0*1024.0*1024.0);
+	if(gpu->MYRANK == 0)
+	{
+		cout << "Size in GB: " << GB << endl;
+		cout << "GB/s: " << GB/sec << endl;
+	}
+
+
+	gpu->shutdown_MPI();
+}
+
+void simple_bandwidth_test(int argc, char *argv[])
+{
+
+		ClusterNet *gpu = new ClusterNet(argc,argv,1235,true);
+		MPI_Request *send_request = new MPI_Request;
+		MPI_Request *recv_request = new MPI_Request;
+
+		int size = 12000;
+		int div = 32;
+		for(int i = 32; i < size; i+=32)
+		{
+			for(int j = 0; j < 3; j++)
+			{
+				if(j==0) div = 1;
+				if(j==1) div = 4;
+				if(j==2) div = 32;
+				Matrix *w_grad_next = empty(i,i/div);
+				Matrix *w_next_sync = empty(i,i/div);
+
+				if(gpu->MYRANK == 0)
+					MPI_Send(w_grad_next->data,w_grad_next->size,MPI_FLOAT,1,999,MPI_COMM_WORLD);
+				if(gpu->MYRANK == 1)
+					MPI_Recv(w_next_sync->data,w_next_sync->size,MPI_FLOAT,0,999,MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+				MPI_Barrier(MPI_COMM_WORLD);
+				int times = 100;
+				gpu->tick();
+				for(int k = 0; k < times; k++)
+				{
+					if(gpu->MYRANK == 0)
+						MPI_Send(w_grad_next->data,w_grad_next->size,MPI_FLOAT,1,999,MPI_COMM_WORLD);
+					if(gpu->MYRANK == 1)
+						MPI_Recv(w_next_sync->data,w_next_sync->size,MPI_FLOAT,0,999,MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+				}
+
+				float quant = 9.5e-08f;
+				float dequant = 2.0e-08f;
+				float compreess = 1.e-07f;
+				float decompress = 5.0e-08f;
+
+				float added_penalty = 0.0f;
+				if(j == 1)added_penalty = compreess + decompress;
+				if(j == 2)added_penalty = quant + dequant;
+
+				//cout << 100*(added_penalty)*w_grad_next->size << endl;
+				float sec = gpu->tock() + (100*(added_penalty)*(i*i));
+				float GB = times*w_grad_next->bytes/(1024.0*1024.0*1024.0);
+				if(gpu->MYRANK == 0)
+				{
+					cout << "Size: " << w_grad_next->rows << "x" << w_grad_next->cols << " GB/s: " << GB/sec << " " << sec*(div == 32 ? 2.0 : 1.0) << "ms"<< endl;
+
+				}
+
+				cudaFree(w_grad_next->data);
+				cudaFree(w_next_sync->data);
+			}
+		}
+
+
+		gpu->shutdown_MPI();
+
+}
+
+
+void model_parallelism_test(int argc, char *argv[])
+{
+
+		ClusterNet *GPU = new ClusterNet(argc,argv,1235,true);
+		MPI_Request *send_request = new MPI_Request;
+		MPI_Request *recv_request = new MPI_Request;
+
+		Matrix *A = GPU->rand(512,5120);
+		Matrix *B = GPU->distributed_uniformSqrtWeight(5120,5120);
+		Matrix *out = zeros(512,5120);
+
+
+		int col_split_size = (B->isDistributed == 1 ? B->cols_distributed : B->cols) / GPU->MPI_SIZE;
+		int remainder = (B->isDistributed == 1 ? B->cols_distributed : B->cols) - (col_split_size*GPU->MPI_SIZE);
+
+		Matrix** arrOut = (Matrix**) malloc(sizeof(Matrix*) * GPU->MPI_SIZE);
+		for (int i = 0; i < GPU->MPI_SIZE; i++)
+		{
+			if (i == GPU->MPI_SIZE - 1)
+				arrOut[i] = empty(A->rows, col_split_size + remainder);
+			else
+				arrOut[i] = empty(A->rows, col_split_size);
+		}
+
+		float **h_arrA = (float**) malloc(sizeof(float*) * GPU->MPI_SIZE);
+		for (int i = 0; i < GPU->MPI_SIZE; i++)
+			h_arrA[i] = arrOut[i]->data;
+
+		float **d_arrA;
+		cudaMalloc((void**) &d_arrA, sizeof(float*) * GPU->MPI_SIZE);
+		cudaMemcpy(d_arrA, h_arrA, sizeof(float*) * GPU->MPI_SIZE,cudaMemcpyDefault);
+
+
+		GPU->tick();
+		for(int i = 0; i < 100; i++)
+		{
+			GPU->dot(A,B,arrOut[GPU->MYRANK]);
+
+
+			int target = GPU->MYRANK +1 == GPU->MPI_SIZE ? 0 : GPU->MYRANK+1;
+				int source = GPU->MYRANK-1 == -1 ? GPU->MPI_SIZE-1 : GPU->MYRANK-1;
+
+				/*
+				GPU->compression_8bit(w_grad_next,0.001,w_next_sync_send);
+				for (int i = 0; i < GPU->MPI_SIZE - 1; i++)
+				{
+					MPI_Isend(w_next_sync_send->char_data,w_next_sync_send->size,MPI_CHAR,target,i,MPI_COMM_WORLD, send_request);
+					MPI_Irecv(w_next_sync_recv->char_data,w_next_sync_recv->size,MPI_CHAR,source,i,MPI_COMM_WORLD,recv_request);
+					target = target +1 == GPU->MPI_SIZE ? 0 : target+1;
+					source = source-1 == -1 ? GPU->MPI_SIZE-1 : source-1;
+				}
+				*/
+
+
+				for (int i = 0; i < GPU->MPI_SIZE - 1; i++)
+				{
+					MPI_Isend(arrOut[GPU->MYRANK]->data,arrOut[GPU->MYRANK]->size,MPI_FLOAT,target,i,MPI_COMM_WORLD, send_request);
+					MPI_Irecv(arrOut[source]->data,arrOut[source]->size,MPI_FLOAT,source,i,MPI_COMM_WORLD,recv_request);
+					target = target +1 == GPU->MPI_SIZE ? 0 : target+1;
+					source = source-1 == -1 ? GPU->MPI_SIZE-1 : source-1;
+				}
+				//MPI_Wait(next->send_request,MPI_STATUS_IGNORE);
+				MPI_Wait(recv_request,MPI_STATUS_IGNORE);
+				//GPU->decompression_8bit(w_next_sync_recv,0.001,w_next_sync);
+
+				hStackN(d_arrA,	arrOut[0]->size, out, GPU->MPI_SIZE);
+
+
+		}
+		GPU->tock();
+
+		GPU->shutdown_MPI();
+
+}
+
+void simple_bandwidth_test_CPU(int argc, char *argv[])
+{
+
+		ClusterNet *gpu = new ClusterNet(argc,argv,1235,true);
+		MPI_Request *send_request = new MPI_Request;
+		MPI_Request *recv_request = new MPI_Request;
+
+		size_t size = 1024*1024*1024;
+		float *data = (float*)malloc(sizeof(float)*size);
+		float *data_sync = (float*)malloc(sizeof(float)*size);
+
+
+		int times = 10;
+		gpu->tick();
+		for(int i = 0; i < times; i++)
+		{
+			if(gpu->MYRANK == 0)
+			{
+				MPI_Send(data,size,MPI_FLOAT,1,999,MPI_COMM_WORLD);
+				//MPI_Recv(w_next_sync->data,w_next_sync->size,MPI_FLOAT,0,999,MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+			}
+			if(gpu->MYRANK == 1)
+			{
+				MPI_Recv(data_sync,size,MPI_FLOAT,0,999,MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+				//MPI_Send(w_grad_next->data,w_grad_next->size,MPI_FLOAT,1,999,MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+			}
+		}
+
+
+		double sec = gpu->tock()*1000.0;
+		double GB = times*size*4.0/(1024.0*1024.0*1024.0);
+		if(gpu->MYRANK == 0)
+		{
+			cout << "Size in GB: " << GB << endl;
+			cout << "GB/s: " << GB/sec << endl;
+		}
+
+
+		gpu->shutdown_MPI();
+
+}
+
+void compression_test(int argc, char *argv[])
+{
+
+	ClusterNet *gpu = new ClusterNet();
+	Matrix *A = scalarMul(gpu->randn(5120,5120),1.0f/10.0f);
+	Matrix *out = empty_char(5120,5120);
+
+
+
+
+
+	gpu->tick();
+	for(int i = 0; i < 10000; i++)
+		gpu->compression_8bit(A, 0.1f,out);
+	gpu->tock();
+
+	gpu->tick();
+	for(int i = 0; i < 10000; i++)
+		gpu->decompression_8bit(out, 0.1f,A);
+	gpu->tock();
+}
 
 
 int main(int argc, char *argv[])
@@ -1694,8 +1949,11 @@ int main(int argc, char *argv[])
 
 	//bandwidth_test_kernel();
 
+	//compression_test(argc,argv);
 
-
+	//simple_bandwidth_test(argc,argv);
+	//simple_bandwidth_test_CPU(argc,argv);
+	//model_parallelism_test(argc,argv);
 
 
 
@@ -1787,12 +2045,14 @@ int main(int argc, char *argv[])
 
 	//Matrix *X = read_hdf5("/home/tim/data/mnist/X.hdf5");
 	//Matrix *y = read_hdf5("/home/tim/data/mnist/y.hdf5");
-	Matrix *X = gpu->distribute_rows_hdf5_file("/home/tim/data/MNIST/X.hdf5");
-	Matrix *y = gpu->distribute_rows_hdf5_file("/home/tim/data/MNIST/y.hdf5");
+
+	Matrix *X = gpu->distribute_rows_hdf5_file("/home/tim/data/mnist/X.hdf5");
+	Matrix *y = gpu->distribute_rows_hdf5_file("/home/tim/data/mnist/y.hdf5");
 
 
 	BatchAllocator b = BatchAllocator();
-	b.init(X,y,(1.0-0.85715),128,128,*gpu, Single_GPU);
+
+	b.init(X,y,(1.0-0.85715),128,128,gpu, Single_GPU);
 
 	Layer *l0 = new Layer(X->cols,128,Input,gpu);
 	l0->PARALLELISM = DataParallelism;
@@ -1810,12 +2070,12 @@ int main(int argc, char *argv[])
 	cout << gpu->MYRANK << endl;
 
 	float decay = 0.99f;
-	gpu->tick();
 	gpu->tick("pass");
+	b.SKIP_LAST_BATCH = true;
 	for(int epoch = 0; epoch < 100; epoch++)
 	{
-		cout << "EPOCH: " << epoch + 1 << endl;
-		gpu->tick("EPOCH");
+		if(gpu->MYRANK == 0)
+			cout << "EPOCH: " << epoch + 1 << endl;
 		b.propagate_through_layers(l0,Training);
 		b.propagate_through_layers(l0,Trainerror);
 		b.propagate_through_layers(l0,CVerror);
@@ -1823,17 +2083,15 @@ int main(int argc, char *argv[])
 
 		l0->learning_rate_decay(decay);
 
-		if(epoch == 75)
+		if(epoch == 40)
 		{
 			l0->dropout_decay();
 			decay = 0.85f;
 		}
-		gpu->tock("EPOCH");
 
 
 	}
 	gpu->tock("pass");
-	gpu->tock();
 
 
 	gpu->shutdown_MPI();
@@ -1845,8 +2103,8 @@ int main(int argc, char *argv[])
 
 	cudaSetDevice(0);
 
-	Matrix *X = read_hdf5("/home/tim/data/MNIST/X.hdf5");
-	Matrix *y = read_hdf5("/home/tim/data/MNIST/y.hdf5");
+	Matrix *X = read_hdf5("/home/tim/data/mnist/X.hdf5");
+	Matrix *y = read_hdf5("/home/tim/data/mnist/y.hdf5");
 
 
 
