@@ -396,7 +396,36 @@ void Layer::print_error(string message)
 {
 	if(!target){ next->print_error(message); return;}
 
-	cout << message << RUNNING_ERROR/RUNNING_SAMPLE_SIZE << endl;
+	if(GPU->MPI_SIZE > 1)
+	{
+		float *errors = (float*)malloc(GPU->MPI_SIZE*sizeof(float));
+		float *size = (float*)malloc(GPU->MPI_SIZE*sizeof(float));
+		errors[GPU->MYRANK] = RUNNING_ERROR;
+		size[GPU->MYRANK] = RUNNING_SAMPLE_SIZE;
+
+		MPI_Gather(&RUNNING_ERROR, 1, MPI_FLOAT, errors, 4, MPI_FLOAT, 0, MPI_COMM_WORLD);
+		MPI_Gather(&RUNNING_SAMPLE_SIZE, 1, MPI_FLOAT, size, 4, MPI_FLOAT, 0, MPI_COMM_WORLD);
+
+		MPI_Barrier(MPI_COMM_WORLD);
+
+		if(GPU->MYRANK == 0)
+		{
+			for(int i = 1; i < GPU->MPI_SIZE; i++)
+			{
+				size[0] += size[i];
+				errors[0] += errors[i];
+			}
+
+			cout << message << errors[0]/size[0] << endl;
+		}
+
+		free(errors);
+		free(size);
+	}
+	else
+	{
+		cout << message << RUNNING_ERROR/RUNNING_SAMPLE_SIZE << endl;
+	}
 	RUNNING_ERROR = 0.0f;
 	RUNNING_SAMPLE_SIZE = 0.0f;
 }
