@@ -2089,7 +2089,7 @@ int main(int argc, char *argv[])
 			decay = 0.85f;
 		}
 
-
+		//cout << l1->MAX_GRAD_VALUE << endl;
 	}
 	gpu->tock("pass");
 

@@ -59,6 +59,11 @@ typedef enum ParallelismType_t
 	ModelParallelism = 2
 } ParallelismType_t;
 
+typedef enum Compression_t
+{
+	bits_32 = 0,
+	bits_8 = 1
+} Compression_t;
 
 typedef enum Costfunction_t
 {

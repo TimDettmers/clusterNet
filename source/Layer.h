@@ -16,6 +16,7 @@ public:
 	Matrix *b_next;
 
 	std::vector<Matrix* > vec_w_grad_next;
+	std::vector<Matrix* > vec_w_grad_next_8bit;
 	Matrix *b_next_sync;
 	Matrix *w_next_sync_recv;
 	Matrix *b_next_sync_recv;
@@ -57,6 +58,11 @@ public:
 	int BATCH_SIZE;
 
 	bool isSynchronizing;
+
+	float MAX_GRAD_VALUE;
+	float *max_grad_value_sync;
+
+	Compression_t compression;
 
 	WeightUpdateType_t UPDATE_TYPE;
 

@@ -36,11 +36,13 @@ void Layer::init(int unitcount, int start_batch_size, Unittype_t unit, ClusterNe
 
 	isSynchronizing = false;
 
+	compression = bits_32;
+
 	target = NULL;
 	target_matrix = NULL;
 	error = NULL;
 
-	LEARNING_RATE = 0.003;
+	LEARNING_RATE = 0.006;
 	RMSPROP_MOMENTUM = 0.9f;
 	UNIT_TYPE = unit;
 	DROPOUT = 0.5f;
@@ -49,6 +51,8 @@ void Layer::init(int unitcount, int start_batch_size, Unittype_t unit, ClusterNe
 	RUNNING_ERROR = 0.0f;
 	RUNNING_SAMPLE_SIZE = 0.0f;
 	L2 = 15.0f;
+
+	MAX_GRAD_VALUE = 1.0f;
 
 	UPDATE_TYPE = RMSProp;
 	COST = Misclassification;
@@ -62,6 +66,8 @@ void Layer::init(int unitcount, int start_batch_size, Unittype_t unit, ClusterNe
 		send_request.push_back(new MPI_Request);
 		recv_request.push_back(new MPI_Request);
 	}
+
+	max_grad_value_sync = (float*)malloc(GPU->MPI_SIZE*sizeof(float));
 
 	if(BATCH_SIZE > 0)
 	{
@@ -87,7 +93,8 @@ void Layer::link_with_next_layer(Layer *next_layer)
 	Matrix *w = GPU->uniformSqrtWeight(UNITCOUNT,next_layer->UNITCOUNT);
 	w_next = w;
 	w_rms_next = zeros(UNITCOUNT,next_layer->UNITCOUNT);
-	if(PARALLELISM == DataParallelism){ for(int i = 0; i < GPU->MPI_SIZE; i++) vec_w_grad_next.push_back(zeros(UNITCOUNT,next_layer->UNITCOUNT)); }
+	for(int i = 0; i < GPU->MPI_SIZE; i++) vec_w_grad_next.push_back(zeros(UNITCOUNT,next_layer->UNITCOUNT));
+	if(PARALLELISM == DataParallelism){ for(int i = 0; i < GPU->MPI_SIZE; i++) vec_w_grad_next_8bit.push_back(empty_char(UNITCOUNT,next_layer->UNITCOUNT)); }
 	if(PARALLELISM == DataParallelism){w_next_sync_send = empty_char(UNITCOUNT,next_layer->UNITCOUNT); }
 	if(PARALLELISM == DataParallelism){w_next_sync_recv = empty_char(UNITCOUNT,next_layer->UNITCOUNT); }
 
@@ -290,32 +297,39 @@ void Layer::MPI_synchronization_async()
 	int target = GPU->MYRANK +1 == GPU->MPI_SIZE ? 0 : GPU->MYRANK+1;
 	int source = GPU->MYRANK-1 == -1 ? GPU->MPI_SIZE-1 : GPU->MYRANK-1;
 
-	/*
 
-	//cout << "pre sync" << endl;
-	
-	GPU->compression_8bit(w_grad_next,0.001,w_next_sync_send);
-	for (int i = 0; i < GPU->MPI_SIZE - 1; i++)
+	if(compression == bits_8)
 	{
-		MPI_Isend(w_next_sync_send->char_data,w_next_sync_send->size,MPI_CHAR,target,999,MPI_COMM_WORLD, send_request);
-		MPI_Irecv(w_next_sync_recv->char_data,w_next_sync_recv->size,MPI_CHAR,source,999,MPI_COMM_WORLD,recv_request);
-		target = target +1 == GPU->MPI_SIZE ? 0 : target+1;
-		source = source-1 == -1 ? GPU->MPI_SIZE-1 : source-1;
+
+		//cout << 1.0f/((float)out->rows) << endl;
+		scalarMul(vec_w_grad_next[GPU->MYRANK],1.0f/((float)out->rows),vec_w_grad_next[GPU->MYRANK]);
+
+		abs(vec_w_grad_next[GPU->MYRANK],vec_w_grad_next[target]);
+
+
+		MAX_GRAD_VALUE = max(vec_w_grad_next[target]);
+		//MAX_GRAD_VALUE = 0.003f;
+		MPI_Allgather(&MAX_GRAD_VALUE, 1, MPI_FLOAT, max_grad_value_sync, 1, MPI_FLOAT, MPI_COMM_WORLD);
+
+		GPU->compression_8bit(vec_w_grad_next[GPU->MYRANK],MAX_GRAD_VALUE,vec_w_grad_next_8bit[GPU->MYRANK]);
+		for (int i = 0; i < GPU->MPI_SIZE - 1; i++)
+		{
+			MPI_Isend(vec_w_grad_next_8bit[GPU->MYRANK]->char_data,vec_w_grad_next_8bit[GPU->MYRANK]->size,MPI_CHAR,target,999,MPI_COMM_WORLD, send_request[target]);
+			MPI_Irecv(vec_w_grad_next_8bit[source]->char_data,vec_w_grad_next_8bit[source]->size,MPI_CHAR,source,999,MPI_COMM_WORLD,recv_request[source]);
+			target = target +1 == GPU->MPI_SIZE ? 0 : target+1;
+			source = source-1 == -1 ? GPU->MPI_SIZE-1 : source-1;
+		}
 	}
-	isSynchronizing = true;
-
-	//cout << "post sync" << endl;
-	*/
-	
-
-	//TODO: test if tag has performance benefits
-	for (int i = 0; i < GPU->MPI_SIZE - 1; i++)
+	else
 	{
-		MPI_Isend(vec_w_grad_next[GPU->MYRANK]->data,vec_w_grad_next[GPU->MYRANK]->size,MPI_FLOAT,target,999,MPI_COMM_WORLD, send_request[target]);
-		MPI_Irecv(vec_w_grad_next[source]->data,vec_w_grad_next[source]->size,MPI_FLOAT,source,999,MPI_COMM_WORLD,recv_request[source]);
-		target = target +1 == GPU->MPI_SIZE ? 0 : target+1;
-		source = source-1 == -1 ? GPU->MPI_SIZE-1 : source-1;
+		for (int i = 0; i < GPU->MPI_SIZE - 1; i++)
+		{
+			MPI_Isend(vec_w_grad_next[GPU->MYRANK]->data,vec_w_grad_next[GPU->MYRANK]->size,MPI_FLOAT,target,999,MPI_COMM_WORLD, send_request[target]);
+			MPI_Irecv(vec_w_grad_next[source]->data,vec_w_grad_next[source]->size,MPI_FLOAT,source,999,MPI_COMM_WORLD,recv_request[source]);
+			target = target +1 == GPU->MPI_SIZE ? 0 : target+1;
+			source = source-1 == -1 ? GPU->MPI_SIZE-1 : source-1;
 
+		}
 	}
 	isSynchronizing = true;
 
@@ -364,7 +378,7 @@ void Layer::wait_for_synchronization()
 	for(int i = 0; i < GPU->MPI_SIZE; i++)
 	{
 		if(i == GPU->MYRANK){ continue; }
-		//printsum(vec_w_grad_next[i]);
+		if(compression == bits_8){ GPU->decompression_8bit(vec_w_grad_next_8bit[i],max_grad_value_sync[i]*0.9,vec_w_grad_next[i]); }
 		add(vec_w_grad_next[GPU->MYRANK],vec_w_grad_next[i],vec_w_grad_next[GPU->MYRANK]);
 	}
 	isSynchronizing = false;
@@ -419,8 +433,8 @@ void Layer::print_error(string message)
 		errors[GPU->MYRANK] = RUNNING_ERROR;
 		size[GPU->MYRANK] = RUNNING_SAMPLE_SIZE;
 
-		MPI_Gather(&RUNNING_ERROR, 1, MPI_FLOAT, errors, 4, MPI_FLOAT, 0, MPI_COMM_WORLD);
-		MPI_Gather(&RUNNING_SAMPLE_SIZE, 1, MPI_FLOAT, size, 4, MPI_FLOAT, 0, MPI_COMM_WORLD);
+		MPI_Gather(&RUNNING_ERROR, 1, MPI_FLOAT, errors, 1, MPI_FLOAT, 0, MPI_COMM_WORLD);
+		MPI_Gather(&RUNNING_SAMPLE_SIZE, 1, MPI_FLOAT, size, 1, MPI_FLOAT, 0, MPI_COMM_WORLD);
 
 		MPI_Barrier(MPI_COMM_WORLD);
 

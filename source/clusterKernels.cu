@@ -1242,7 +1242,8 @@ __global__ void kRMSprop_with_weight_update (float *RMS, float *grad, float *w, 
 
 	  for (unsigned int i = idx;i < size; i += numThreads)
 	  {
-		  grad_value = fdividef(grad[i],(float)batch_size) ;
+		  //grad_value = fdividef(grad[i],(float)batch_size) ;
+		  grad_value = grad[i];
 		  RMS_value = (RMS_multiplier*RMS[i]) + (powf(grad_value,2.0f)*rms_reciprocal);
 		  grad_value = learning_rate*fdividef(grad_value,(sqrtf(RMS_value)+1.0e-08f));
 
