@@ -297,8 +297,8 @@ void Layer::MPI_synchronization_async()
 	GPU->compression_8bit(w_grad_next,0.001,w_next_sync_send);
 	for (int i = 0; i < GPU->MPI_SIZE - 1; i++)
 	{
-		MPI_Isend(w_next_sync_send->char_data,w_next_sync_send->size,MPI_CHAR,target,i,MPI_COMM_WORLD, send_request);
-		MPI_Irecv(w_next_sync_recv->char_data,w_next_sync_recv->size,MPI_CHAR,source,i,MPI_COMM_WORLD,recv_request);
+		MPI_Isend(w_next_sync_send->char_data,w_next_sync_send->size,MPI_CHAR,target,999,MPI_COMM_WORLD, send_request);
+		MPI_Irecv(w_next_sync_recv->char_data,w_next_sync_recv->size,MPI_CHAR,source,999,MPI_COMM_WORLD,recv_request);
 		target = target +1 == GPU->MPI_SIZE ? 0 : target+1;
 		source = source-1 == -1 ? GPU->MPI_SIZE-1 : source-1;
 	}
@@ -308,15 +308,14 @@ void Layer::MPI_synchronization_async()
 	*/
 	
 
-
-
-
+	//TODO: test if tag has performance benefits
 	for (int i = 0; i < GPU->MPI_SIZE - 1; i++)
 	{
-		MPI_Isend(vec_w_grad_next[GPU->MYRANK]->data,vec_w_grad_next[GPU->MYRANK]->size,MPI_FLOAT,target,i,MPI_COMM_WORLD, send_request[target]);
-		MPI_Irecv(vec_w_grad_next[source]->data,vec_w_grad_next[source]->size,MPI_FLOAT,source,i,MPI_COMM_WORLD,recv_request[source]);
+		MPI_Isend(vec_w_grad_next[GPU->MYRANK]->data,vec_w_grad_next[GPU->MYRANK]->size,MPI_FLOAT,target,999,MPI_COMM_WORLD, send_request[target]);
+		MPI_Irecv(vec_w_grad_next[source]->data,vec_w_grad_next[source]->size,MPI_FLOAT,source,999,MPI_COMM_WORLD,recv_request[source]);
 		target = target +1 == GPU->MPI_SIZE ? 0 : target+1;
 		source = source-1 == -1 ? GPU->MPI_SIZE-1 : source-1;
+
 	}
 	isSynchronizing = true;
 
@@ -345,6 +344,23 @@ void Layer::wait_for_synchronization()
 	//cout << "pre decomrpess" << endl;
 	//GPU->decompression_8bit(w_next_sync_recv,0.001,w_next_sync);
 	//cout << "post decompress" << endl;
+
+
+
+
+	/*
+	MPI_Barrier(MPI_COMM_WORLD);
+	cout << GPU->MYRANK << " " << sum(vec_w_grad_next[0]) << " 0" << endl;
+	MPI_Barrier(MPI_COMM_WORLD);
+	cout << GPU->MYRANK << " " << sum(vec_w_grad_next[1]) << " 1" << endl;
+	MPI_Barrier(MPI_COMM_WORLD);
+	cout << GPU->MYRANK << " " << sum(vec_w_grad_next[2]) << " 2" << endl;
+	MPI_Barrier(MPI_COMM_WORLD);
+	cout << GPU->MYRANK << " " << sum(vec_w_grad_next[3]) << " 3" << endl;
+	MPI_Barrier(MPI_COMM_WORLD);
+	*/
+
+
 	for(int i = 0; i < GPU->MPI_SIZE; i++)
 	{
 		if(i == GPU->MYRANK){ continue; }

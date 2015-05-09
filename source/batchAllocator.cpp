@@ -1128,6 +1128,10 @@ void BatchAllocator::propagate_through_layers(Layer *root, DataPropagationType_t
 		root->activation = (type == CVerror ? CURRENT_BATCH_CV : CURRENT_BATCH);
 		end->target = (type == CVerror ? CURRENT_BATCH_CV_Y : CURRENT_BATCH_Y);
 
+
+		//MPI_Barrier(MPI_COMM_WORLD);
+		//cout << m_cluster->MYRANK << " " << sum(root->activation) << " 0" << endl;
+
 		if(type == CVerror){ broadcast_batch_cv_to_processes(); }
 		else{ broadcast_batch_to_processes(); }
 
