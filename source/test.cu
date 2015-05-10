@@ -2072,7 +2072,7 @@ int main(int argc, char *argv[])
 	float decay = 0.99f;
 	gpu->tick("pass");
 	b.SKIP_LAST_BATCH = true;
-	for(int epoch = 0; epoch < 100; epoch++)
+	for(int epoch = 0; epoch < 60; epoch++)
 	{
 		if(gpu->MYRANK == 0)
 			cout << "EPOCH: " << epoch + 1 << endl;
@@ -2095,6 +2095,20 @@ int main(int argc, char *argv[])
 
 
 	gpu->shutdown_MPI();
+
+	int n = l0->Train_errors.size();
+
+	Matrix *train = empty_cpu(1,n);
+	Matrix *cv = empty_cpu(1,n);
+
+	for(int i = 0; i < n; i++)
+	{
+		train->data[i] = l0->Train_errors[i];
+		cv->data[i] = l0->CV_errors[i];
+	}
+
+	write_hdf5("/home/tim/data/mnist/train_error.hdf5",train);
+	write_hdf5("/home/tim/data/mnist/cv_error.hdf5",cv);
 
 
 

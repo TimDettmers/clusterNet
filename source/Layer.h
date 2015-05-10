@@ -43,6 +43,9 @@ public:
 	std::vector<MPI_Request* > send_request;
 	std::vector<MPI_Request* > recv_request;
 
+	std::vector<float> CV_errors;
+	std::vector<float> Train_errors;
+
 	ClusterNet *GPU;
 
 	float LEARNING_RATE;

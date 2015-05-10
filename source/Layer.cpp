@@ -451,6 +451,13 @@ void Layer::print_error(string message)
 
 		free(errors);
 		free(size);
+
+		if(message == "Train error: ")
+			Train_errors.push_back(errors[0]/size[0]);
+		else
+			CV_errors.push_back(errors[0]/size[0]);
+
+
 	}
 	else
 	{
