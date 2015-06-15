@@ -1117,7 +1117,7 @@ void BatchAllocator::replace_current_cv_batch_with_next()
 	}
 }
 
-void BatchAllocator::propagate_through_layers(Layer *root, DataPropagationType_t type)
+void BatchAllocator::propagate_through_layers(Layer *root, DataPropagationType_t type, int epoch)
 {
 	Layer *end = root;
 	while(end->next){end = end->next; }
@@ -1143,7 +1143,7 @@ void BatchAllocator::propagate_through_layers(Layer *root, DataPropagationType_t
 				//root->weight_update();
 				//m_cluster->tick();
 		}
-		else if(type == Trainerror || type == CVerror){ root->forward(false); root->running_error(); }
+		else if(type == Trainerror || type == CVerror){ root->forward(false); root->running_error(type == CVerror,epoch); }
 		else{ throw "DataPropagationType not implemented!";	}
 
 		if(type == CVerror){allocate_next_cv_batch_async(); replace_current_cv_batch_with_next(); }

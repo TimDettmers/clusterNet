@@ -1146,8 +1146,8 @@ __global__ void kDecompression_8bit(float *flt_tbl, unsigned char *A, float prec
 	}
 
 
-	tbl_floats[126] = 0.0f;
-	tbl_floats[254] = -0.0f;
+	tbl_floats[126] = precision;
+	tbl_floats[254] = precision;//0.0f;
 	tbl_floats[127] = precision;
 	tbl_floats[255] = -precision;
 
@@ -1161,6 +1161,77 @@ __global__ void kDecompression_8bit(float *flt_tbl, unsigned char *A, float prec
 
 
 __global__ void kCompression_8bit(float *flt_tbl, float *A, float precision, int size, unsigned char *out)
+{
+	const unsigned int numThreads = blockDim.x * gridDim.x;
+	const int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
+
+	float absnumber = 0.0f;
+	float threshold_lower = 0.0000015;
+	float threshold_upper = 0.995703;
+	int isNegative = 0;
+	int pivot = 63;
+	int upper_pivot = 125;
+	int lower_pivot = 0;
+
+	__shared__ float tbl_floats[128];
+	if(threadIdx.x < 126)
+		tbl_floats[threadIdx.x] = flt_tbl[threadIdx.x];
+
+
+	__syncthreads();
+
+	  for (int i = idx;i < size; i += numThreads)
+	  {
+		  isNegative = 0;
+		  pivot = 63;
+		  upper_pivot = 125;
+		  lower_pivot = 0;
+		  absnumber = A[i]/precision;
+		  if(absnumber < 0.0f){isNegative = 1; absnumber=-absnumber; }
+		  if(absnumber < threshold_lower){ out[i] = (unsigned char)254; continue; }
+		  if(absnumber > threshold_upper){ out[i] = (isNegative == 0 ? (unsigned char)127 : (unsigned char)255); continue; }
+		  for(int j = 32; j > 0; j>>=1)
+		  {
+			  if(absnumber > tbl_floats[pivot])
+			  {
+				  lower_pivot = pivot;
+				  pivot+=j;
+			  }
+			  else
+			  {
+				  upper_pivot = pivot;
+				  pivot-=j;
+			  }
+
+		  }
+
+		  if(lower_pivot == pivot)
+			  if(fabsf(tbl_floats[pivot]-absnumber) < (tbl_floats[upper_pivot]-absnumber))
+				  if(isNegative == 1)
+					  out[i] =  pivot | 1 << 7;
+				  else
+					  out[i] =  pivot;
+			  else
+				  if(isNegative == 1)
+					  out[i] =  upper_pivot | 1 << 7;
+				  else
+					  out[i] =  upper_pivot;
+		  else
+			  if((tbl_floats[pivot]-absnumber) < fabsf(tbl_floats[lower_pivot]-absnumber))
+				  if(isNegative == 1)
+					  out[i] =  (pivot | 1 << 7);
+				  else
+					  out[i] =  pivot;
+			  else
+		  	  	  if(isNegative == 1)
+		  	  		  out[i] =  lower_pivot | 1 << 7;
+		  		  else
+		  			  out[i] =  lower_pivot;
+
+	  }
+}
+
+__global__ void kCompression_8bit_float(float *flt_tbl, float *A, float precision, int size, float *out)
 {
 	const unsigned int numThreads = blockDim.x * gridDim.x;
 	const int idx = (blockIdx.x * blockDim.x) + threadIdx.x;

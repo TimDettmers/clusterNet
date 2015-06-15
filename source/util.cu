@@ -233,12 +233,12 @@ float tock(cudaEvent_t* startstop, std::string text)
 	cudaEventRecord(startstop[1], 0);
 	cudaEventSynchronize(startstop[1]);
 	cudaEventElapsedTime(&time, startstop[0], startstop[1]);
-	printf((text + ": %f ms.\n").c_str(), time);
+	//printf((text + ": %f ms.\n").c_str(), time);
 	return time;
 }
 float tock(std::string text, float tocks)
 {
-	printf((text + ": %f ms.\n").c_str(), tocks);
+	//printf((text + ": %f ms.\n").c_str(), tocks);
 	return tocks;
 }
 float tock(cudaEvent_t* startstop, float tocks)

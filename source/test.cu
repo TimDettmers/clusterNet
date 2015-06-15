@@ -1743,16 +1743,18 @@ void simple_bandwidth_test(int argc, char *argv[])
 		MPI_Request *recv_request = new MPI_Request;
 
 		int size = 12000;
-		int div = 32;
-		for(int i = 32; i < size; i+=32)
+		for(int i = 8; i < size; i+=8)
 		{
 			for(int j = 0; j < 3; j++)
 			{
-				if(j==0) div = 1;
-				if(j==1) div = 4;
-				if(j==2) div = 32;
-				Matrix *w_grad_next = empty(i,i/div);
-				Matrix *w_next_sync = empty(i,i/div);
+				Matrix *w_grad_next;
+				if(j==0) w_grad_next = empty(i,i);
+				if(j==1) w_grad_next = empty(i/2,i/2);
+				if(j==2) w_grad_next = empty(i/4,i/8);
+				Matrix *w_next_sync;
+				if(j==0) w_next_sync = empty(i,i);
+				if(j==1) w_next_sync = empty(i/2,i/2);
+				if(j==2) w_next_sync = empty(i/4,i/8);
 
 				if(gpu->MYRANK == 0)
 					MPI_Send(w_grad_next->data,w_grad_next->size,MPI_FLOAT,1,999,MPI_COMM_WORLD);
@@ -1785,7 +1787,7 @@ void simple_bandwidth_test(int argc, char *argv[])
 				float GB = times*w_grad_next->bytes/(1024.0*1024.0*1024.0);
 				if(gpu->MYRANK == 0)
 				{
-					cout << "Size: " << w_grad_next->rows << "x" << w_grad_next->cols << " GB/s: " << GB/sec << " " << sec*(div == 32 ? 2.0 : 1.0) << "ms"<< endl;
+					cout << "Size: " << w_grad_next->rows << "x" << w_grad_next->cols << " GB/s: " << GB/(sec/1000) << " " << sec*(j == 2 ? 2.0 : 1.0) << "ms"<< endl;
 
 				}
 
@@ -1807,69 +1809,184 @@ void model_parallelism_test(int argc, char *argv[])
 		MPI_Request *send_request = new MPI_Request;
 		MPI_Request *recv_request = new MPI_Request;
 
-		Matrix *A = GPU->rand(512,5120);
-		Matrix *B = GPU->distributed_uniformSqrtWeight(5120,5120);
-		Matrix *out = zeros(512,5120);
+		std::vector<MPI_Request *> send_requests;
+		std::vector<MPI_Request *> recv_requests;
 
-
-		int col_split_size = (B->isDistributed == 1 ? B->cols_distributed : B->cols) / GPU->MPI_SIZE;
-		int remainder = (B->isDistributed == 1 ? B->cols_distributed : B->cols) - (col_split_size*GPU->MPI_SIZE);
-
-		Matrix** arrOut = (Matrix**) malloc(sizeof(Matrix*) * GPU->MPI_SIZE);
-		for (int i = 0; i < GPU->MPI_SIZE; i++)
+		for(int i = 0; i < GPU->MPI_SIZE-1; i++)
 		{
-			if (i == GPU->MPI_SIZE - 1)
-				arrOut[i] = empty(A->rows, col_split_size + remainder);
-			else
-				arrOut[i] = empty(A->rows, col_split_size);
+			send_requests.push_back(new MPI_Request);
+			recv_requests.push_back(new MPI_Request);
 		}
 
-		float **h_arrA = (float**) malloc(sizeof(float*) * GPU->MPI_SIZE);
-		for (int i = 0; i < GPU->MPI_SIZE; i++)
-			h_arrA[i] = arrOut[i]->data;
-
-		float **d_arrA;
-		cudaMalloc((void**) &d_arrA, sizeof(float*) * GPU->MPI_SIZE);
-		cudaMemcpy(d_arrA, h_arrA, sizeof(float*) * GPU->MPI_SIZE,cudaMemcpyDefault);
+		float max_value = 1.0f;
 
 
-		GPU->tick();
-		for(int i = 0; i < 100; i++)
+
+		for(int round = 128; round <= 8192; round+=128)
 		{
-			GPU->dot(A,B,arrOut[GPU->MYRANK]);
+			int batch_size = 256;
+			int inner = round;
+			int outer = round;
+
+			Matrix *A = GPU->rand(batch_size,inner);
+			Matrix *B = GPU->distributed_uniformSqrtWeight(inner,outer);
+			Matrix *B_normal = GPU->uniformSqrtWeight(inner,outer);
+			Matrix *out = zeros(batch_size,outer);
+			Matrix *out_stacked = zeros(batch_size,outer);
 
 
-			int target = GPU->MYRANK +1 == GPU->MPI_SIZE ? 0 : GPU->MYRANK+1;
-				int source = GPU->MYRANK-1 == -1 ? GPU->MPI_SIZE-1 : GPU->MYRANK-1;
+			int col_split_size = (B->isDistributed == 1 ? B->cols_distributed : B->cols) / GPU->MPI_SIZE;
+			int remainder = (B->isDistributed == 1 ? B->cols_distributed : B->cols) - (col_split_size*GPU->MPI_SIZE);
+
+			if(GPU->MYRANK == 0)
+			cout << batch_size << "x" << inner << " DOT " << inner << "x" << outer << endl;
+
+			Matrix** arrOut = (Matrix**) malloc(sizeof(Matrix*) * GPU->MPI_SIZE);
+			Matrix** arrOut8 = (Matrix**) malloc(sizeof(Matrix*) * GPU->MPI_SIZE);
+
+			for (int i = 0; i < GPU->MPI_SIZE; i++)
+			{
+				if (i == GPU->MPI_SIZE - 1)
+				{
+					arrOut[i] = empty(A->rows, col_split_size + remainder);
+					arrOut8[i] = empty_char(A->rows, col_split_size + remainder);
+				}
+				else
+				{
+					arrOut[i] = empty(A->rows, col_split_size);
+					arrOut8[i] = empty_char(A->rows, col_split_size);
+				}
+			}
+
+			float **h_arrA = (float**) malloc(sizeof(float*) * GPU->MPI_SIZE);
+			unsigned char **h_arrA8 = (unsigned char**) malloc(sizeof(unsigned char*) * GPU->MPI_SIZE);
+			for (int i = 0; i < GPU->MPI_SIZE; i++)
+			{
+				h_arrA[i] = arrOut[i]->data;
+				h_arrA8[i] = arrOut8[i]->char_data;
+			}
+
+			float **d_arrA;
+			cudaMalloc((void**) &d_arrA, sizeof(float*) * GPU->MPI_SIZE);
+			cudaMemcpy(d_arrA, h_arrA, sizeof(float*) * GPU->MPI_SIZE,cudaMemcpyDefault);
+
+			unsigned char **d_arrA8;
+			cudaMalloc((unsigned char**) &d_arrA8, sizeof(unsigned char*) * GPU->MPI_SIZE);
+			cudaMemcpy(d_arrA8, h_arrA8, sizeof(unsigned char*) * GPU->MPI_SIZE,cudaMemcpyDefault);
+
+			for(int epoch = 0; epoch < 2; epoch++)
+			for(int type = 0; type < 3; type++)
+			{
+				std::string text = "";
+				if(type == 0)
+					text = "DOT";
+				else if(type == 1)
+					text = "DOT32BIT";
+				else if(type == 2)
+					text = "DOT8BIT";
+
+				if(GPU->MYRANK == 0 && epoch == 1){ GPU->tick(text); }
+				for(int i = 0; i < 100; i++)
+				{
+					if(type == 0)
+					{
+						GPU->dot(A,B_normal,out);
+						continue;
+					}
+					GPU->dot(A,B,arrOut[GPU->MYRANK]);
+
+					int target = GPU->MYRANK +1 == GPU->MPI_SIZE ? 0 : GPU->MYRANK+1;
+					int source = GPU->MYRANK-1 == -1 ? GPU->MPI_SIZE-1 : GPU->MYRANK-1;
+
+					if(type == 2)
+					{
+						GPU->compression_8bit(arrOut[GPU->MYRANK],max_value,arrOut8[GPU->MYRANK]);
+						for (int i = 0; i < GPU->MPI_SIZE - 1; i++)
+						{
+							MPI_Isend(arrOut8[GPU->MYRANK]->char_data,arrOut8[GPU->MYRANK]->size,MPI_CHAR,target,i,MPI_COMM_WORLD, send_requests[i]);
+							MPI_Irecv(arrOut8[source]->char_data,arrOut8[source]->size,MPI_CHAR,source,i,MPI_COMM_WORLD,recv_requests[i]);
+							target = target +1 == GPU->MPI_SIZE ? 0 : target+1;
+							source = source-1 == -1 ? GPU->MPI_SIZE-1 : source-1;
+						}
+					}
+
+
+					if(type == 1)
+					{
+						for (int i = 0; i < GPU->MPI_SIZE - 1; i++)
+						{
+							MPI_Isend(arrOut[GPU->MYRANK]->data,arrOut[GPU->MYRANK]->size,MPI_FLOAT,target,i,MPI_COMM_WORLD, send_requests[i]);
+							MPI_Irecv(arrOut[source]->data,arrOut[source]->size,MPI_FLOAT,source,i,MPI_COMM_WORLD,recv_requests[i]);
+							target = target +1 == GPU->MPI_SIZE ? 0 : target+1;
+							source = source-1 == -1 ? GPU->MPI_SIZE-1 : source-1;
+						}
+					}
+					//MPI_Wait(next->send_request,MPI_STATUS_IGNORE);
+					for(int i = 0; i < GPU->MPI_SIZE-1; i++)
+						MPI_Wait(recv_requests[i],MPI_STATUS_IGNORE);
+
+					if(type == 2)
+					{
+						for (int i = 0; i < GPU->MPI_SIZE; i++)
+						{
+							if(i == GPU->MYRANK){continue;}
+							GPU->decompression_8bit(arrOut8[i],max_value,arrOut[i]);
+						}
+					}
+
+					hStackN(d_arrA,	arrOut[0]->size, out_stacked, GPU->MPI_SIZE);
+
+
+				}
+				if(GPU->MYRANK == 0 && epoch == 1){ GPU->tock(text); }
+
 
 				/*
-				GPU->compression_8bit(w_grad_next,0.001,w_next_sync_send);
-				for (int i = 0; i < GPU->MPI_SIZE - 1; i++)
-				{
-					MPI_Isend(w_next_sync_send->char_data,w_next_sync_send->size,MPI_CHAR,target,i,MPI_COMM_WORLD, send_request);
-					MPI_Irecv(w_next_sync_recv->char_data,w_next_sync_recv->size,MPI_CHAR,source,i,MPI_COMM_WORLD,recv_request);
-					target = target +1 == GPU->MPI_SIZE ? 0 : target+1;
-					source = source-1 == -1 ? GPU->MPI_SIZE-1 : source-1;
-				}
+				MPI_Barrier(MPI_COMM_WORLD);
+				if(type == 0)
+					printsum(out);
+				else if(type == 1)
+					printsum(out_stacked);
+				else if(type == 2)
+					printsum(out_stacked);
+
+				MPI_Barrier(MPI_COMM_WORLD);
+				if(type == 0)
+					printmat(out,0,4,0,4);
+				else if(type == 1)
+					printmat(out_stacked,0,4,0,4);
+				else if(type == 2)
+					printmat(out_stacked,0,4,0,4);
+
 				*/
 
 
-				for (int i = 0; i < GPU->MPI_SIZE - 1; i++)
+				if(type == 0)
 				{
-					MPI_Isend(arrOut[GPU->MYRANK]->data,arrOut[GPU->MYRANK]->size,MPI_FLOAT,target,i,MPI_COMM_WORLD, send_request);
-					MPI_Irecv(arrOut[source]->data,arrOut[source]->size,MPI_FLOAT,source,i,MPI_COMM_WORLD,recv_request);
-					target = target +1 == GPU->MPI_SIZE ? 0 : target+1;
-					source = source-1 == -1 ? GPU->MPI_SIZE-1 : source-1;
+					abs(out,out);
+					max_value = max(out);
 				}
-				//MPI_Wait(next->send_request,MPI_STATUS_IGNORE);
-				MPI_Wait(recv_request,MPI_STATUS_IGNORE);
-				//GPU->decompression_8bit(w_next_sync_recv,0.001,w_next_sync);
 
-				hStackN(d_arrA,	arrOut[0]->size, out, GPU->MPI_SIZE);
+			}
+
+			cudaFree(A->data);
+			cudaFree(B->data);
+			cudaFree(out->data);
+			cudaFree(out_stacked->data);
+			cudaFree(d_arrA8);
+			cudaFree(d_arrA);
+			for(int i = 0; i < GPU->MPI_SIZE; i++)
+			{
+				cudaFree(arrOut[i]->data);
+				cudaFree(arrOut8[i]->char_data);
+			}
+
+			size_t total, free;
+			cudaMemGetInfo(&free, &total);
+
 
 
 		}
-		GPU->tock();
 
 		GPU->shutdown_MPI();
 
@@ -2046,22 +2163,36 @@ int main(int argc, char *argv[])
 	//Matrix *X = read_hdf5("/home/tim/data/mnist/X.hdf5");
 	//Matrix *y = read_hdf5("/home/tim/data/mnist/y.hdf5");
 
-	Matrix *X = gpu->distribute_rows_hdf5_file("/home/tim/data/mnist/X.hdf5");
-	Matrix *y = gpu->distribute_rows_hdf5_file("/home/tim/data/mnist/y.hdf5");
+	Matrix *X = gpu->distribute_file("/home/tim/data/mnist/X.hdf5");
+	Matrix *y = gpu->distribute_file("/home/tim/data/mnist/y.hdf5");
 
 
+	//Matrix *X = gpu->distribute_rows_hdf5_file("/home/tim/data/mnist/X.hdf5");
+	//Matrix *y = gpu->distribute_rows_hdf5_file("/home/tim/data/mnist/y.hdf5");
+	//Matrix *y = gpu->distribute_rows_hdf5_file("/home/tim/data/mnist/y_15000.hdf5");
+
+
+	printdim(X);
+	printdim(y);
 	BatchAllocator b = BatchAllocator();
+	//16384
+	int batch_size_per_GPU = 128;
 
-	b.init(X,y,(1.0-0.85715),128,128,gpu, Single_GPU);
+	b.init(X,y,(1.0-0.85715),batch_size_per_GPU,128,gpu, Single_GPU);
 
-	Layer *l0 = new Layer(X->cols,128,Input,gpu);
-	l0->PARALLELISM = DataParallelism;
+
+	Layer *l0 = new Layer(X->cols,batch_size_per_GPU,Input,gpu);
+	//l0->PARALLELISM = DataParallelism;
+	l0->PARALLELISM = ModelParallelism;
 	Layer *l1 = new Layer(1024, Logistic, l0);
-	l1->PARALLELISM = DataParallelism;
+	//l1->PARALLELISM = DataParallelism;
+	l1->PARALLELISM = ModelParallelism;
 	Layer *l2 = new Layer(1024, Logistic, l1);
-	l2->PARALLELISM = DataParallelism;
+	//l2->PARALLELISM = DataParallelism;
+	l2->PARALLELISM = ModelParallelism;
 	Layer *l3 = new Layer(10, Softmax, l2);
-	l3->PARALLELISM = DataParallelism;
+	//l3->PARALLELISM = DataParallelism;
+	l3->PARALLELISM = ModelParallelism;
 
 
 	l0->DROPOUT = 0.2f;
@@ -2072,43 +2203,57 @@ int main(int argc, char *argv[])
 	float decay = 0.99f;
 	gpu->tick("pass");
 	b.SKIP_LAST_BATCH = true;
-	for(int epoch = 0; epoch < 60; epoch++)
+	int epochs = 100;
+	for(int epoch = 0; epoch < epochs; epoch++)
 	{
+		gpu->tick("epoch");
 		if(gpu->MYRANK == 0)
 			cout << "EPOCH: " << epoch + 1 << endl;
-		b.propagate_through_layers(l0,Training);
-		b.propagate_through_layers(l0,Trainerror);
-		b.propagate_through_layers(l0,CVerror);
+		b.propagate_through_layers(l0,Training,epoch);
+		b.propagate_through_layers(l0,Trainerror,epoch);
+		b.propagate_through_layers(l0,CVerror,epoch);
 
 
 		l0->learning_rate_decay(decay);
 
-		if(epoch == 40)
+		if(epoch == 50)
 		{
 			l0->dropout_decay();
 			decay = 0.85f;
 		}
 
 		//cout << l1->MAX_GRAD_VALUE << endl;
+		gpu->tock("epoch");
 	}
 	gpu->tock("pass");
 
 
+
 	gpu->shutdown_MPI();
 
-	int n = l0->Train_errors.size();
 
-	Matrix *train = empty_cpu(1,n);
-	Matrix *cv = empty_cpu(1,n);
-
-	for(int i = 0; i < n; i++)
+	/*
+	if(gpu->MYRANK == 0)
 	{
-		train->data[i] = l0->Train_errors[i];
-		cv->data[i] = l0->CV_errors[i];
-	}
+		int n1 = l3->Train_errors[0].size();
+		int n2 = l3->CV_errors[0].size();
+		cout << n1 << endl;
+		cout << n2 << endl;
+		Matrix *train = empty_cpu(epochs,n1);
+		Matrix *cv = empty_cpu(epochs,n2);
 
-	write_hdf5("/home/tim/data/mnist/train_error.hdf5",train);
-	write_hdf5("/home/tim/data/mnist/cv_error.hdf5",cv);
+		for(int i = 0; i < epochs; i++)
+		{
+			for(int j = 0; j < n1; j++)
+				train->data[j + (i*n1)] = l3->Train_errors[i][j];
+			for(int j = 0; j < n2; j++)
+				cv->data[j + (i*n2)] = l3->CV_errors[i][j];
+		}
+
+		write_hdf5("/home/tim/data/mnist/results/8bit/train_error.hdf5" ,train);
+		write_hdf5("/home/tim/data/mnist/results/8bit/cv_error.hdf5",cv);
+	}
+	*/
 
 
 

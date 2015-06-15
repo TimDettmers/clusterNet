@@ -51,7 +51,7 @@ public:
 	 void init(std::string path_X, std::string path_y, float cross_validation_size, int batch_size, int cv_batch_size, ClusterNet *cluster, BatchAllocationMethod_t batchmethod);
 	 void init(Matrix *X, Matrix *y, float cross_validation_size, int batch_size, int cv_batch_size);
 
-	 void propagate_through_layers(Layer *root, DataPropagationType_t type);
+	 void propagate_through_layers(Layer *root, DataPropagationType_t type, int epoch);
 
 	 int m_next_batch_number_cv;
 private:

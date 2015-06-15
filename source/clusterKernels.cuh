@@ -6,6 +6,7 @@
 __global__ void kRdmNumbers(float *seed, int size, float *out);
 __global__ void kCompression_8bit_test(float *tbl, float *A, float precision, int size, float *out);
 __global__ void kCompression_8bit(float *flt_tbl, float *A, float precision, int size, unsigned char *out);
+__global__ void kCompression_8bit_float(float *flt_tbl, float *A, float precision, int size, float *out);
 __global__ void kDecompression_8bit(float *flt_tbl, unsigned char *A, float precision, int size, float *out);
 __global__ void kRenormalizeWeights(float *w, float *unit_sums, float limit, int rows, int cols);
 __global__ void kGetNonZeroColumns(float *A, float *out, int rows, int cols);

@@ -42,7 +42,7 @@ void Layer::init(int unitcount, int start_batch_size, Unittype_t unit, ClusterNe
 	target_matrix = NULL;
 	error = NULL;
 
-	LEARNING_RATE = 0.006;
+	LEARNING_RATE = 0.003;
 	RMSPROP_MOMENTUM = 0.9f;
 	UNIT_TYPE = unit;
 	DROPOUT = 0.5f;
@@ -82,6 +82,8 @@ void Layer::init(int unitcount, int start_batch_size, Unittype_t unit, ClusterNe
 		activation = NULL;
 	}
 
+
+	mpi_buffer = (float*)malloc(GPU->MPI_SIZE*sizeof(float));
 }
 
 void Layer::link_with_next_layer(Layer *next_layer)
@@ -90,27 +92,54 @@ void Layer::link_with_next_layer(Layer *next_layer)
 	if(next->BATCH_SIZE == 0){ next->BATCH_SIZE = BATCH_SIZE; }
 	if(!next->GPU){next->GPU = GPU;}
 
-	Matrix *w = GPU->uniformSqrtWeight(UNITCOUNT,next_layer->UNITCOUNT);
-	w_next = w;
 	w_rms_next = zeros(UNITCOUNT,next_layer->UNITCOUNT);
-	for(int i = 0; i < GPU->MPI_SIZE; i++) vec_w_grad_next.push_back(zeros(UNITCOUNT,next_layer->UNITCOUNT));
-	if(PARALLELISM == DataParallelism){ for(int i = 0; i < GPU->MPI_SIZE; i++) vec_w_grad_next_8bit.push_back(empty_char(UNITCOUNT,next_layer->UNITCOUNT)); }
-	if(PARALLELISM == DataParallelism){w_next_sync_send = empty_char(UNITCOUNT,next_layer->UNITCOUNT); }
-	if(PARALLELISM == DataParallelism){w_next_sync_recv = empty_char(UNITCOUNT,next_layer->UNITCOUNT); }
+	if(PARALLELISM == DataParallelism)
+	{
+		for(int i = 0; i < GPU->MPI_SIZE; i++)
+		{
+			vec_w_grad_next.push_back(zeros(UNITCOUNT,next_layer->UNITCOUNT));
+			vec_w_grad_next_8bit.push_back(empty_char(UNITCOUNT,next_layer->UNITCOUNT));
+		}
+
+		w_next_sync_send = empty_char(UNITCOUNT,next_layer->UNITCOUNT);
+		w_next_sync_recv = empty_char(UNITCOUNT,next_layer->UNITCOUNT);
+		b_next_sync = zeros(1,next_layer->UNITCOUNT);
+		b_next_sync_send = empty_char(1,next_layer->UNITCOUNT);
+		b_next_sync_recv = empty_char(1,next_layer->UNITCOUNT);
+	}
+
+	if(PARALLELISM == ModelParallelism)
+	{
+		for(int i = 0; i < GPU->MPI_SIZE; i++)
+		{
+			vec_w_grad_next.push_back(GPU->distributed_zeros(UNITCOUNT,next_layer->UNITCOUNT));
+		}
+
+		Matrix *w = GPU->distributed_uniformSqrtWeight(UNITCOUNT,next_layer->UNITCOUNT);
+		w_next = w;
+		b_grad_next = GPU->distributed_zeros(1,next_layer->UNITCOUNT);
+		b_rms_next = GPU->distributed_zeros(1,next_layer->UNITCOUNT);
+
+	}
+	else
+	{
+		Matrix *w = GPU->uniformSqrtWeight(UNITCOUNT,next_layer->UNITCOUNT);
+		w_next = w;
+		b_grad_next = zeros(1,next_layer->UNITCOUNT);
+		b_rms_next = zeros(1,next_layer->UNITCOUNT);
+
+	}
+
 
 	Matrix *b = zeros(1,next_layer->UNITCOUNT);
 	b_next = b;
-	b_grad_next = zeros(1,next_layer->UNITCOUNT);
-	b_rms_next = zeros(1,next_layer->UNITCOUNT);
-	if(PARALLELISM == DataParallelism){b_next_sync = zeros(1,next_layer->UNITCOUNT); }
-	if(PARALLELISM == DataParallelism){b_next_sync_send = empty_char(1,next_layer->UNITCOUNT); }
-	if(PARALLELISM == DataParallelism){b_next_sync_recv = empty_char(1,next_layer->UNITCOUNT); }
-
 	next->out = zeros(BATCH_SIZE, next->UNITCOUNT);
 	next->activation = zeros(BATCH_SIZE, next->UNITCOUNT);
 	next->error = zeros(BATCH_SIZE, next->UNITCOUNT);
 	next->bias_activations = ones(1, BATCH_SIZE);
 	next->prev = this;
+
+
 }
 
 
@@ -145,7 +174,6 @@ void Layer::unit_activation(bool useDropout)
 		else
 			scalarMul(activation,1.0f-DROPOUT, out);
 	}
-
 
 }
 
@@ -223,7 +251,7 @@ void Layer::forward(bool useDropout)
 {
 	handle_offsize();
 	if(!prev){  unit_activation(useDropout); next->forward(useDropout); return; }
-	if(useDropout){ prev->wait_for_synchronization(); prev->weight_update(); }
+	if(PARALLELISM == DataParallelism && useDropout){ prev->wait_for_synchronization(); prev->weight_update(); }
 
 	GPU->dot(prev->out,prev->w_next,out);
 	addMatrixVector(out,prev->b_next,out);
@@ -233,15 +261,26 @@ void Layer::forward(bool useDropout)
 }
 
 
-void Layer::running_error()
+void Layer::running_error(bool isCV, int epoch)
 {
-	if(!target){ next->running_error(); return;}
+	if(!target){ next->running_error(isCV, epoch); return;}
 
 	string text = "";
 
 	Matrix *result;
 	Matrix *eq;
 	float sum_value = 0.0f;
+	float size = 0.0f;
+
+	if (!Train_errors.count(epoch))
+	{
+		Train_errors[epoch] = std::vector<float>();
+		CV_errors[epoch] = std::vector<float>();
+	}
+
+
+
+
 
 	switch(COST)
 	{
@@ -249,6 +288,15 @@ void Layer::running_error()
 			result = argmax(out);
 			eq = equal(result,target);
 			sum_value = sum(eq);
+			sum_value = reduce_to_sum_root(sum_value);
+			size = reduce_to_sum_root(out->rows);
+			if(GPU->MYRANK == 0)
+			{
+				if(isCV)
+					CV_errors[epoch].push_back(sum_value/size);
+				else
+					Train_errors[epoch].push_back(sum_value/size);
+			}
 			RUNNING_ERROR += (out->rows  - sum_value);
 			RUNNING_SAMPLE_SIZE += out->rows;
 			break;
@@ -342,6 +390,7 @@ void Layer::wait_for_synchronization()
 {
 	if(target){ return; }
 	if(!isSynchronizing){ return; }
+	if(PARALLELISM != DataParallelism){ return; }
 	//GPU->tick();
 	//MPI_Wait(next->send_request,MPI_STATUS_IGNORE);_w_next_sync
 
@@ -378,7 +427,7 @@ void Layer::wait_for_synchronization()
 	for(int i = 0; i < GPU->MPI_SIZE; i++)
 	{
 		if(i == GPU->MYRANK){ continue; }
-		if(compression == bits_8){ GPU->decompression_8bit(vec_w_grad_next_8bit[i],max_grad_value_sync[i]*0.9,vec_w_grad_next[i]); }
+		if(compression == bits_8){ GPU->decompression_8bit(vec_w_grad_next_8bit[i],max_grad_value_sync[i],vec_w_grad_next[i]); }
 		add(vec_w_grad_next[GPU->MYRANK],vec_w_grad_next[i],vec_w_grad_next[GPU->MYRANK]);
 	}
 	isSynchronizing = false;
@@ -389,11 +438,18 @@ void Layer::weight_update()
 	if(target){ return; }
 
 	//next->weight_update();
+	float *data = (float*)malloc(sizeof(float)*100);
 
 	switch(UPDATE_TYPE)
 	{
 		case RMSProp:
+
+			CUDA_CHECK_RETURN(cudaMemcpy(data,vec_w_grad_next[GPU->MYRANK]->data,10*sizeof(float),cudaMemcpyDefault));
+			cout << "pre print" << endl;
+
+			for(int i; i < 100; i++){ cout << data[i]  << endl;}
 			RMSprop_with_weight_update(w_rms_next,vec_w_grad_next[GPU->MYRANK],w_next,w_next,RMSPROP_MOMENTUM,LEARNING_RATE,out->rows*GPU->MPI_SIZE,MOMENTUM);
+			cout << "post print" << endl;
 			//RMSprop_with_weight_update(b_rms_next,b_grad_next,b_next,b_next,RMSPROP_MOMENTUM,LEARNING_RATE/100.0f,out->rows,MOMENTUM);
 			//scalarMul(b_grad_next, LEARNING_RATE/float(out->rows*GPU->MPI_SIZE) ,b_grad_next);
 			//sub(b_next,b_grad_next,b_next);
@@ -403,6 +459,7 @@ void Layer::weight_update()
 			throw "Unknown update type!";
 			break;
 	}
+	free(data);
 
 	//limit_magnitude();
 
@@ -428,43 +485,28 @@ void Layer::print_error(string message)
 
 	if(GPU->MPI_SIZE > 1)
 	{
-		float *errors = (float*)malloc(GPU->MPI_SIZE*sizeof(float));
-		float *size = (float*)malloc(GPU->MPI_SIZE*sizeof(float));
-		errors[GPU->MYRANK] = RUNNING_ERROR;
-		size[GPU->MYRANK] = RUNNING_SAMPLE_SIZE;
-
-		MPI_Gather(&RUNNING_ERROR, 1, MPI_FLOAT, errors, 1, MPI_FLOAT, 0, MPI_COMM_WORLD);
-		MPI_Gather(&RUNNING_SAMPLE_SIZE, 1, MPI_FLOAT, size, 1, MPI_FLOAT, 0, MPI_COMM_WORLD);
-
-		MPI_Barrier(MPI_COMM_WORLD);
-
-		if(GPU->MYRANK == 0)
-		{
-			for(int i = 1; i < GPU->MPI_SIZE; i++)
-			{
-				size[0] += size[i];
-				errors[0] += errors[i];
-			}
-
-			cout << message << errors[0]/size[0] << endl;
-		}
-
-		free(errors);
-		free(size);
-
-		if(message == "Train error: ")
-			Train_errors.push_back(errors[0]/size[0]);
-		else
-			CV_errors.push_back(errors[0]/size[0]);
-
-
+		RUNNING_ERROR =reduce_to_sum_root(RUNNING_ERROR);
+		RUNNING_SAMPLE_SIZE = reduce_to_sum_root(RUNNING_SAMPLE_SIZE);
 	}
-	else
-	{
+
+	if(GPU->MYRANK == 0)
 		cout << message << RUNNING_ERROR/RUNNING_SAMPLE_SIZE << endl;
-	}
+
 	RUNNING_ERROR = 0.0f;
 	RUNNING_SAMPLE_SIZE = 0.0f;
+}
+
+
+float Layer::reduce_to_sum_root(float value)
+{
+
+	MPI_Gather(&value, 1, MPI_FLOAT, mpi_buffer, 1, MPI_FLOAT, 0, MPI_COMM_WORLD);
+		for(int i = 1; i < GPU->MPI_SIZE; i++)
+			mpi_buffer[0] += mpi_buffer[i];
+
+
+	return mpi_buffer[0];
+
 }
 
 void Layer::set_hidden_dropout(float dropout)

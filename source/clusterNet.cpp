@@ -641,12 +641,18 @@ void ClusterNet::dotMPI(Matrix *A, Matrix *B, Matrix *out, bool applyTranspose_A
 		int matrix_idx = MYRANK;
 		for (int i = 0; i < MPI_SIZE - 1; i++)
 		{
+			/*
 			compression_8bit(m_matrixCache[strMatrixName][matrix_idx], 1.0f, m_matrixCacheChar[strMatrixName][matrix_idx]);
 			MPI_Isend(m_matrixCacheChar[strMatrixName][matrix_idx]->char_data, m_matrixCacheChar[strMatrixName][matrix_idx]->size, MPI_CHAR, m_destination, 100, MPI_COMM_WORLD, &m_sendrequests[i]);
 			matrix_idx = (matrix_idx - 1) < 0 ? MPI_SIZE - 1 : (matrix_idx - 1);
 			MPI_Recv(m_matrixCacheChar[strMatrixName][matrix_idx]->char_data, m_matrixCacheChar[strMatrixName][matrix_idx]->size, MPI_CHAR, m_source, 100, MPI_COMM_WORLD, &m_status);
 
 			decompression_8bit(m_matrixCacheChar[strMatrixName][matrix_idx], 1.0f, m_matrixCache[strMatrixName][matrix_idx]);
+			*/
+			MPI_Isend(m_matrixCache[strMatrixName][matrix_idx]->data, m_matrixCache[strMatrixName][matrix_idx]->size, MPI_FLOAT, m_destination, 100, MPI_COMM_WORLD, &m_sendrequests[i]);
+			matrix_idx = (matrix_idx - 1) < 0 ? MPI_SIZE - 1 : (matrix_idx - 1);
+			MPI_Recv(m_matrixCache[strMatrixName][matrix_idx]->data, m_matrixCache[strMatrixName][matrix_idx]->size, MPI_FLOAT, m_source, 100, MPI_COMM_WORLD, &m_status);
+
 		}
 
 		for(int i = 0; i < MPI_SIZE -1;i++ )
@@ -1448,6 +1454,37 @@ Matrix *ClusterNet::distribute_rows_hdf5_file(std::string path)
 		}
 
 		out = splits[0];
+	}
+	else
+	{
+		MPI_Recv(&rows,1,MPI_INT,0,999,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
+		MPI_Recv(&cols,1,MPI_INT,0,999,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
+		out = empty_cpu(rows,cols);
+		MPI_Recv(out->data,out->size,MPI_FLOAT,0,999,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
+
+	}
+
+	return out;
+}
+
+Matrix *ClusterNet::distribute_file(std::string path)
+{
+	int rows = 0;
+	int cols = 0;
+	Matrix *out;
+	if(MYRANK == 0)
+	{
+		Matrix *cpu = read_hdf5(path.c_str());
+
+
+		for(int i=1; i < MPI_SIZE; i++)
+		{
+			MPI_Send(&cpu->rows,1,MPI_INT,i,999,MPI_COMM_WORLD);
+			MPI_Send(&cpu->cols,1,MPI_INT,i,999,MPI_COMM_WORLD);
+			MPI_Send(cpu->data,cpu->size,MPI_FLOAT,i,999,MPI_COMM_WORLD);
+		}
+
+		out = cpu;
 	}
 	else
 	{

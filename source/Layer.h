@@ -6,6 +6,14 @@
 #include <basicOps.cuh>
 #include <clusterNet.h>
 
+#define CUDA_CHECK_RETURN(value) {											\
+	cudaError_t _m_cudaStat = value;										\
+	if (_m_cudaStat != cudaSuccess) {										\
+		fprintf(stderr, "Error %s at line %d in file %s\n",					\
+				cudaGetErrorString(_m_cudaStat), __LINE__, __FILE__);		\
+		exit(1);															\
+	} }
+
 class Layer
 {
 public:
@@ -31,6 +39,8 @@ public:
 	Matrix *error;
 	Matrix *activation;
 
+	float *mpi_buffer;
+
 	Matrix *out_offsize;
 	Matrix *activation_offsize;
 	Matrix *error_offsize;
@@ -43,8 +53,8 @@ public:
 	std::vector<MPI_Request* > send_request;
 	std::vector<MPI_Request* > recv_request;
 
-	std::vector<float> CV_errors;
-	std::vector<float> Train_errors;
+	std::map<int,std::vector<float> > CV_errors;
+	std::map<int,std::vector<float> > Train_errors;
 
 	ClusterNet *GPU;
 
@@ -82,7 +92,7 @@ public:
 
 	virtual void forward();
 	virtual void forward(bool useDropout);
-	virtual void running_error();
+	virtual void running_error(bool isCV, int epoch);
 	virtual void backward_errors();
 	virtual void backward_grads();
 	virtual void print_error(std::string message);
@@ -99,6 +109,8 @@ public:
 
 	virtual void dropout_decay();
 	virtual void learning_rate_decay(float decay_rate);
+
+	float reduce_to_sum_root(float value);
 
 
 
