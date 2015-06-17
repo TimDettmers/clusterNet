@@ -29,7 +29,7 @@ int run_batchAllocator_test(ClusterNet gpus)
 	assert(test_matrix(b.CURRENT_BATCH_CV_Y,256,1));
 
 	BatchAllocator b_dist = BatchAllocator();
-	b_dist.init(m1,m2,0.2,128,256,gpus,Distributed_weights);
+	b_dist.init(m1,m2,0.2,128,256,&gpus,Distributed_weights);
 	assert(test_matrix(b_dist.CURRENT_BATCH,128,784));
 	assert(test_matrix(b_dist.CURRENT_BATCH_Y,128,1));
 	assert(test_matrix(b_dist.CURRENT_BATCH_CV,256,784));
@@ -123,7 +123,7 @@ int run_batchAllocator_test(ClusterNet gpus)
 	   assert(test_matrix(b.CURRENT_BATCH_CV_Y,512,10));
 
 	    b_dist = BatchAllocator();
-		b_dist.init(m1,m2,0.2,128,512,gpus,Distributed_weights);
+		b_dist.init(m1,m2,0.2,128,512,&gpus,Distributed_weights);
 		assert(test_matrix(b_dist.CURRENT_BATCH,128,784));
 		assert(test_matrix(b_dist.CURRENT_BATCH_Y,128,10));
 		assert(test_matrix(b_dist.CURRENT_BATCH_CV,512,784));

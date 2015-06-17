@@ -1128,7 +1128,6 @@ void BatchAllocator::propagate_through_layers(Layer *root, DataPropagationType_t
 		root->activation = (type == CVerror ? CURRENT_BATCH_CV : CURRENT_BATCH);
 		end->target = (type == CVerror ? CURRENT_BATCH_CV_Y : CURRENT_BATCH_Y);
 
-
 		//MPI_Barrier(MPI_COMM_WORLD);
 		//cout << m_cluster->MYRANK << " " << sum(root->activation) << " 0" << endl;
 
@@ -1140,7 +1139,8 @@ void BatchAllocator::propagate_through_layers(Layer *root, DataPropagationType_t
 				root->forward();
 				//m_cluster->tick();
 				root->backward_errors();
-				//root->weight_update();
+				if(root->PARALLELISM == ModelParallelism)
+					root->weight_update();
 				//m_cluster->tick();
 		}
 		else if(type == Trainerror || type == CVerror){ root->forward(false); root->running_error(type == CVerror,epoch); }

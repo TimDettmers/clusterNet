@@ -508,7 +508,7 @@ void run_miniMNIST_test(ClusterNet gpus)
 
 
 	BatchAllocator allocator = BatchAllocator();
-	allocator.init(X,y,0.2,128,256,gpus, Distributed_weights);
+	allocator.init(X,y,0.2,128,256,&gpus, Distributed_weights);
 	DeepNeuralNetwork net = DeepNeuralNetwork(layers,Classification, gpus, allocator, 10);
 	net.EPOCHS = 1000;
 	//net.LEARNING_RATE = 0.001;
@@ -524,7 +524,7 @@ void run_miniMNIST_test(ClusterNet gpus)
 
 	allocator = BatchAllocator();
 	Matrix *t = to_host(create_t_matrix(to_gpu(y),10));
-	allocator.init(X,t,0.2,128,256,gpus, Distributed_weights);
+	allocator.init(X,t,0.2,128,256,&gpus, Distributed_weights);
 	net = DeepNeuralNetwork(layers,Regression, gpus, allocator, 10);
 	net.EPOCHS = 100;
 	net.PRINT_MISSCLASSIFICATION = true;

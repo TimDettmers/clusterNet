@@ -9,6 +9,7 @@ using std::endl;
 
 void run_util_test()
 {
+	/*
 	char buff[1024];
 	ssize_t len = ::readlink("/proc/self/exe", buff, sizeof(buff)-1);
 	std::string path = std::string(buff);
@@ -46,7 +47,7 @@ void run_util_test()
 	for(int i = 0;i < out->size; i++)
 		assert(test_eq(out->data[i],(float)i,"slice sparse to dense test."));
 
-
+	*/
 
 
 

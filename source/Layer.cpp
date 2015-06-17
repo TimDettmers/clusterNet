@@ -42,7 +42,7 @@ void Layer::init(int unitcount, int start_batch_size, Unittype_t unit, ClusterNe
 	target_matrix = NULL;
 	error = NULL;
 
-	LEARNING_RATE = 0.003;
+	LEARNING_RATE = 0.006;
 	RMSPROP_MOMENTUM = 0.9f;
 	UNIT_TYPE = unit;
 	DROPOUT = 0.5f;
@@ -92,7 +92,6 @@ void Layer::link_with_next_layer(Layer *next_layer)
 	if(next->BATCH_SIZE == 0){ next->BATCH_SIZE = BATCH_SIZE; }
 	if(!next->GPU){next->GPU = GPU;}
 
-	w_rms_next = zeros(UNITCOUNT,next_layer->UNITCOUNT);
 	if(PARALLELISM == DataParallelism)
 	{
 		for(int i = 0; i < GPU->MPI_SIZE; i++)
@@ -119,6 +118,7 @@ void Layer::link_with_next_layer(Layer *next_layer)
 		w_next = w;
 		b_grad_next = GPU->distributed_zeros(1,next_layer->UNITCOUNT);
 		b_rms_next = GPU->distributed_zeros(1,next_layer->UNITCOUNT);
+		w_rms_next = GPU->distributed_zeros(UNITCOUNT,next_layer->UNITCOUNT);
 
 	}
 	else
@@ -127,6 +127,7 @@ void Layer::link_with_next_layer(Layer *next_layer)
 		w_next = w;
 		b_grad_next = zeros(1,next_layer->UNITCOUNT);
 		b_rms_next = zeros(1,next_layer->UNITCOUNT);
+		w_rms_next = zeros(UNITCOUNT,next_layer->UNITCOUNT);
 
 	}
 
@@ -437,19 +438,20 @@ void Layer::weight_update()
 {
 	if(target){ return; }
 
-	//next->weight_update();
-	float *data = (float*)malloc(sizeof(float)*100);
+	if(PARALLELISM == ModelParallelism)
+		next->weight_update();
+	//float *data = (float*)malloc(sizeof(float)*100);
 
 	switch(UPDATE_TYPE)
 	{
 		case RMSProp:
 
-			CUDA_CHECK_RETURN(cudaMemcpy(data,vec_w_grad_next[GPU->MYRANK]->data,10*sizeof(float),cudaMemcpyDefault));
-			cout << "pre print" << endl;
+			//CUDA_CHECK_RETURN(cudaMemcpy(data,vec_w_grad_next[GPU->MYRANK]->data,10*sizeof(float),cudaMemcpyDefault));
+			//cout << "pre print" << endl;
 
-			for(int i; i < 100; i++){ cout << data[i]  << endl;}
+			//for(int i; i < 100; i++){ cout << data[i]  << endl;}
 			RMSprop_with_weight_update(w_rms_next,vec_w_grad_next[GPU->MYRANK],w_next,w_next,RMSPROP_MOMENTUM,LEARNING_RATE,out->rows*GPU->MPI_SIZE,MOMENTUM);
-			cout << "post print" << endl;
+			//cout << "post print" << endl;
 			//RMSprop_with_weight_update(b_rms_next,b_grad_next,b_next,b_next,RMSPROP_MOMENTUM,LEARNING_RATE/100.0f,out->rows,MOMENTUM);
 			//scalarMul(b_grad_next, LEARNING_RATE/float(out->rows*GPU->MPI_SIZE) ,b_grad_next);
 			//sub(b_next,b_grad_next,b_next);
@@ -459,7 +461,7 @@ void Layer::weight_update()
 			throw "Unknown update type!";
 			break;
 	}
-	free(data);
+	//free(data);
 
 	//limit_magnitude();
 

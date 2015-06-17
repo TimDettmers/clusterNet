@@ -116,6 +116,7 @@ public:
 
 	 Matrix *distribute_rows_hdf5_file(std::string path);
 	 Matrix *distribute_file(std::string path);
+	 float *distribute_float(float number);
 
 	 void RMSprop_with_nesterov_weight_update_PCIe(Matrix **RMS, Matrix **grad, Matrix **w, Matrix **m, float RMS_multiplier, float learning_rate, int batch_size, float momentum);
 
@@ -194,6 +195,8 @@ public:
 	 std::vector<int> PCIe_RANKS;
 	 std::vector<int> MASTER_GPU_RANKS;
 
+	 int count;
+
 	 void *hello(void)
 	 {
 		 bool uden = true;
@@ -231,6 +234,7 @@ private:
 
 	 Matrix *flt_tbl;
 	 Matrix *seeds;
+	 float *sync_floats;
 
 	 bool m_hasMPI;
 	 bool m_cublasInitialized;

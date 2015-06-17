@@ -337,7 +337,8 @@ int run_clusterNet_test(ClusterNet gpus)
 
 	//dotMPI test for distributed weights
 	m1 = gpus.distributed_zeros(8783,317);
-	scalarAdd(m1,1.0,m1);
+	printf("%i",m1->cols);
+	scalarAdd(m1,1.0f,m1);
 	m2 = ones(111,8783);
 	m3 = ones(17,317);
 	m4 = ones(8783,17);

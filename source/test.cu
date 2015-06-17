@@ -2153,11 +2153,35 @@ int main(int argc, char *argv[])
 
 
 
+	//ClusterNet *gpu = new ClusterNet(argc,argv,123635,false);
+	ClusterNet *gpu = new ClusterNet(argc,argv);
+	/*
+
+	Matrix *A = gpu->distributed_uniformSqrtWeight(6,4);
+	Matrix *B = gpu->rand(4,6);
+	Matrix *A2 = empty(6,2);
+
+	A2->data = A->data;
+	printmat(A);
+
+	Matrix *C = gpu->dotMPI(B,A);
+	Matrix *C2 = gpu->dot(B,A2);
+
+	printmat(C);
+	printmat(C2);
+
+	gpu->shutdown_MPI();
+	*/
 
 
 
 
-	ClusterNet *gpu = new ClusterNet(argc,argv,123635,true);
+
+
+
+
+
+
 
 
 	//Matrix *X = read_hdf5("/home/tim/data/mnist/X.hdf5");
@@ -2200,10 +2224,10 @@ int main(int argc, char *argv[])
 
 	cout << gpu->MYRANK << endl;
 
-	float decay = 0.99f;
+	float decay = 0.98f;
 	gpu->tick("pass");
 	b.SKIP_LAST_BATCH = true;
-	int epochs = 100;
+	int epochs = 60;
 	for(int epoch = 0; epoch < epochs; epoch++)
 	{
 		gpu->tick("epoch");
@@ -2232,7 +2256,8 @@ int main(int argc, char *argv[])
 	gpu->shutdown_MPI();
 
 
-	/*
+
+
 	if(gpu->MYRANK == 0)
 	{
 		int n1 = l3->Train_errors[0].size();
@@ -2250,10 +2275,10 @@ int main(int argc, char *argv[])
 				cv->data[j + (i*n2)] = l3->CV_errors[i][j];
 		}
 
-		write_hdf5("/home/tim/data/mnist/results/8bit/train_error.hdf5" ,train);
-		write_hdf5("/home/tim/data/mnist/results/8bit/cv_error.hdf5",cv);
+		write_hdf5("/home/tim/data/mnist/results/32bit/train_error_model.hdf5" ,train);
+		write_hdf5("/home/tim/data/mnist/results/32bit/cv_error_model.hdf5",cv);
 	}
-	*/
+
 
 
 

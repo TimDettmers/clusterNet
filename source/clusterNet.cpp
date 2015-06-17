@@ -63,6 +63,7 @@ void ClusterNet::init(int seed)
 	curandSetGeneratorOffset(m_generator_same_seed, 100);
 
 
+	count = 0;
 
 
 	char buff[4096];
@@ -74,6 +75,8 @@ void ClusterNet::init(int seed)
 	int current_device = 0;
 	cudaGetDevice(&current_device);
 	cout << "Active device: GPU" << current_device << endl;
+
+
 
 
 	seeds = rand_int(512,128,0,2147483647);
@@ -93,6 +96,7 @@ void ClusterNet::init(int seed)
 
 	m_cublasInitialized = false;
 	m_cusparseInitialized = false;
+
 
 
 	cudaGetDeviceCount(&GPU_COUNT);
@@ -134,6 +138,7 @@ void ClusterNet::init(int seed)
 
 
 	StartBackgroundQueue = false;
+	sync_floats = (float*)malloc(sizeof(float)*MPI_SIZE);
 
 
 
@@ -506,6 +511,7 @@ void ClusterNet::TdotMPI(Matrix *A, Matrix *B, Matrix *out){ dotMPI(A,B,out,true
 void ClusterNet::dotTMPI(Matrix *A, Matrix *B, Matrix *out){ dotMPI(A,B,out,false, true); }
 void ClusterNet::dotMPI(Matrix *A, Matrix *B, Matrix *out, bool applyTranspose_A, bool applyTranspose_B)
 {
+
 	int col_split_size = (B->isDistributed == 1 ? B->cols_distributed : B->cols) / MPI_SIZE;
 	int remainder = (B->isDistributed == 1 ? B->cols_distributed : B->cols) - (col_split_size*MPI_SIZE);
 	std::string strMatrixName = SSTR(A->rows) + "x" + SSTR(A->cols) + " * " +
@@ -639,21 +645,46 @@ void ClusterNet::dotMPI(Matrix *A, Matrix *B, Matrix *out, bool applyTranspose_A
 	if(out->isDistributed == 0 && !applyTranspose_B)
 	{
 		int matrix_idx = MYRANK;
+
+		/*
+		if(count % 1 == 0)
+		{
+
+			Matrix *temp = abs(m_matrixCache[strMatrixName][matrix_idx]);
+			float max_value = max(temp);
+			MPI_Allgather(&max_value, 1, MPI_FLOAT, sync_floats, 1, MPI_FLOAT, MPI_COMM_WORLD);
+			cudaFree(temp->data);
+		}
+		count++;
+		*/
+
+
+
+		MPI_Barrier(MPI_COMM_WORLD);
 		for (int i = 0; i < MPI_SIZE - 1; i++)
 		{
+
+
+
+
 			/*
-			compression_8bit(m_matrixCache[strMatrixName][matrix_idx], 1.0f, m_matrixCacheChar[strMatrixName][matrix_idx]);
+			compression_8bit(m_matrixCache[strMatrixName][matrix_idx], sync_floats[matrix_idx], m_matrixCacheChar[strMatrixName][matrix_idx]);
 			MPI_Isend(m_matrixCacheChar[strMatrixName][matrix_idx]->char_data, m_matrixCacheChar[strMatrixName][matrix_idx]->size, MPI_CHAR, m_destination, 100, MPI_COMM_WORLD, &m_sendrequests[i]);
 			matrix_idx = (matrix_idx - 1) < 0 ? MPI_SIZE - 1 : (matrix_idx - 1);
 			MPI_Recv(m_matrixCacheChar[strMatrixName][matrix_idx]->char_data, m_matrixCacheChar[strMatrixName][matrix_idx]->size, MPI_CHAR, m_source, 100, MPI_COMM_WORLD, &m_status);
 
-			decompression_8bit(m_matrixCacheChar[strMatrixName][matrix_idx], 1.0f, m_matrixCache[strMatrixName][matrix_idx]);
+			decompression_8bit(m_matrixCacheChar[strMatrixName][matrix_idx], sync_floats[matrix_idx], m_matrixCache[strMatrixName][matrix_idx]);
+
 			*/
+
 			MPI_Isend(m_matrixCache[strMatrixName][matrix_idx]->data, m_matrixCache[strMatrixName][matrix_idx]->size, MPI_FLOAT, m_destination, 100, MPI_COMM_WORLD, &m_sendrequests[i]);
 			matrix_idx = (matrix_idx - 1) < 0 ? MPI_SIZE - 1 : (matrix_idx - 1);
 			MPI_Recv(m_matrixCache[strMatrixName][matrix_idx]->data, m_matrixCache[strMatrixName][matrix_idx]->size, MPI_FLOAT, m_source, 100, MPI_COMM_WORLD, &m_status);
 
+
+
 		}
+
 
 		for(int i = 0; i < MPI_SIZE -1;i++ )
 			MPI_Wait(&m_sendrequests[i],&m_status);
@@ -669,9 +700,19 @@ void ClusterNet::dotMPI(Matrix *A, Matrix *B, Matrix *out, bool applyTranspose_A
 		int matrix_idx = MYRANK;
 		for (int i = 0; i < MPI_SIZE - 1; i++)
 		{
+			/*
+			compression_8bit(m_matrixCache[strMatrixName][matrix_idx], 1.0f, m_matrixCacheChar[strMatrixName][matrix_idx]);
+			MPI_Isend(m_matrixCacheChar[strMatrixName][matrix_idx]->char_data, m_matrixCacheChar[strMatrixName][matrix_idx]->size, MPI_CHAR, m_destination, 100, MPI_COMM_WORLD, &m_sendrequests[i]);
+			matrix_idx = (matrix_idx - 1) < 0 ? MPI_SIZE - 1 : (matrix_idx - 1);
+			MPI_Recv(m_matrixCacheChar[strMatrixName][matrix_idx]->char_data, m_matrixCacheChar[strMatrixName][matrix_idx]->size, MPI_CHAR, m_source, 100, MPI_COMM_WORLD, &m_status);
+
+			decompression_8bit(m_matrixCacheChar[strMatrixName][matrix_idx], 1.0f, m_matrixCache[strMatrixName][matrix_idx]);
+			*/
+
 			MPI_Isend(m_matrixCache[strMatrixName][matrix_idx]->data,m_matrixCache[strMatrixName][matrix_idx]->size, MPI_FLOAT, m_destination, 100, MPI_COMM_WORLD, &m_sendrequests[i]);
 			matrix_idx = (matrix_idx - 1) < 0 ? MPI_SIZE - 1 : (matrix_idx - 1);
 			MPI_Recv(m_matrixCache[strMatrixName][matrix_idx]->data, m_matrixCache[strMatrixName][matrix_idx]->size, MPI_FLOAT, m_source, 100, MPI_COMM_WORLD, &m_status);
+
 		}
 		for(int i = 0; i < MPI_SIZE -1;i++ )
 			MPI_Wait(&m_sendrequests[i],&m_status);
@@ -949,9 +990,8 @@ Matrix *ClusterNet::distributed_sparseInitWeight(int rows, int cols)
 	Matrix *W = zeros(rows, col_size);
 	Matrix *rdm = randn(col_size, connections);
 	Matrix *idx = rand_int(col_size, connections, 0, rows - 1);
-	Matrix *out = zeros(rows, col_size);
 
-	sparseRdmWeight(rdm, idx, out, connections);
+	sparseRdmWeight(rdm, idx, W, connections);
 	cudaFree(rdm->data);
 	cudaFree(idx->data);
 
@@ -1497,5 +1537,20 @@ Matrix *ClusterNet::distribute_file(std::string path)
 
 	return out;
 }
+
+
+
+
+float *ClusterNet::distribute_float(float number)
+{
+	float *data = (float*)malloc(sizeof(float)*MPI_SIZE);
+	data[MYRANK] = number;
+
+	MPI_Allgather(&number, 1, MPI_FLOAT, data, 1, MPI_FLOAT, MPI_COMM_WORLD);
+
+	return data;
+}
+
+
 
 
