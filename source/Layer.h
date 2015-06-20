@@ -29,6 +29,7 @@ public:
 	Matrix *w_next_sync_recv;
 	Matrix *b_next_sync_recv;
 	Matrix *w_next_sync_send;
+	Matrix *w_next_abs_max_buffer;
 	Matrix *b_next_sync_send;
 
 	Matrix *w_rms_next;
@@ -57,6 +58,8 @@ public:
 	std::map<int,std::vector<float> > Train_errors;
 
 	ClusterNet *GPU;
+
+	int count;
 
 	float LEARNING_RATE;
 	float MOMENTUM;

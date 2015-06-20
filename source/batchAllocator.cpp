@@ -1139,7 +1139,7 @@ void BatchAllocator::propagate_through_layers(Layer *root, DataPropagationType_t
 				root->forward();
 				//m_cluster->tick();
 				root->backward_errors();
-				if(root->PARALLELISM == ModelParallelism)
+				if(root->PARALLELISM != DataParallelism)
 					root->weight_update();
 				//m_cluster->tick();
 		}

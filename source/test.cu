@@ -2153,8 +2153,8 @@ int main(int argc, char *argv[])
 
 
 
-	//ClusterNet *gpu = new ClusterNet(argc,argv,123635,false);
-	ClusterNet *gpu = new ClusterNet(argc,argv);
+	ClusterNet *gpu = new ClusterNet(argc,argv,123635,false);
+	//ClusterNet *gpu = new ClusterNet(argc,argv);
 	/*
 
 	Matrix *A = gpu->distributed_uniformSqrtWeight(6,4);
@@ -2187,12 +2187,12 @@ int main(int argc, char *argv[])
 	//Matrix *X = read_hdf5("/home/tim/data/mnist/X.hdf5");
 	//Matrix *y = read_hdf5("/home/tim/data/mnist/y.hdf5");
 
-	Matrix *X = gpu->distribute_file("/home/tim/data/mnist/X.hdf5");
-	Matrix *y = gpu->distribute_file("/home/tim/data/mnist/y.hdf5");
+	//Matrix *X = gpu->distribute_file("/home/tim/data/mnist/X.hdf5");
+	//Matrix *y = gpu->distribute_file("/home/tim/data/mnist/y.hdf5");
 
 
-	//Matrix *X = gpu->distribute_rows_hdf5_file("/home/tim/data/mnist/X.hdf5");
-	//Matrix *y = gpu->distribute_rows_hdf5_file("/home/tim/data/mnist/y.hdf5");
+	Matrix *X = gpu->distribute_rows_hdf5_file("/home/tim/data/mnist/distributed_X.hdf5");
+	Matrix *y = gpu->distribute_rows_hdf5_file("/home/tim/data/mnist/distributed_y.hdf5");
 	//Matrix *y = gpu->distribute_rows_hdf5_file("/home/tim/data/mnist/y_15000.hdf5");
 
 
@@ -2206,17 +2206,29 @@ int main(int argc, char *argv[])
 
 
 	Layer *l0 = new Layer(X->cols,batch_size_per_GPU,Input,gpu);
-	//l0->PARALLELISM = DataParallelism;
-	l0->PARALLELISM = ModelParallelism;
+	l0->PARALLELISM = DataParallelism;
+	//l0->PARALLELISM = ModelParallelism;
 	Layer *l1 = new Layer(1024, Logistic, l0);
-	//l1->PARALLELISM = DataParallelism;
-	l1->PARALLELISM = ModelParallelism;
+	l1->PARALLELISM = DataParallelism;
+	//l1->PARALLELISM = ModelParallelism;
 	Layer *l2 = new Layer(1024, Logistic, l1);
-	//l2->PARALLELISM = DataParallelism;
-	l2->PARALLELISM = ModelParallelism;
+	l2->PARALLELISM = DataParallelism;
+	//l2->PARALLELISM = ModelParallelism;
 	Layer *l3 = new Layer(10, Softmax, l2);
-	//l3->PARALLELISM = DataParallelism;
-	l3->PARALLELISM = ModelParallelism;
+	l3->PARALLELISM = DataParallelism;
+	//l3->PARALLELISM = ModelParallelism;
+
+	l0->MAX_GRAD_VALUE = 0.005;
+	l1->MAX_GRAD_VALUE = 0.002;
+	l2->MAX_GRAD_VALUE = 0.01;
+	l3->MAX_GRAD_VALUE = 1;
+
+	/*
+	cout << "l0: " << l0->MAX_GRAD_VALUE << endl;
+	cout << "l1: " << l1->MAX_GRAD_VALUE << endl;
+	cout << "l2: " << l2->MAX_GRAD_VALUE << endl;
+	cout << "l3: " << l3->MAX_GRAD_VALUE << endl;
+	*/
 
 
 	l0->DROPOUT = 0.2f;
@@ -2224,10 +2236,10 @@ int main(int argc, char *argv[])
 
 	cout << gpu->MYRANK << endl;
 
-	float decay = 0.98f;
+	float decay = 0.99f;
 	gpu->tick("pass");
 	b.SKIP_LAST_BATCH = true;
-	int epochs = 60;
+	int epochs = 75;
 	for(int epoch = 0; epoch < epochs; epoch++)
 	{
 		gpu->tick("epoch");
@@ -2240,10 +2252,25 @@ int main(int argc, char *argv[])
 
 		l0->learning_rate_decay(decay);
 
-		if(epoch == 50)
+/*
+		cout << "l0: " << l0->MAX_GRAD_VALUE << endl;
+		cout << "l1: " << l1->MAX_GRAD_VALUE << endl;
+		cout << "l2: " << l2->MAX_GRAD_VALUE << endl;
+		cout << "l3: " << l3->MAX_GRAD_VALUE << endl;
+		*/
+
+
+		if(epoch == 60)
 		{
 			l0->dropout_decay();
 			decay = 0.85f;
+
+			/*
+			l0->compression = bits_32;
+			l1->MAX_GRAD_VALUE = bits_32;
+			l2->MAX_GRAD_VALUE = bits_32;
+			l3->MAX_GRAD_VALUE = bits_32;
+			*/
 		}
 
 		//cout << l1->MAX_GRAD_VALUE << endl;
@@ -2275,8 +2302,8 @@ int main(int argc, char *argv[])
 				cv->data[j + (i*n2)] = l3->CV_errors[i][j];
 		}
 
-		write_hdf5("/home/tim/data/mnist/results/32bit/train_error_model.hdf5" ,train);
-		write_hdf5("/home/tim/data/mnist/results/32bit/cv_error_model.hdf5",cv);
+		write_hdf5("/home/tim/data/mnist/results/8bit/train_error_model.hdf5" ,train);
+		write_hdf5("/home/tim/data/mnist/results/8bit/cv_error_model.hdf5",cv);
 	}
 
 

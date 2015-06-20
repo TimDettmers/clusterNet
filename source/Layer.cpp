@@ -36,7 +36,7 @@ void Layer::init(int unitcount, int start_batch_size, Unittype_t unit, ClusterNe
 
 	isSynchronizing = false;
 
-	compression = bits_32;
+	compression = bits_8;
 
 	target = NULL;
 	target_matrix = NULL;
@@ -59,6 +59,7 @@ void Layer::init(int unitcount, int start_batch_size, Unittype_t unit, ClusterNe
 	PARALLELISM = None;
 
 	GPU = gpu;
+	count = 0;
 
 	for(int i = 0; i < GPU->MPI_SIZE; i++)
 	{
@@ -92,21 +93,6 @@ void Layer::link_with_next_layer(Layer *next_layer)
 	if(next->BATCH_SIZE == 0){ next->BATCH_SIZE = BATCH_SIZE; }
 	if(!next->GPU){next->GPU = GPU;}
 
-	if(PARALLELISM == DataParallelism)
-	{
-		for(int i = 0; i < GPU->MPI_SIZE; i++)
-		{
-			vec_w_grad_next.push_back(zeros(UNITCOUNT,next_layer->UNITCOUNT));
-			vec_w_grad_next_8bit.push_back(empty_char(UNITCOUNT,next_layer->UNITCOUNT));
-		}
-
-		w_next_sync_send = empty_char(UNITCOUNT,next_layer->UNITCOUNT);
-		w_next_sync_recv = empty_char(UNITCOUNT,next_layer->UNITCOUNT);
-		b_next_sync = zeros(1,next_layer->UNITCOUNT);
-		b_next_sync_send = empty_char(1,next_layer->UNITCOUNT);
-		b_next_sync_recv = empty_char(1,next_layer->UNITCOUNT);
-	}
-
 	if(PARALLELISM == ModelParallelism)
 	{
 		for(int i = 0; i < GPU->MPI_SIZE; i++)
@@ -128,6 +114,19 @@ void Layer::link_with_next_layer(Layer *next_layer)
 		b_grad_next = zeros(1,next_layer->UNITCOUNT);
 		b_rms_next = zeros(1,next_layer->UNITCOUNT);
 		w_rms_next = zeros(UNITCOUNT,next_layer->UNITCOUNT);
+		w_next_abs_max_buffer = zeros(UNITCOUNT,next_layer->UNITCOUNT);
+
+		for(int i = 0; i < GPU->MPI_SIZE; i++)
+		{
+			vec_w_grad_next.push_back(zeros(UNITCOUNT,next_layer->UNITCOUNT));
+			vec_w_grad_next_8bit.push_back(empty_char(UNITCOUNT,next_layer->UNITCOUNT));
+		}
+
+		w_next_sync_send = empty_char(UNITCOUNT,next_layer->UNITCOUNT);
+		w_next_sync_recv = empty_char(UNITCOUNT,next_layer->UNITCOUNT);
+		b_next_sync = zeros(1,next_layer->UNITCOUNT);
+		b_next_sync_send = empty_char(1,next_layer->UNITCOUNT);
+		b_next_sync_recv = empty_char(1,next_layer->UNITCOUNT);
 
 	}
 
@@ -351,14 +350,17 @@ void Layer::MPI_synchronization_async()
 	{
 
 		//cout << 1.0f/((float)out->rows) << endl;
+		/*
 		scalarMul(vec_w_grad_next[GPU->MYRANK],1.0f/((float)out->rows),vec_w_grad_next[GPU->MYRANK]);
 
-		abs(vec_w_grad_next[GPU->MYRANK],vec_w_grad_next[target]);
-
-
-		MAX_GRAD_VALUE = max(vec_w_grad_next[target]);
-		//MAX_GRAD_VALUE = 0.003f;
+		abs(vec_w_grad_next[GPU->MYRANK],w_next_abs_max_buffer);
+		MAX_GRAD_VALUE = max(w_next_abs_max_buffer);
 		MPI_Allgather(&MAX_GRAD_VALUE, 1, MPI_FLOAT, max_grad_value_sync, 1, MPI_FLOAT, MPI_COMM_WORLD);
+		*/
+
+		//cout << max_grad_value_sync[GPU->MYRANK] << " vs. " << MAX_GRAD_VALUE << " and " << max_grad_value_sync[source] << endl;
+
+
 
 		GPU->compression_8bit(vec_w_grad_next[GPU->MYRANK],MAX_GRAD_VALUE,vec_w_grad_next_8bit[GPU->MYRANK]);
 		for (int i = 0; i < GPU->MPI_SIZE - 1; i++)
@@ -438,7 +440,7 @@ void Layer::weight_update()
 {
 	if(target){ return; }
 
-	if(PARALLELISM == ModelParallelism)
+	if(PARALLELISM != DataParallelism)
 		next->weight_update();
 	//float *data = (float*)malloc(sizeof(float)*100);
 
@@ -450,7 +452,8 @@ void Layer::weight_update()
 			//cout << "pre print" << endl;
 
 			//for(int i; i < 100; i++){ cout << data[i]  << endl;}
-			RMSprop_with_weight_update(w_rms_next,vec_w_grad_next[GPU->MYRANK],w_next,w_next,RMSPROP_MOMENTUM,LEARNING_RATE,out->rows*GPU->MPI_SIZE,MOMENTUM);
+			//RMSprop_with_weight_update(w_rms_next,vec_w_grad_next[GPU->MYRANK],w_next,w_next,RMSPROP_MOMENTUM,LEARNING_RATE,out->rows*GPU->MPI_SIZE,MOMENTUM);
+			RMSprop_with_weight_update(w_rms_next,vec_w_grad_next[GPU->MYRANK],w_next,w_next,RMSPROP_MOMENTUM,LEARNING_RATE,GPU->MPI_SIZE,MOMENTUM);
 			//cout << "post print" << endl;
 			//RMSprop_with_weight_update(b_rms_next,b_grad_next,b_next,b_next,RMSPROP_MOMENTUM,LEARNING_RATE/100.0f,out->rows,MOMENTUM);
 			//scalarMul(b_grad_next, LEARNING_RATE/float(out->rows*GPU->MPI_SIZE) ,b_grad_next);
